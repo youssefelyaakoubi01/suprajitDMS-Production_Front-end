@@ -1,0 +1,73 @@
+<div class="lessons-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Lessons Learned</h1>
+            <p class="page-subtitle">Document and share lessons from production</p>
+        </div>
+        <p-button label="Add Lesson" icon="pi pi-plus" (click)="openLessonDialog()"></p-button>
+    </div>
+
+    <!-- Lessons Grid -->
+    <div class="lessons-grid">
+        <p-card *ngFor="let lesson of lessons" [styleClass]="'lesson-card ' + lesson.type">
+            <ng-template pTemplate="header">
+                <div class="lesson-header">
+                    <p-tag [value]="getTypeLabel(lesson.type)" [severity]="getTypeSeverity(lesson.type)"></p-tag>
+                    <span class="lesson-date">{{ lesson.createdAt | date:'dd/MM/yyyy' }}</span>
+                </div>
+            </ng-template>
+
+            <div class="lesson-content">
+                <h3 class="lesson-title">{{ lesson.title }}</h3>
+                <p class="lesson-description">{{ lesson.description }}</p>
+
+                <div class="lesson-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Root Cause:</span>
+                        <span class="detail-value">{{ lesson.rootCause }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Actions:</span>
+                        <span class="detail-value">{{ lesson.actions }}</span>
+                    </div>
+                </div>
+
+                <div class="lesson-footer">
+                    <p-tag [value]="lesson.project" severity="info" [rounded]="true"></p-tag>
+                    <p-tag [value]="lesson.status" [severity]="lesson.status === 'closed' ? 'success' : 'warn'"></p-tag>
+                </div>
+            </div>
+        </p-card>
+    </div>
+</div>
+
+<p-dialog header="Add Lesson Learned" [(visible)]="showLessonDialog" [modal]="true" [style]="{ width: '600px' }">
+    <div class="dialog-form">
+        <div class="form-field">
+            <label>Type</label>
+            <p-select [options]="types" optionLabel="label" optionValue="value" placeholder="Select type" [style]="{ width: '100%' }"></p-select>
+        </div>
+        <div class="form-field">
+            <label>Title</label>
+            <input type="text" pInputText class="w-full" placeholder="Brief title" />
+        </div>
+        <div class="form-field">
+            <label>Description</label>
+            <textarea pTextarea rows="3" class="w-full" placeholder="What happened?"></textarea>
+        </div>
+        <div class="form-field">
+            <label>Root Cause</label>
+            <textarea pTextarea rows="2" class="w-full" placeholder="Why did it happen?"></textarea>
+        </div>
+        <div class="form-field">
+            <label>Actions Taken</label>
+            <textarea pTextarea rows="2" class="w-full" placeholder="What was done?"></textarea>
+        </div>
+    </div>
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" [text]="true" (click)="closeLessonDialog()"></p-button>
+        <p-button label="Save" (click)="closeLessonDialog()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<p-toast position="top-right"></p-toast>

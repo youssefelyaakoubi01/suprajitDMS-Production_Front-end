@@ -1,0 +1,27 @@
+.kpi-container { display: flex; flex-direction: column; gap: 1.5rem; }
+.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.page-subtitle { font-size: 0.875rem; color: var(--text-color-secondary); margin: 0.25rem 0 0 0; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+@media (max-width: 992px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 576px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+::ng-deep .kpi-card {
+    transition: all 0.3s;
+    &:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+    &.success { border-left: 4px solid var(--green-500); }
+    &.warn { border-left: 4px solid var(--yellow-500); }
+    &.danger { border-left: 4px solid var(--red-500); }
+}
+
+.kpi-content { display: flex; flex-direction: column; gap: 0.5rem; }
+.kpi-name { font-size: 0.875rem; font-weight: 500; color: var(--text-color-secondary); }
+.kpi-value-row { display: flex; align-items: baseline; gap: 0.25rem; }
+.kpi-value { font-size: 2rem; font-weight: 700; }
+.kpi-unit { font-size: 1rem; color: var(--text-color-secondary); }
+.kpi-target { font-size: 0.75rem; color: var(--text-color-secondary); }
+
+.card-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--surface-border); }
+.card-title { font-size: 1.125rem; font-weight: 600; margin: 0; }
+.chart-container { height: 300px; padding: 1rem; }

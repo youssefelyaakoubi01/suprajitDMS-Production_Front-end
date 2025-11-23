@@ -1,0 +1,22 @@
+<p-card [styleClass]="'kpi-card kpi-' + kpi.status">
+    <div class="kpi-content">
+        <div class="kpi-header">
+            <span class="kpi-label">{{ kpi.label }}</span>
+            <i [class]="kpi.icon + ' kpi-icon'"></i>
+        </div>
+
+        <div class="kpi-value-row">
+            <span class="kpi-value">{{ kpi.value }}</span>
+            <span class="kpi-unit">{{ kpi.unit }}</span>
+        </div>
+
+        <div class="kpi-footer">
+            <span class="kpi-target">Target: {{ kpi.target }}{{ kpi.unit }}</span>
+            <p-tag
+                [severity]="getTrendSeverity()"
+                [value]="(kpi.trend > 0 ? '+' : '') + kpi.trend + '%'"
+                [icon]="getTrendIcon()">
+            </p-tag>
+        </div>
+    </div>
+</p-card>

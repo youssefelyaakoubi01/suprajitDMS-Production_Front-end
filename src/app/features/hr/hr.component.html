@@ -1,0 +1,77 @@
+<div class="hr-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">HR & Employees</h1>
+            <p class="page-subtitle">Manage employees and qualifications</p>
+        </div>
+        <p-button label="Add Employee" icon="pi pi-plus"></p-button>
+    </div>
+
+    <p-tabs value="0">
+        <p-tablist>
+            <p-tab value="0">Employee Directory</p-tab>
+            <p-tab value="1">Qualification Matrix</p-tab>
+            <p-tab value="2">Attendance</p-tab>
+        </p-tablist>
+        <p-tabpanels>
+            <p-tabpanel value="0">
+                <div class="search-bar mt-4">
+                    <span class="p-input-icon-left">
+                        <i class="pi pi-search"></i>
+                        <input type="text" pInputText [(ngModel)]="searchTerm" placeholder="Search employees..." />
+                    </span>
+                </div>
+
+                <p-table [value]="filteredEmployees" [paginator]="true" [rows]="10" [rowHover]="true" class="mt-4">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Photo</th>
+                            <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
+                            <th>ID</th>
+                            <th pSortableColumn="Categorie_Emp">Category <p-sortIcon field="Categorie_Emp"></p-sortIcon></th>
+                            <th pSortableColumn="Departement_Emp">Department <p-sortIcon field="Departement_Emp"></p-sortIcon></th>
+                            <th>Hire Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-emp>
+                        <tr>
+                            <td><p-avatar [image]="emp.Picture" shape="circle" size="large"></p-avatar></td>
+                            <td><span class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span></td>
+                            <td>{{ emp.Id_Emp }}</td>
+                            <td>{{ emp.Categorie_Emp }}</td>
+                            <td>{{ emp.Departement_Emp }}</td>
+                            <td>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
+                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag></td>
+                            <td>
+                                <p-button icon="pi pi-eye" [rounded]="true" [text]="true" (click)="viewEmployee(emp)"></p-button>
+                                <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"></p-button>
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </p-tabpanel>
+
+            <p-tabpanel value="1">
+                <p-card class="mt-4">
+                    <div class="text-center p-4">
+                        <i class="pi pi-table text-4xl text-color-secondary mb-3"></i>
+                        <p>Qualification matrix will be displayed here</p>
+                    </div>
+                </p-card>
+            </p-tabpanel>
+
+            <p-tabpanel value="2">
+                <p-card class="mt-4">
+                    <div class="text-center p-4">
+                        <i class="pi pi-calendar text-4xl text-color-secondary mb-3"></i>
+                        <p>Attendance tracker will be displayed here</p>
+                    </div>
+                </p-card>
+            </p-tabpanel>
+        </p-tabpanels>
+    </p-tabs>
+</div>
+
+<p-toast position="top-right"></p-toast>

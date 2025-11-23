@@ -1,0 +1,21 @@
+<div class="production-line-card" (click)="onClick()">
+    <div class="line-info">
+        <div class="line-header">
+            <span class="line-name">{{ line.name }}</span>
+            <p-tag [severity]="getStatusSeverity()" [value]="getStatusLabel()"></p-tag>
+        </div>
+        <span class="line-project">Project: {{ line.project }}</span>
+    </div>
+
+    <div class="line-metrics">
+        <div class="metric">
+            <span class="metric-value">{{ line.efficiency }}%</span>
+            <span class="metric-label">Efficiency</span>
+        </div>
+        <div class="metric">
+            <span class="metric-value">{{ line.output }}/{{ line.target }}</span>
+            <span class="metric-label">Output/Target</span>
+        </div>
+        <i class="pi pi-chevron-right chevron-icon"></i>
+    </div>
+</div>

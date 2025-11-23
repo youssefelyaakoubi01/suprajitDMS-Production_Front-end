@@ -1,0 +1,32 @@
+.lessons-container { display: flex; flex-direction: column; gap: 1.5rem; }
+.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.page-subtitle { font-size: 0.875rem; color: var(--text-color-secondary); margin: 0.25rem 0 0 0; }
+
+.lessons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+@media (max-width: 1200px) { .lessons-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) { .lessons-grid { grid-template-columns: 1fr; } }
+
+::ng-deep .lesson-card {
+    transition: all 0.3s;
+    &:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+    &.good { border-top: 4px solid var(--green-500); }
+    &.bad { border-top: 4px solid var(--red-500); }
+    .p-card-header { padding: 1rem 1.5rem 0; }
+    .p-card-body { padding: 0; }
+    .p-card-content { padding: 1rem 1.5rem 1.5rem; }
+}
+
+.lesson-header { display: flex; justify-content: space-between; align-items: center; }
+.lesson-date { font-size: 0.75rem; color: var(--text-color-secondary); }
+.lesson-content { display: flex; flex-direction: column; gap: 0.75rem; }
+.lesson-title { font-size: 1rem; font-weight: 600; margin: 0; }
+.lesson-description { font-size: 0.875rem; color: var(--text-color-secondary); margin: 0; }
+.lesson-details { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; background: var(--surface-ground); border-radius: 8px; }
+.detail-item { display: flex; flex-direction: column; gap: 0.25rem; }
+.detail-label { font-size: 0.75rem; font-weight: 600; color: var(--text-color-secondary); }
+.detail-value { font-size: 0.875rem; }
+.lesson-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; }
+
+.dialog-form { display: flex; flex-direction: column; gap: 1rem; }
+.form-field { display: flex; flex-direction: column; gap: 0.5rem; label { font-weight: 500; } }

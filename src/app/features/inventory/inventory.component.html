@@ -1,0 +1,126 @@
+<div class="inventory-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Inventory Management</h1>
+            <p class="page-subtitle">Track and manage material inventory</p>
+        </div>
+        <div class="header-actions">
+            <p-button label="Add Entry" icon="pi pi-plus" (click)="openEntryDialog()"></p-button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <i class="pi pi-box summary-icon"></i>
+                <div class="summary-info">
+                    <span class="summary-value">{{ inventoryItems.length }}</span>
+                    <span class="summary-label">Total Items</span>
+                </div>
+            </div>
+        </p-card>
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <i class="pi pi-dollar summary-icon"></i>
+                <div class="summary-info">
+                    <span class="summary-value">{{ getTotalValue() | number:'1.2-2' }} €</span>
+                    <span class="summary-label">Total Value</span>
+                </div>
+            </div>
+        </p-card>
+        <p-card styleClass="summary-card warning">
+            <div class="summary-content">
+                <i class="pi pi-exclamation-triangle summary-icon"></i>
+                <div class="summary-info">
+                    <span class="summary-value">{{ getLowStockCount() }}</span>
+                    <span class="summary-label">Low Stock Items</span>
+                </div>
+            </div>
+        </p-card>
+    </div>
+
+    <!-- Inventory Table -->
+    <p-card>
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Inventory Items</h2>
+                <div class="search-box">
+                    <span class="p-input-icon-left">
+                        <i class="pi pi-search"></i>
+                        <input type="text" pInputText [(ngModel)]="searchTerm" placeholder="Search by PN or description..." />
+                    </span>
+                </div>
+            </div>
+        </ng-template>
+
+        <p-table [value]="filteredItems" [paginator]="true" [rows]="10" [rowHover]="true" [showCurrentPageReport]="true"
+                 currentPageReportTemplate="Showing {first} to {last} of {totalRecords} items">
+            <ng-template pTemplate="header">
+                <tr>
+                    <th pSortableColumn="PN">Part Number <p-sortIcon field="PN"></p-sortIcon></th>
+                    <th pSortableColumn="PNDESC">Description <p-sortIcon field="PNDESC"></p-sortIcon></th>
+                    <th>Unit</th>
+                    <th pSortableColumn="TOTALSTOCK">Stock <p-sortIcon field="TOTALSTOCK"></p-sortIcon></th>
+                    <th pSortableColumn="PRICE">Price <p-sortIcon field="PRICE"></p-sortIcon></th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-item>
+                <tr>
+                    <td><span class="font-semibold">{{ item.PN }}</span></td>
+                    <td>{{ item.PNDESC }}</td>
+                    <td>{{ item.UNIT }}</td>
+                    <td>
+                        <span class="stock-value">{{ item.TOTALSTOCK | number }}</span>
+                    </td>
+                    <td>{{ item.PRICE | number:'1.2-2' }} €</td>
+                    <td>
+                        <p-tag [severity]="getStockStatus(item)" [value]="getStockLabel(item)"></p-tag>
+                    </td>
+                    <td>
+                        <p-button icon="pi pi-eye" [rounded]="true" [text]="true"></p-button>
+                        <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"></p-button>
+                    </td>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="7" class="text-center p-4">No inventory items found</td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </p-card>
+</div>
+
+<!-- Add Entry Dialog -->
+<p-dialog header="Add Stock Entry" [(visible)]="showEntryDialog" [modal]="true" [style]="{ width: '500px' }">
+    <div class="dialog-form">
+        <div class="form-field">
+            <label>Part Number *</label>
+            <p-select [(ngModel)]="newEntry.PN" [options]="inventoryItems" optionLabel="PN" optionValue="PN"
+                        placeholder="Select Part" [style]="{ width: '100%' }"></p-select>
+        </div>
+        <div class="form-field">
+            <label>Quantity *</label>
+            <p-inputNumber [(ngModel)]="newEntry.QTY" [min]="1" [style]="{ width: '100%' }"></p-inputNumber>
+        </div>
+        <div class="form-field">
+            <label>Batch Number</label>
+            <input type="text" pInputText [(ngModel)]="newEntry.BATCHNO" class="w-full" />
+        </div>
+        <div class="form-field">
+            <label>Location</label>
+            <p-select [(ngModel)]="newEntry.AREA" [options]="locations" optionLabel="Name_Location" optionValue="Code_Location"
+                        placeholder="Select Location" [style]="{ width: '100%' }"></p-select>
+        </div>
+    </div>
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="closeEntryDialog()"></p-button>
+        <p-button label="Save" icon="pi pi-check" (click)="saveEntry()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<p-toast position="top-right"></p-toast>

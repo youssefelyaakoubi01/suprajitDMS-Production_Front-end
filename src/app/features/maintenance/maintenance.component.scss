@@ -1,0 +1,14 @@
+.maintenance-container { display: flex; flex-direction: column; gap: 1.5rem; }
+.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.page-subtitle { font-size: 0.875rem; color: var(--text-color-secondary); margin: 0.25rem 0 0 0; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+@media (max-width: 768px) { .summary-grid { grid-template-columns: 1fr; } }
+::ng-deep .summary-card { &.success { border-left: 4px solid var(--green-500); } &.warning { border-left: 4px solid var(--yellow-500); } &.danger { border-left: 4px solid var(--red-500); } }
+.summary-content { display: flex; flex-direction: column; align-items: center; padding: 1rem; }
+.summary-value { font-size: 2rem; font-weight: 700; }
+.summary-label { font-size: 0.875rem; color: var(--text-color-secondary); }
+.card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--surface-border); }
+.card-title { font-size: 1.125rem; font-weight: 600; margin: 0; }
+.dialog-form { display: flex; flex-direction: column; gap: 1rem; }
+.form-field { display: flex; flex-direction: column; gap: 0.5rem; label { font-weight: 500; } }
