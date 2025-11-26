@@ -172,6 +172,14 @@
                                 (click)="viewDetails(ticket)">
                             </p-button>
                             <p-button
+                                icon="pi pi-pencil"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="info"
+                                pTooltip="Edit Ticket"
+                                (click)="openEditDialog(ticket)">
+                            </p-button>
+                            <p-button
                                 *ngIf="ticket.Status !== 'Closed'"
                                 icon="pi pi-check"
                                 [rounded]="true"
@@ -188,6 +196,14 @@
                                 severity="info"
                                 pTooltip="Leader Confirm"
                                 (click)="confirmLeaderClose(ticket)">
+                            </p-button>
+                            <p-button
+                                icon="pi pi-trash"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="danger"
+                                pTooltip="Delete Ticket"
+                                (click)="confirmDelete(ticket)">
                             </p-button>
                         </div>
                     </td>
@@ -308,5 +324,146 @@
         <p-button label="Close Ticket" icon="pi pi-check" severity="success" (click)="closeTicket()"></p-button>
     </ng-template>
 </p-dialog>
+
+<!-- Edit Ticket Dialog -->
+<p-dialog
+    header="Edit Ticket"
+    [(visible)]="showEditDialog"
+    [modal]="true"
+    [style]="{ width: '700px' }"
+    [draggable]="false"
+    [resizable]="false">
+    <div class="edit-dialog-content" *ngIf="selectedTicket && editForm">
+        <div class="edit-header">
+            <p-tag [value]="selectedTicket.TicketNo" severity="info"></p-tag>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="editZone">Zone *</label>
+                <input
+                    id="editZone"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="editForm.Zone"
+                    class="w-full">
+            </div>
+
+            <div class="form-field">
+                <label for="editProject">Impacted Project *</label>
+                <input
+                    id="editProject"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="editForm.ImpactedProject"
+                    class="w-full">
+            </div>
+
+            <div class="form-field">
+                <label for="editMachine">Impacted Machine *</label>
+                <input
+                    id="editMachine"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="editForm.ImpactedMachine"
+                    class="w-full">
+            </div>
+
+            <div class="form-field">
+                <label for="editStatus">Status</label>
+                <p-select
+                    id="editStatus"
+                    [(ngModel)]="editForm.Status"
+                    [options]="[{label: 'Open', value: 'Open'}, {label: 'In Progress', value: 'In Progress'}, {label: 'Closed', value: 'Closed'}]"
+                    optionLabel="label"
+                    optionValue="value"
+                    [style]="{ width: '100%' }">
+                </p-select>
+            </div>
+
+            <div class="form-field">
+                <label for="editPriority">Priority</label>
+                <p-select
+                    id="editPriority"
+                    [(ngModel)]="editForm.Priority"
+                    [options]="[{label: 'Low', value: 'Low'}, {label: 'Medium', value: 'Medium'}, {label: 'High', value: 'High'}, {label: 'Critical', value: 'Critical'}]"
+                    optionLabel="label"
+                    optionValue="value"
+                    [style]="{ width: '100%' }">
+                </p-select>
+            </div>
+
+            <div class="form-field">
+                <label for="editDuration">Duration (minutes)</label>
+                <p-inputNumber
+                    id="editDuration"
+                    [(ngModel)]="editForm.DowntimeDuration"
+                    [min]="0"
+                    suffix=" min"
+                    [style]="{ width: '100%' }">
+                </p-inputNumber>
+            </div>
+
+            <div class="form-field">
+                <label for="editStartTime">Downtime Start</label>
+                <p-datepicker
+                    id="editStartTime"
+                    [(ngModel)]="editForm.DowntimeStartsAt"
+                    [showTime]="true"
+                    [showIcon]="true"
+                    dateFormat="dd/mm/yy"
+                    [style]="{ width: '100%' }">
+                </p-datepicker>
+            </div>
+
+            <div class="form-field">
+                <label for="editAssignedTo">Assigned To</label>
+                <input
+                    id="editAssignedTo"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="editForm.AssignedTo"
+                    class="w-full">
+            </div>
+        </div>
+
+        <div class="form-field full-width">
+            <label for="editDescription">Description</label>
+            <textarea
+                id="editDescription"
+                pTextarea
+                [(ngModel)]="editForm.Description"
+                rows="3"
+                class="w-full"
+                placeholder="Describe the downtime issue...">
+            </textarea>
+        </div>
+
+        <div class="form-field full-width" *ngIf="editForm.Status === 'Closed'">
+            <label for="editResolution">Resolution</label>
+            <textarea
+                id="editResolution"
+                pTextarea
+                [(ngModel)]="editForm.Resolution"
+                rows="3"
+                class="w-full"
+                placeholder="Describe the resolution...">
+            </textarea>
+        </div>
+    </div>
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showEditDialog = false"></p-button>
+        <p-button label="Save Changes" icon="pi pi-check" (click)="saveEdit()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<p-confirmDialog [style]="{ width: '450px' }">
+    <ng-template pTemplate="message" let-message>
+        <div class="confirm-message">
+            <i class="pi pi-exclamation-triangle confirm-icon"></i>
+            <span [innerHTML]="message.message"></span>
+        </div>
+    </ng-template>
+</p-confirmDialog>
 
 <p-toast position="top-right"></p-toast>

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import {
     Project,
     ProductionLine,
@@ -12,76 +12,127 @@ import {
     Downtime
 } from '../../core/models';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
+import { ProductionService as CoreProductionService } from '../../core/services/production.service';
 
 @Injectable({
     providedIn: 'root'
 })
 export class ProductionService {
+    constructor(private coreService: CoreProductionService) {}
+
     getShifts(): Observable<Shift[]> {
-        return of([
-            { id: 'morning', name: 'Morning', startHour: 6, endHour: 14 },
-            { id: 'evening', name: 'Evening', startHour: 14, endHour: 22 },
-            { id: 'night', name: 'Night', startHour: 22, endHour: 6 }
-        ]).pipe(delay(200));
+        return this.coreService.getShifts().pipe(
+            map((response: any) => {
+                const shifts = response.results || response;
+                return shifts.map((shift: any) => ({
+                    id: shift.id,  // Use numeric ID from Django
+                    name: shift.name,
+                    startHour: this.parseTimeToHour(shift.start_time),
+                    endHour: this.parseTimeToHour(shift.end_time)
+                }));
+            })
+        );
+    }
+
+    getShiftsByProductionLine(productionLineId: number): Observable<Shift[]> {
+        return this.coreService.getShiftsByProductionLine(productionLineId).pipe(
+            map((response: any) => {
+                const shifts = response.results || response;
+                return shifts.map((shift: any) => ({
+                    id: shift.id,
+                    name: shift.name,
+                    startHour: this.parseTimeToHour(shift.start_time),
+                    endHour: this.parseTimeToHour(shift.end_time)
+                }));
+            })
+        );
+    }
+
+    private parseTimeToHour(timeString: string): number {
+        if (!timeString) return 0;
+        const parts = timeString.split(':');
+        return parseInt(parts[0], 10);
     }
 
     getProjects(): Observable<Project[]> {
-        return of([
-            { Id_Project: 1, Name_Project: 'VW Handle Assy', Code_Project: 'VW-HA', Status_Project: 'Active' },
-            { Id_Project: 2, Name_Project: 'HÖRMANN', Code_Project: 'HOR', Status_Project: 'Active' },
-            { Id_Project: 3, Name_Project: 'WITTE', Code_Project: 'WIT', Status_Project: 'Active' },
-            { Id_Project: 4, Name_Project: 'Grammer', Code_Project: 'GRM', Status_Project: 'Active' }
-        ]).pipe(delay(300));
+        return this.coreService.getProjects().pipe(
+            map((response: any) => {
+                const projects = response.results || response;
+                return projects.map((p: any) => ({
+                    Id_Project: p.id,
+                    Name_Project: p.name,
+                    Code_Project: p.code,
+                    Status_Project: p.is_active ? 'Active' : 'Inactive'
+                }));
+            })
+        );
     }
 
     getProductionLines(projectId?: number): Observable<ProductionLine[]> {
-        const lines: ProductionLine[] = [
-            { id: 1, name: 'VW Handle Assy Line 1', project: 'VW Handle Assy', projectId: 1, status: 'running', efficiency: 97.2, output: 412, target: 424 },
-            { id: 2, name: 'VW Handle Assy Line 2', project: 'VW Handle Assy', projectId: 1, status: 'running', efficiency: 95.8, output: 380, target: 400 },
-            { id: 3, name: 'HÖRMANN Line 1', project: 'HÖRMANN', projectId: 2, status: 'running', efficiency: 92.5, output: 185, target: 200 },
-            { id: 4, name: 'WITTE Assembly Line', project: 'WITTE', projectId: 3, status: 'setup', efficiency: 0, output: 0, target: 300 },
-            { id: 5, name: 'Grammer Line 1', project: 'Grammer', projectId: 4, status: 'downtime', efficiency: 82, output: 164, target: 200 }
-        ];
-
-        const filtered = projectId ? lines.filter(l => l.projectId === projectId) : lines;
-        return of(filtered).pipe(delay(300));
+        return this.coreService.getProductionLines(projectId).pipe(
+            map((response: any) => {
+                const lines = response.results || response;
+                return lines.map((line: any) => ({
+                    id: line.id,
+                    name: line.name,
+                    project: line.project_name || line.project,
+                    projectId: line.project,
+                    status: line.status,
+                    efficiency: 0, // TODO: Calculate from hourly production
+                    output: 0, // TODO: Calculate from hourly production
+                    target: line.capacity || 0
+                }));
+            })
+        );
     }
 
     getParts(projectId?: number): Observable<Part[]> {
-        const parts: Part[] = [
-            { Id_Part: 1, PN_Part: 'VW-HA-001', Id_Project: 1, ShiftTarget_Part: 424, ScrapTarget_Part: 8, Price_Part: 2.50, Efficiency: 95, MATSTATUS: 'Active' },
-            { Id_Part: 2, PN_Part: 'VW-HA-002', Id_Project: 1, ShiftTarget_Part: 400, ScrapTarget_Part: 6, Price_Part: 2.75, Efficiency: 92, MATSTATUS: 'Active' },
-            { Id_Part: 3, PN_Part: 'HOR-001', Id_Project: 2, ShiftTarget_Part: 200, ScrapTarget_Part: 4, Price_Part: 3.00, Efficiency: 90, MATSTATUS: 'Active' },
-            { Id_Part: 4, PN_Part: 'WIT-001', Id_Project: 3, ShiftTarget_Part: 300, ScrapTarget_Part: 5, Price_Part: 1.80, Efficiency: 88, MATSTATUS: 'Active' },
-            { Id_Part: 5, PN_Part: 'GRM-001', Id_Project: 4, ShiftTarget_Part: 200, ScrapTarget_Part: 3, Price_Part: 4.50, Efficiency: 93, MATSTATUS: 'Active' }
-        ];
-
-        const filtered = projectId ? parts.filter(p => p.Id_Project === projectId) : parts;
-        return of(filtered).pipe(delay(300));
+        return this.coreService.getParts(projectId).pipe(
+            map((response: any) => {
+                const parts = response.results || response;
+                return parts.map((p: any) => ({
+                    Id_Part: p.id,
+                    PN_Part: p.part_number,
+                    Id_Project: p.project,
+                    ShiftTarget_Part: p.shift_target || 0,
+                    ScrapTarget_Part: 0, // TODO: Add to Django model
+                    Price_Part: parseFloat(p.price) || 0,
+                    Efficiency: p.efficiency || 0,
+                    MATSTATUS: p.material_status || 'active'
+                }));
+            })
+        );
     }
 
     getWorkstations(lineId?: number): Observable<Workstation[]> {
-        return of([
-            { Id_Workstation: 1, Name_Workstation: 'Assembly Station 1', Code_Workstation: 'ASB-001', Id_ProdLine: 1 },
-            { Id_Workstation: 2, Name_Workstation: 'Assembly Station 2', Code_Workstation: 'ASB-002', Id_ProdLine: 1 },
-            { Id_Workstation: 3, Name_Workstation: 'Packaging Station', Code_Workstation: 'PKG-001', Id_ProdLine: 1 },
-            { Id_Workstation: 4, Name_Workstation: 'Quality Check', Code_Workstation: 'QC-001', Id_ProdLine: 1 }
-        ]).pipe(delay(300));
+        return this.coreService.getWorkstations(lineId).pipe(
+            map((response: any) => {
+                const workstations = response.results || response;
+                return workstations.map((w: any) => ({
+                    Id_Workstation: w.id,
+                    Name_Workstation: w.name,
+                    Code_Workstation: w.code,
+                    Id_ProdLine: w.production_line
+                }));
+            })
+        );
     }
 
-    getHours(shiftId?: string): Observable<{ label: string; value: number; startTime: string; endTime: string; isOvertime: boolean }[]> {
-        // Shift timings based on 24/7 operation
-        const shiftStartHours: Record<string, number> = {
-            morning: 6,   // 06:00 - 14:00
-            evening: 14,  // 14:00 - 22:00
-            night: 22     // 22:00 - 06:00
-        };
+    getHours(shift?: Shift): Observable<{ label: string; value: number; startTime: string; endTime: string; isOvertime: boolean }[]> {
+        // Use shift's actual start and end hours from database
+        const startHour = shift?.startHour ?? 6;
+        const endHour = shift?.endHour ?? 14;
 
-        const startHour = shiftStartHours[shiftId || 'morning'] || 6;
+        // Calculate shift duration (handle overnight shifts)
+        let shiftDuration = endHour - startHour;
+        if (shiftDuration <= 0) {
+            shiftDuration += 24; // Overnight shift (e.g., 22:00 - 07:00 = 9 hours)
+        }
+
         const hours = [];
 
-        // Regular 8 hours
-        for (let i = 0; i < 8; i++) {
+        // Generate hours based on actual shift duration
+        for (let i = 0; i < shiftDuration; i++) {
             const hourStart = (startHour + i) % 24;
             const hourEnd = (startHour + i + 1) % 24;
             hours.push({
@@ -93,19 +144,6 @@ export class ProductionService {
             });
         }
 
-        // Overtime hours (H9, H10, H11, H12)
-        for (let i = 8; i < 12; i++) {
-            const hourStart = (startHour + i) % 24;
-            const hourEnd = (startHour + i + 1) % 24;
-            hours.push({
-                label: `H${i + 1} OT (${this.formatHour(hourStart)} - ${this.formatHour(hourEnd)})`,
-                value: i + 1,
-                startTime: this.formatHour(hourStart),
-                endTime: this.formatHour(hourEnd),
-                isOvertime: true
-            });
-        }
-
         return of(hours);
     }
 
@@ -114,74 +152,235 @@ export class ProductionService {
     }
 
     getDowntimeProblems(): Observable<DowntimeProblem[]> {
-        return of([
-            { Id_DowntimeProblems: 1, Name_DowntimeProblems: 'Machine Breakdown', Category_DowntimeProblems: 'Technical' },
-            { Id_DowntimeProblems: 2, Name_DowntimeProblems: 'Material Shortage', Category_DowntimeProblems: 'Supply' },
-            { Id_DowntimeProblems: 3, Name_DowntimeProblems: 'Changeover', Category_DowntimeProblems: 'Process' },
-            { Id_DowntimeProblems: 4, Name_DowntimeProblems: 'Quality Issue', Category_DowntimeProblems: 'Quality' },
-            { Id_DowntimeProblems: 5, Name_DowntimeProblems: 'Operator Absence', Category_DowntimeProblems: 'HR' },
-            { Id_DowntimeProblems: 6, Name_DowntimeProblems: 'Other', Category_DowntimeProblems: 'Other' }
-        ]).pipe(delay(200));
+        return this.coreService.getDowntimeProblems().pipe(
+            map((response: any) => {
+                const problems = response.results || response;
+                return problems.map((p: any) => ({
+                    Id_DowntimeProblems: p.id,
+                    Name_DowntimeProblems: p.name,
+                    Category_DowntimeProblems: p.category
+                }));
+            })
+        );
     }
 
     getAssignedEmployees(hourlyProdId?: number): Observable<EmployeeWithAssignment[]> {
-        return of([
-            {
-                Id_Emp: 54,
-                Nom_Emp: 'ELBOURIANY',
-                Prenom_Emp: 'WISSAL',
-                DateNaissance_Emp: new Date('1990-05-15'),
-                Genre_Emp: 'F',
-                Categorie_Emp: 'Operator',
-                DateEmbauche_Emp: new Date('2020-03-01'),
-                Departement_Emp: 'Production',
-                Picture: 'assets/images/avatar-default.png',
-                EmpStatus: 'Active',
-                workstation: 'Assembly Station 1',
-                qualification: 'Level 3',
-                qualificationLevel: 3
-            },
-            {
-                Id_Emp: 55,
-                Nom_Emp: 'BENALI',
-                Prenom_Emp: 'AHMED',
-                DateNaissance_Emp: new Date('1988-08-20'),
-                Genre_Emp: 'M',
-                Categorie_Emp: 'Operator',
-                DateEmbauche_Emp: new Date('2019-06-15'),
-                Departement_Emp: 'Production',
-                Picture: 'assets/images/avatar-default.png',
-                EmpStatus: 'Active',
-                workstation: 'Assembly Station 2',
-                qualification: 'Level 4',
-                qualificationLevel: 4
-            }
-        ]).pipe(delay(300));
+        return this.coreService.getTeamAssignments(hourlyProdId).pipe(
+            map((response: any) => {
+                const assignments = response.results || response;
+                return assignments.map((a: any) => ({
+                    Id_Emp: a.employee?.id || a.employee,
+                    Nom_Emp: a.employee?.last_name || '',
+                    Prenom_Emp: a.employee?.first_name || '',
+                    DateNaissance_Emp: a.employee?.birth_date ? new Date(a.employee.birth_date) : new Date(),
+                    Genre_Emp: a.employee?.gender || 'M',
+                    Categorie_Emp: a.employee?.category || 'Operator',
+                    DateEmbauche_Emp: a.employee?.hire_date ? new Date(a.employee.hire_date) : new Date(),
+                    Departement_Emp: a.employee?.department || 'Production',
+                    Picture: a.employee?.picture || 'assets/images/avatar-default.png',
+                    EmpStatus: a.employee?.status || 'active',
+                    workstation: a.workstation?.name || '',
+                    qualification: '', // TODO: Get from qualifications
+                    qualificationLevel: 0
+                }));
+            })
+        );
     }
 
-    saveHourlyProduction(data: Partial<HourlyProduction>): Observable<HourlyProduction> {
-        return of({
-            Id_HourlyProd: Math.floor(Math.random() * 10000),
-            Date_HourlyProd: new Date(),
-            Shift_HourlyProd: 'morning',
-            Hour_HourlyProd: 1,
-            Id_Part: 1,
-            Result_HourlyProdPN: 0,
-            Target_HourlyProdPN: 53,
-            HC_HourlyProdPN: 2,
-            Id_ProdLine: 1,
-            ...data
-        } as HourlyProduction).pipe(delay(500));
+    getTeamAssignments(hourlyProdId: number): Observable<any[]> {
+        return this.coreService.getTeamAssignments(hourlyProdId).pipe(
+            map((response: any) => {
+                const assignments = response.results || response;
+                return assignments.map((a: any) => ({
+                    Id_Assignment: a.id,
+                    Id_Emp: a.employee?.id || a.employee,
+                    Id_Workstation: a.workstation?.id || a.workstation,
+                    Id_HourlyProd: a.hourly_production
+                }));
+            })
+        );
+    }
+
+    getDowntimes(hourlyProdId: number): Observable<Downtime[]> {
+        return this.coreService.getDowntimes(hourlyProdId).pipe(
+            map((response: any) => {
+                const downtimes = response.results || response;
+                return downtimes.map((d: any) => ({
+                    Id_Downtime: d.id,
+                    Total_Downtime: d.duration,
+                    Comment_Downtime: d.comment,
+                    Id_HourlyProd: d.hourly_production,
+                    Id_DowntimeProblems: d.problem,
+                    problem_name: d.problem_name
+                }));
+            })
+        );
+    }
+
+    saveHourlyProduction(data: Partial<HourlyProduction> & { hour_type?: string; order_no?: string; line_leader?: string; quality_agent?: string; maintenance_tech?: string; pqc?: string }): Observable<HourlyProduction> {
+        // Map front-end field names to Django API field names
+        const apiData: any = {
+            date: data.Date_HourlyProd instanceof Date
+                ? data.Date_HourlyProd.toISOString().split('T')[0]
+                : data.Date_HourlyProd,
+            shift: typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd,
+            hour: data.Hour_HourlyProd,
+            hour_type: data.hour_type || 'normal',
+            part: data.Id_Part,
+            production_line: data.Id_ProdLine,
+            result: data.Result_HourlyProdPN || 0,
+            target: data.Target_HourlyProdPN || 0,
+            headcount: data.HC_HourlyProdPN || 0,
+            // Order Number
+            order_no: data.order_no || '',
+            // Production Supervisors & Key Personnel
+            line_leader: data.line_leader || '',
+            quality_agent: data.quality_agent || '',
+            maintenance_tech: data.maintenance_tech || '',
+            pqc: data.pqc || ''
+        };
+
+        console.log('saveHourlyProduction - Input data:', data);
+        console.log('saveHourlyProduction - API data being sent:', apiData);
+
+        if (data.Id_HourlyProd) {
+            return this.coreService.updateHourlyProduction(data.Id_HourlyProd, apiData);
+        } else {
+            return this.coreService.createHourlyProduction(apiData);
+        }
+    }
+
+    updateHourlyProduction(id: number, data: Partial<HourlyProduction> & { hour_type?: string; order_no?: string; line_leader?: string; quality_agent?: string; maintenance_tech?: string; pqc?: string }): Observable<HourlyProduction> {
+        // Map front-end field names to Django API field names
+        const apiData: any = {
+            date: data.Date_HourlyProd instanceof Date
+                ? data.Date_HourlyProd.toISOString().split('T')[0]
+                : data.Date_HourlyProd,
+            shift: typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd,
+            hour: data.Hour_HourlyProd,
+            hour_type: data.hour_type || 'normal',
+            part: data.Id_Part,
+            production_line: data.Id_ProdLine,
+            result: data.Result_HourlyProdPN || 0,
+            target: data.Target_HourlyProdPN || 0,
+            headcount: data.HC_HourlyProdPN || 0,
+            // Order Number
+            order_no: data.order_no || '',
+            // Production Supervisors & Key Personnel
+            line_leader: data.line_leader || '',
+            quality_agent: data.quality_agent || '',
+            maintenance_tech: data.maintenance_tech || '',
+            pqc: data.pqc || ''
+        };
+
+        return this.coreService.updateHourlyProduction(id, apiData);
     }
 
     saveDowntime(data: Partial<Downtime>): Observable<Downtime> {
-        return of({
-            Id_Downtime: Math.floor(Math.random() * 10000),
-            Total_Downtime: 0,
-            Comment_Downtime: '',
-            Id_HourlyProd: 1,
-            Id_DowntimeProblems: 1,
-            ...data
-        } as Downtime).pipe(delay(500));
+        // Map front-end field names to Django API field names
+        let hourlyProductionValue: any;
+
+        // Handle different formats of hourly production ID
+        if (typeof data.Id_HourlyProd === 'object' && data.Id_HourlyProd !== null) {
+            // If it's an object with date/shift/hour, we need to send those fields
+            const obj = data.Id_HourlyProd as any;
+            console.log('Id_HourlyProd is an object:', obj);
+
+            // Try to extract a numeric ID if it exists
+            hourlyProductionValue = obj.id || obj.Id_HourlyProd || obj.production_id;
+
+            // If no ID found, send the composite key parts
+            if (!hourlyProductionValue) {
+                console.warn('No ID found in object, using date/shift/hour lookup');
+                // Backend should support this format or we need to fetch the ID first
+                hourlyProductionValue = obj.date && obj.shift && obj.hour ?
+                    { date: obj.date, shift: obj.shift, hour: obj.hour } : null;
+            }
+        } else {
+            hourlyProductionValue = data.Id_HourlyProd;
+        }
+
+        const apiData: any = {
+            duration: data.Total_Downtime,
+            comment: data.Comment_Downtime,
+            problem: data.Id_DowntimeProblems,
+            hourly_production: hourlyProductionValue
+        };
+
+        console.log('Downtime API data being sent:', apiData);
+
+        if (data.Id_Downtime) {
+            return this.coreService.updateDowntime(data.Id_Downtime, apiData);
+        } else {
+            return this.coreService.createDowntime(apiData);
+        }
+    }
+
+    getHourlyProductions(params?: {
+        date?: string;
+        shift?: string | number;
+        hour?: number;
+        lineId?: number;
+        partId?: number;
+    }): Observable<HourlyProduction[]> {
+        // Map front-end parameter names to Django API parameter names
+        const apiParams: any = {};
+        if (params?.date) apiParams.date = params.date;
+        if (params?.shift) apiParams.shift = params.shift;
+        if (params?.hour !== undefined) apiParams.hour = params.hour;
+        if (params?.lineId) apiParams.production_line = params.lineId;  // Django expects 'production_line'
+        if (params?.partId) apiParams.part = params.partId;  // Django expects 'part'
+
+        return this.coreService.getHourlyProduction(apiParams).pipe(
+            map((response: any) => {
+                const productions = response.results || response;
+                return productions.map((p: any) => ({
+                    Id_HourlyProd: p.id,
+                    Date_HourlyProd: new Date(p.date),
+                    Shift_HourlyProd: p.shift,
+                    Hour_HourlyProd: p.hour,
+                    Id_Part: p.part,
+                    Result_HourlyProdPN: p.result,
+                    Target_HourlyProdPN: p.target,
+                    HC_HourlyProdPN: p.headcount,
+                    Id_ProdLine: p.production_line,
+                    // Additional fields for display
+                    shiftName: p.shift_name,
+                    projectName: p.project_name,
+                    lineName: p.line_name,
+                    partNumber: p.part_number
+                }));
+            })
+        );
+    }
+
+    getHourlyProductionById(id: number): Observable<HourlyProduction> {
+        return this.coreService.getHourlyProductionById(id).pipe(
+            map((p: any) => ({
+                Id_HourlyProd: p.id,
+                Date_HourlyProd: new Date(p.date),
+                Shift_HourlyProd: p.shift,
+                Hour_HourlyProd: p.hour,
+                Id_Part: p.part,
+                Result_HourlyProdPN: p.result,
+                Target_HourlyProdPN: p.target,
+                HC_HourlyProdPN: p.headcount,
+                Id_ProdLine: p.production_line
+            }))
+        );
+    }
+
+    deleteHourlyProduction(id: number): Observable<void> {
+        return this.coreService.deleteHourlyProduction(id);
+    }
+
+    createTeamAssignment(assignment: { hourly_production: number; employee: number; workstation: number }): Observable<any> {
+        // The core service expects TeamAssignment interface, but we're sending API format
+        // Cast to any to bypass type checking since we're sending directly to API
+        return this.coreService.createTeamAssignment(assignment as any);
+    }
+
+    deleteTeamAssignment(id: number): Observable<void> {
+        return this.coreService.deleteTeamAssignment(id);
     }
 }

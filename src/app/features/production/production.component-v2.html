@@ -149,19 +149,6 @@
                             [style]="{ width: '100%' }">
                         </p-select>
                     </div>
-
-                    <div class="form-field">
-                        <label for="orderNo">Order NO</label>
-                        <input
-                            id="orderNo"
-                            type="text"
-                            pInputText
-                            [(ngModel)]="session.orderNo"
-                            [ngModelOptions]="{standalone: true}"
-                            (ngModelChange)="onOrderNoChange()"
-                            placeholder="Enter Order Number"
-                            class="w-full">
-                    </div>
                 </div>
 
                 <div class="form-actions">
@@ -195,10 +182,6 @@
             <div class="summary-item">
                 <span class="summary-label">Part:</span>
                 <span class="summary-value">{{ session.part?.PN_Part }}</span>
-            </div>
-            <div class="summary-item" *ngIf="session.orderNo">
-                <span class="summary-label">Order NO:</span>
-                <span class="summary-value">{{ session.orderNo }}</span>
             </div>
         </div>
     </p-card>
@@ -311,19 +294,19 @@
                 <div class="actors-grid">
                     <div class="form-field">
                         <label for="lineLeader"><i class="pi pi-user"></i> Line Leader</label>
-                        <input id="lineLeader" type="text" pInputText [(ngModel)]="session.actors.lineLeader" (ngModelChange)="onActorChange()" placeholder="Scan Line Leader badge" class="w-full">
+                        <input id="lineLeader" type="text" pInputText [(ngModel)]="session.actors.lineLeader" placeholder="Scan Line Leader badge" class="w-full">
                     </div>
                     <div class="form-field">
                         <label for="qualityAgent"><i class="pi pi-check-circle"></i> Quality Agent</label>
-                        <input id="qualityAgent" type="text" pInputText [(ngModel)]="session.actors.qualityAgent" (ngModelChange)="onActorChange()" placeholder="Scan Quality Agent badge" class="w-full">
+                        <input id="qualityAgent" type="text" pInputText [(ngModel)]="session.actors.qualityAgent" placeholder="Scan Quality Agent badge" class="w-full">
                     </div>
                     <div class="form-field">
                         <label for="maintenanceTech"><i class="pi pi-wrench"></i> Maintenance Tech</label>
-                        <input id="maintenanceTech" type="text" pInputText [(ngModel)]="session.actors.maintenanceTech" (ngModelChange)="onActorChange()" placeholder="Scan Maintenance Tech badge" class="w-full">
+                        <input id="maintenanceTech" type="text" pInputText [(ngModel)]="session.actors.maintenanceTech" placeholder="Scan Maintenance Tech badge" class="w-full">
                     </div>
                     <div class="form-field">
                         <label for="pqc"><i class="pi pi-shield"></i> PQC</label>
-                        <input id="pqc" type="text" pInputText [(ngModel)]="session.actors.pqc" (ngModelChange)="onActorChange()" placeholder="Scan PQC badge" class="w-full">
+                        <input id="pqc" type="text" pInputText [(ngModel)]="session.actors.pqc" placeholder="Scan PQC badge" class="w-full">
                     </div>
                 </div>
             </div>
@@ -374,7 +357,6 @@
                 <tr>
                     <th style="width: 80px">Hour</th>
                     <th style="width: 150px">Time Range</th>
-                    <th style="width: 140px">Type</th>
                     <th style="width: 120px">Status</th>
                     <th style="width: 100px">Output</th>
                     <th style="width: 100px">Target</th>
@@ -394,30 +376,6 @@
                     </td>
                     <td>
                         <span class="time-range">{{ hour.timeRange }}</span>
-                    </td>
-                    <td>
-                        <p-select
-                            [options]="hourTypeOptions"
-                            [(ngModel)]="hour.hourType"
-                            (ngModelChange)="onHourTypeChange(i, $event)"
-                            optionLabel="label"
-                            optionValue="value"
-                            [style]="{ width: '130px' }"
-                            appendTo="body">
-                            <ng-template pTemplate="selectedItem" let-selected>
-                                <p-tag
-                                    *ngIf="selected"
-                                    [value]="selected.label"
-                                    [severity]="getHourTypeSeverity(selected.value)">
-                                </p-tag>
-                            </ng-template>
-                            <ng-template pTemplate="item" let-option>
-                                <p-tag
-                                    [value]="option.label"
-                                    [severity]="getHourTypeSeverity(option.value)">
-                                </p-tag>
-                            </ng-template>
-                        </p-select>
                     </td>
                     <td>
                         <p-tag
@@ -463,9 +421,9 @@
                                 (click)="openHourDialog(i)">
                             </p-button>
                             <p-button
-                                *ngIf="hour.status === 'completed' && hour.hourlyProductionId"
+                                *ngIf="hour.status === 'completed'"
                                 icon="pi pi-clock"
-                                severity="warn"
+                                severity="warning"
                                 size="small"
                                 [text]="true"
                                 pTooltip="Add Downtime"
@@ -477,7 +435,7 @@
             </ng-template>
             <ng-template pTemplate="emptymessage">
                 <tr>
-                    <td colspan="10" class="text-center">
+                    <td colspan="9" class="text-center">
                         <div class="empty-state">
                             <i class="pi pi-clock empty-icon"></i>
                             <p class="empty-title">No hours configured</p>
@@ -524,14 +482,14 @@
 
 <!-- HOUR PRODUCTION DIALOG -->
 <p-dialog
-    header="Enter Production - Hour {{ selectedHourIndex !== null && session.hours[selectedHourIndex] ? session.hours[selectedHourIndex].hour : '' }}"
+    header="Enter Production - Hour {{ selectedHourIndex !== null ? session.hours[selectedHourIndex].hour : '' }}"
     [(visible)]="showHourDialog"
     [modal]="true"
     [style]="{ width: '600px' }"
     [draggable]="false"
     [resizable]="false">
 
-    <div class="dialog-content" *ngIf="selectedHourIndex !== null && session.hours[selectedHourIndex]">
+    <div class="dialog-content" *ngIf="selectedHourIndex !== null">
         <div class="dialog-header-info">
             <div class="info-item">
                 <i class="pi pi-clock"></i>
@@ -594,7 +552,7 @@
                     <label for="downtimeDuration">Duration (minutes) *</label>
                     <p-inputNumber
                         id="downtimeDuration"
-                        [(ngModel)]="hourProductionInput.downtime!.duration"
+                        [(ngModel)]="hourProductionInput.downtime.duration"
                         [min]="1"
                         suffix=" min"
                         [style]="{ width: '100%' }">
@@ -605,12 +563,11 @@
                     <label for="downtimeProblem">Problem Category *</label>
                     <p-select
                         id="downtimeProblem"
-                        [(ngModel)]="hourProductionInput.downtime!.problemId"
+                        [(ngModel)]="hourProductionInput.downtime.problemId"
                         [options]="downtimeProblems"
                         optionLabel="Name_DowntimeProblems"
                         optionValue="Id_DowntimeProblems"
                         placeholder="Select Problem"
-                        appendTo="body"
                         [style]="{ width: '100%' }">
                     </p-select>
                 </div>
@@ -621,7 +578,7 @@
                 <textarea
                     id="downtimeComment"
                     pTextarea
-                    [(ngModel)]="hourProductionInput.downtime!.comment"
+                    [(ngModel)]="hourProductionInput.downtime.comment"
                     rows="3"
                     class="w-full"
                     placeholder="Describe the downtime issue and actions taken...">
@@ -671,7 +628,6 @@
                 optionLabel="Name_DowntimeProblems"
                 optionValue="Id_DowntimeProblems"
                 placeholder="Select Problem"
-                appendTo="body"
                 [style]="{ width: '100%' }">
             </p-select>
         </div>

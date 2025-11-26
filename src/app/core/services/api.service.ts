@@ -11,6 +11,10 @@ export class ApiService {
 
     constructor(private http: HttpClient) {}
 
+    private ensureTrailingSlash(endpoint: string): string {
+        return endpoint.endsWith('/') ? endpoint : `${endpoint}/`;
+    }
+
     get<T>(endpoint: string, params?: Record<string, string | number | boolean>): Observable<T> {
         let httpParams = new HttpParams();
         if (params) {
@@ -18,22 +22,22 @@ export class ApiService {
                 httpParams = httpParams.set(key, String(params[key]));
             });
         }
-        return this.http.get<T>(`${this.apiUrl}/${endpoint}`, { params: httpParams });
+        return this.http.get<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, { params: httpParams });
     }
 
     post<T>(endpoint: string, body: unknown): Observable<T> {
-        return this.http.post<T>(`${this.apiUrl}/${endpoint}`, body);
+        return this.http.post<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, body);
     }
 
     put<T>(endpoint: string, body: unknown): Observable<T> {
-        return this.http.put<T>(`${this.apiUrl}/${endpoint}`, body);
+        return this.http.put<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, body);
     }
 
     patch<T>(endpoint: string, body: unknown): Observable<T> {
-        return this.http.patch<T>(`${this.apiUrl}/${endpoint}`, body);
+        return this.http.patch<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, body);
     }
 
     delete<T>(endpoint: string): Observable<T> {
-        return this.http.delete<T>(`${this.apiUrl}/${endpoint}`);
+        return this.http.delete<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`);
     }
 }

@@ -1,0 +1,85 @@
+import { Shift, Project, ProductionLine, Part, DowntimeProblem } from './production.model';
+import { EmployeeWithAssignment } from './employee.model';
+
+// Use existing Downtime interface from production.model.ts
+export interface DowntimeExtended {
+    id?: number;
+    Id_Downtime?: number;
+    Total_Downtime: number;
+    Comment_Downtime: string;
+    Id_DowntimeProblems: number;
+    Id_HourlyProd?: number;
+    problemName?: string;
+}
+
+export type HourStatus = 'not_started' | 'in_progress' | 'completed';
+export type HourType = 'normal' | 'setup' | 'break' | 'extra_hour_break';
+
+export interface HourlyProductionState {
+    hour: number;
+    timeRange: string; // "09:00 - 10:00"
+    startTime: string; // "09:00"
+    endTime: string; // "10:00"
+    isOvertime: boolean;
+    hourType: HourType; // Type of hour: normal, setup, break, extra_hour_break
+    status: HourStatus;
+    output: number | null;
+    scrap: number | null;
+    target: number;
+    scrapTarget: number;
+    efficiency: number | null;
+    scrapRate: number | null;
+    downtimes: DowntimeExtended[];
+    totalDowntime: number; // Sum of all downtimes in minutes
+    hourlyProductionId: number | null; // ID after save
+}
+
+// Target percentages for each hour type
+export const HOUR_TYPE_TARGET_PERCENTAGE: Record<HourType, number> = {
+    'normal': 100,      // 100% of target
+    'setup': 50,        // 50% of target (setup time reduces production)
+    'break': 0,         // 0% target during break
+    'extra_hour_break': 50  // 50% of target for extra hour break
+};
+
+export interface ProductionActors {
+    lineLeader: string;
+    qualityAgent: string;
+    maintenanceTech: string;
+    pqc: string;
+}
+
+export interface ShiftProductionSession {
+    // Shift Information
+    shift: Shift | null;
+    date: Date;
+    project: Project | null;
+    productionLine: ProductionLine | null;
+    part: Part | null;
+
+    // Order Number
+    orderNo: string;
+
+    // Team
+    team: EmployeeWithAssignment[];
+    actors: ProductionActors;
+
+    // Hourly production tracking
+    hours: HourlyProductionState[];
+
+    // Session state
+    isSetupComplete: boolean;
+    isTeamComplete: boolean;
+    currentHourIndex: number | null;
+}
+
+export interface HourProductionInput {
+    output: number;
+    scrap: number;
+    hasDowntime: boolean;
+    downtime?: {
+        duration: number;
+        problemId: number;
+        comment: string;
+    };
+}

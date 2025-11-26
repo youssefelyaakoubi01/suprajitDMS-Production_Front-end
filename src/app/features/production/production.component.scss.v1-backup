@@ -1,0 +1,656 @@
+.production-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+    margin: 0.25rem 0 0 0;
+}
+
+.header-time {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.current-time {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    font-family: 'Courier New', monospace;
+}
+
+.current-date {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+}
+
+// Summary Grid
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+
+    @media (max-width: 1200px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+::ng-deep .summary-card {
+    .p-card-body {
+        padding: 1rem;
+    }
+
+    &.card-success {
+        border-left: 4px solid var(--green-500);
+    }
+
+    &.card-warning {
+        border-left: 4px solid var(--yellow-500);
+    }
+
+    &.card-danger {
+        border-left: 4px solid var(--red-500);
+    }
+}
+
+.summary-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    i {
+        font-size: 1.5rem;
+    }
+}
+
+.summary-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.summary-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.summary-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.summary-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 80px;
+}
+
+::ng-deep .hour-progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.progress-label {
+    font-size: 0.625rem;
+    color: var(--text-color-secondary);
+    text-align: center;
+}
+
+// Efficiency colors
+.efficiency-good {
+    color: var(--green-500);
+    font-weight: 600;
+}
+
+.efficiency-warning {
+    color: var(--yellow-600);
+    font-weight: 600;
+}
+
+.efficiency-bad {
+    color: var(--red-500);
+    font-weight: 600;
+}
+
+// History card
+::ng-deep .history-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 0;
+    }
+}
+
+// Time range styling
+.time-range {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+// Overtime row styling
+::ng-deep .overtime-row {
+    background-color: var(--yellow-50) !important;
+
+    &:hover {
+        background-color: var(--yellow-100) !important;
+    }
+}
+
+// Actors card
+::ng-deep .actors-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 1.5rem;
+    }
+}
+
+.actors-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+
+    @media (max-width: 1200px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+    }
+
+    .form-field {
+        label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+
+            i {
+                color: var(--primary-color);
+            }
+        }
+    }
+}
+
+// Card Header
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+// Shift Form
+::ng-deep .shift-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 1.5rem;
+    }
+}
+
+.shift-form {
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+
+        @media (max-width: 992px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        @media (max-width: 576px) {
+            grid-template-columns: 1fr;
+        }
+    }
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-color);
+    }
+}
+
+// Metrics Grid
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+
+    @media (max-width: 992px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+// Extended Metrics Grid (with Scrap)
+.metrics-grid-extended {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1rem;
+
+    @media (max-width: 1600px) {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    @media (max-width: 1200px) {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    @media (max-width: 992px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+// Scrap card styling
+::ng-deep .scrap-card {
+    border-left: 4px solid var(--orange-500);
+
+    .metric-label {
+        color: var(--orange-600);
+
+        i {
+            margin-right: 0.25rem;
+        }
+    }
+}
+
+::ng-deep .scrap-input {
+    color: var(--orange-600) !important;
+}
+
+// Scrap Target card styling
+::ng-deep .scrap-target-card {
+    border-left: 4px solid var(--cyan-500);
+
+    .metric-label {
+        color: var(--cyan-600);
+
+        i {
+            margin-right: 0.25rem;
+        }
+    }
+}
+
+::ng-deep .scrap-target-input {
+    color: var(--cyan-600) !important;
+}
+
+::ng-deep .metric-card {
+    .p-card-body {
+        padding: 1.5rem;
+    }
+
+    &.metric-success {
+        border-left: 4px solid var(--green-500);
+        background: linear-gradient(135deg, var(--green-50) 0%, #fff 100%);
+    }
+
+    &.metric-warning {
+        border-left: 4px solid var(--yellow-500);
+        background: linear-gradient(135deg, var(--yellow-50) 0%, #fff 100%);
+    }
+
+    &.metric-danger {
+        border-left: 4px solid var(--red-500);
+        background: linear-gradient(135deg, var(--red-50) 0%, #fff 100%);
+    }
+}
+
+.metric-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+::ng-deep .metric-input {
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    width: 150px !important;
+}
+
+::ng-deep .action-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+// Team Card
+::ng-deep .team-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 1.5rem;
+    }
+}
+
+.team-assignment-form {
+    margin-bottom: 1rem;
+
+    .form-row {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+
+        .flex-grow {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .button-field {
+            display: flex;
+            flex-direction: column;
+        }
+    }
+}
+
+.employee-name {
+    font-weight: 600;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: var(--text-color-secondary);
+
+    .empty-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    p {
+        margin: 0;
+    }
+}
+
+// Downtime Card
+::ng-deep .downtime-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 1.5rem;
+    }
+}
+
+.downtime-form {
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 1rem;
+
+        @media (max-width: 576px) {
+            grid-template-columns: 1fr;
+        }
+    }
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+// Dialog
+.dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+// Step Indicators
+.step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-500) 100%);
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+// Save Card
+::ng-deep .save-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 1.5rem;
+    }
+}
+
+// Review Summary
+.review-summary {
+    background: var(--surface-50);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.review-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.review-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+
+    .review-icon {
+        color: var(--primary-color);
+        font-size: 1.25rem;
+        margin-top: 0.25rem;
+    }
+
+    div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .review-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-color-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .review-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-color);
+    }
+}
+
+// Validation Messages
+.validation-messages {
+    background: var(--yellow-50);
+    border-left: 4px solid var(--yellow-500);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+
+    ::ng-deep .p-message {
+        margin-bottom: 1rem;
+    }
+}
+
+.validation-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0 0;
+
+    li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0;
+        font-size: 0.875rem;
+        color: var(--text-color);
+
+        i {
+            color: var(--orange-500);
+            font-size: 0.75rem;
+        }
+    }
+}
+
+// Action Buttons
+.action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--surface-border);
+}
+
+// Metrics Card
+::ng-deep .metrics-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 1.5rem;
+    }
+}
+
+// Actors Section
+.actors-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--surface-border);
+}
+
+.section-subtitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0 0 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    i {
+        color: var(--primary-color);
+    }
+}
+
+.empty-title {
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0.5rem 0 0 0;
+}
+
+.empty-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+    margin: 0.25rem 0 0 0;
+}
+
+.employee-id {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    color: var(--primary-color);
+}

@@ -19,6 +19,7 @@ export interface HourlyProduction {
     Target_HourlyProdPN: number;
     HC_HourlyProdPN: number;
     Id_ProdLine: number;
+    Scrap_HourlyProdPN?: number;
 }
 
 export interface Part {
@@ -61,10 +62,15 @@ export interface Workstation {
 }
 
 export interface Shift {
-    id: string;
+    id: number;
     name: string;
-    startHour: number;
-    endHour: number;
+    code: string;
+    start_time: string;  // Format: "HH:MM:SS"
+    end_time: string;    // Format: "HH:MM:SS"
+    is_active: boolean;
+    // Computed fields for frontend convenience
+    startHour?: number;
+    endHour?: number;
 }
 
 export interface TeamAssignment {

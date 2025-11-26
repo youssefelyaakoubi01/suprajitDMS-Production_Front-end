@@ -30,8 +30,16 @@ export const appRoutes: Routes = [
                 loadComponent: () => import('./app/features/production/production.component').then(m => m.ProductionComponent)
             },
             {
+                path: 'production-list',
+                loadComponent: () => import('./app/features/production/production-list.component').then(m => m.ProductionListComponent)
+            },
+            {
                 path: 'downtime-list',
                 loadComponent: () => import('./app/features/downtime-list/downtime-list.component').then(m => m.DowntimeListComponent)
+            },
+            {
+                path: 'settings/shifts',
+                loadComponent: () => import('./app/features/settings/shifts.component').then(m => m.ShiftsComponent)
             }
         ]
     },

@@ -334,3 +334,51 @@
         color: var(--text-color);
     }
 }
+
+// Edit Dialog
+.edit-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.edit-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+
+    @media (max-width: 576px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-field.full-width {
+    grid-column: 1 / -1;
+}
+
+// Confirm Dialog
+.confirm-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 0;
+
+    .confirm-icon {
+        font-size: 2rem;
+        color: var(--orange-500);
+        flex-shrink: 0;
+    }
+
+    span {
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+}

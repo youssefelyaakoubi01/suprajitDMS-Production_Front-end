@@ -1,4 +1,5 @@
-import { Injectable, effect, signal, computed } from '@angular/core';
+import { Injectable, effect, signal, computed, PLATFORM_ID, Inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Subject } from 'rxjs';
 
 export interface layoutConfig {
@@ -22,17 +23,25 @@ interface MenuChangeEvent {
     routeEvent?: boolean;
 }
 
+// LocalStorage key for user preferences
+const LAYOUT_CONFIG_KEY = 'dms_layout_config';
+
 @Injectable({
     providedIn: 'root'
 })
 export class LayoutService {
-    _config: layoutConfig = {
+    private isBrowser: boolean;
+
+    // Default configuration
+    private defaultConfig: layoutConfig = {
         preset: 'Aura',
         primary: 'emerald',
         surface: null,
         darkTheme: false,
         menuMode: 'static'
     };
+
+    _config: layoutConfig;
 
     _state: LayoutState = {
         staticMenuDesktopInactive: false,
@@ -42,7 +51,7 @@ export class LayoutService {
         menuHoverActive: false
     };
 
-    layoutConfig = signal<layoutConfig>(this._config);
+    layoutConfig: ReturnType<typeof signal<layoutConfig>>;
 
     layoutState = signal<LayoutState>(this._state);
 
@@ -78,11 +87,24 @@ export class LayoutService {
 
     private initialized = false;
 
-    constructor() {
+    constructor(@Inject(PLATFORM_ID) platformId: Object) {
+        this.isBrowser = isPlatformBrowser(platformId);
+
+        // Load saved config from localStorage or use defaults
+        this._config = this.loadConfigFromStorage();
+        this.layoutConfig = signal<layoutConfig>(this._config);
+
+        // Apply dark mode immediately if saved
+        if (this.isBrowser && this._config.darkTheme) {
+            document.documentElement.classList.add('app-dark');
+        }
+
         effect(() => {
             const config = this.layoutConfig();
             if (config) {
                 this.onConfigUpdate();
+                // Save to localStorage whenever config changes
+                this.saveConfigToStorage(config);
             }
         });
 
@@ -96,6 +118,60 @@ export class LayoutService {
 
             this.handleDarkModeTransition(config);
         });
+    }
+
+    /**
+     * Load configuration from localStorage
+     */
+    private loadConfigFromStorage(): layoutConfig {
+        if (!this.isBrowser) {
+            return { ...this.defaultConfig };
+        }
+
+        try {
+            const savedConfig = localStorage.getItem(LAYOUT_CONFIG_KEY);
+            if (savedConfig) {
+                const parsed = JSON.parse(savedConfig);
+                // Merge with defaults to ensure all properties exist
+                return { ...this.defaultConfig, ...parsed };
+            }
+        } catch (e) {
+            console.warn('Failed to load layout config from localStorage:', e);
+        }
+
+        return { ...this.defaultConfig };
+    }
+
+    /**
+     * Save configuration to localStorage
+     */
+    private saveConfigToStorage(config: layoutConfig): void {
+        if (!this.isBrowser) {
+            return;
+        }
+
+        try {
+            localStorage.setItem(LAYOUT_CONFIG_KEY, JSON.stringify(config));
+        } catch (e) {
+            console.warn('Failed to save layout config to localStorage:', e);
+        }
+    }
+
+    /**
+     * Get saved configuration (for external access)
+     */
+    getSavedConfig(): layoutConfig {
+        return this.loadConfigFromStorage();
+    }
+
+    /**
+     * Reset configuration to defaults
+     */
+    resetConfig(): void {
+        if (this.isBrowser) {
+            localStorage.removeItem(LAYOUT_CONFIG_KEY);
+        }
+        this.layoutConfig.set({ ...this.defaultConfig });
     }
 
     private handleDarkModeTransition(config: layoutConfig): void {

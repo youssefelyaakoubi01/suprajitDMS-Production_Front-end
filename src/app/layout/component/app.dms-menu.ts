@@ -29,14 +29,30 @@ export class AppDmsMenu {
                         routerLink: ['/dms-production/dashboard']
                     },
                     {
-                        label: 'Production',
+                        label: 'Production Entry',
                         icon: 'pi pi-fw pi-bolt',
                         routerLink: ['/dms-production/production']
+                    },
+                    {
+                        label: 'Production List',
+                        icon: 'pi pi-fw pi-list',
+                        routerLink: ['/dms-production/production-list']
                     },
                     {
                         label: 'Downtime List',
                         icon: 'pi pi-fw pi-clock',
                         routerLink: ['/dms-production/downtime-list']
+                    }
+                ]
+            },
+            { separator: true },
+            {
+                label: 'Settings',
+                items: [
+                    {
+                        label: 'Shifts',
+                        icon: 'pi pi-fw pi-calendar',
+                        routerLink: ['/dms-production/settings/shifts']
                     }
                 ]
             },

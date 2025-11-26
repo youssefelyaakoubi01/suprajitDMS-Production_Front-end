@@ -1,0 +1,178 @@
+.production-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+    margin: 0.25rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+// Filter Card
+::ng-deep .filter-card {
+    .p-card-body {
+        padding: 1rem;
+    }
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+.filter-field {
+    flex: 0 0 auto;
+
+    &:first-child {
+        flex: 1;
+        min-width: 250px;
+        max-width: 400px;
+    }
+}
+
+// Table Card
+::ng-deep .table-card {
+    .p-card-body {
+        padding: 0;
+    }
+    .p-card-content {
+        padding: 0;
+    }
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+// Table styling
+.datetime {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+}
+
+.project-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.part-number {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.result-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.target-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color-secondary);
+}
+
+.headcount {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+
+    i {
+        color: var(--text-color-secondary);
+        font-size: 0.875rem;
+    }
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    color: var(--text-color-secondary);
+
+    .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: var(--text-color-secondary);
+    }
+
+    p {
+        margin: 0.5rem 0;
+        font-size: 1rem;
+
+        &:first-of-type {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+    }
+
+    .empty-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-color-secondary);
+        margin-bottom: 1.5rem;
+    }
+}
+
+// Responsive
+@media (max-width: 768px) {
+    .filter-row {
+        .filter-field {
+            flex: 1 1 100%;
+            max-width: 100%;
+        }
+    }
+
+    .page-header {
+        .header-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+    }
+}

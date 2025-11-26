@@ -1,0 +1,577 @@
+<div class="production-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Production Monitoring</h1>
+            <p class="page-subtitle">Track hourly production, team assignments and downtime</p>
+        </div>
+        <div class="header-time">
+            <span class="current-time">{{ currentTime | date:'HH:mm:ss' }}</span>
+            <span class="current-date">{{ currentTime | date:'dd/MM/yyyy' }}</span>
+        </div>
+    </div>
+
+    <!-- Real-time Summary Cards -->
+    <div class="summary-grid">
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--blue-100);">
+                    <i class="pi pi-clock" style="color: var(--blue-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Current Hour</span>
+                    <span class="summary-value">H{{ getCurrentHour() }}</span>
+                </div>
+                <div class="summary-progress">
+                    <p-progressBar [value]="hourProgress" [showValue]="false" styleClass="hour-progress"></p-progressBar>
+                    <span class="progress-label">{{ hourProgress }}% completed</span>
+                </div>
+            </div>
+        </p-card>
+
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--green-100);">
+                    <i class="pi pi-box" style="color: var(--green-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Total Output</span>
+                    <span class="summary-value">{{ getTotalOutput() }} / {{ getTotalTarget() }}</span>
+                </div>
+            </div>
+        </p-card>
+
+        <p-card styleClass="summary-card" [ngClass]="{'card-success': getOverallEfficiency() >= 95, 'card-warning': getOverallEfficiency() >= 80 && getOverallEfficiency() < 95, 'card-danger': getOverallEfficiency() < 80}">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--purple-100);">
+                    <i class="pi pi-chart-line" style="color: var(--purple-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Overall Efficiency</span>
+                    <span class="summary-value">{{ getOverallEfficiency() }}%</span>
+                </div>
+            </div>
+        </p-card>
+
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--red-100);">
+                    <i class="pi pi-exclamation-triangle" style="color: var(--red-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Total Downtime</span>
+                    <span class="summary-value">{{ totalDowntimeToday }} min</span>
+                </div>
+            </div>
+        </p-card>
+    </div>
+
+    <!-- Shift Information Form -->
+    <p-card styleClass="shift-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Shift Information</h2>
+            </div>
+        </ng-template>
+
+        <form [formGroup]="shiftForm" class="shift-form">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="shift">Shift *</label>
+                    <p-select
+                        id="shift"
+                        formControlName="shift"
+                        [options]="shifts"
+                        optionLabel="name"
+                        placeholder="Select Shift"
+                        [style]="{ width: '100%' }">
+                    </p-select>
+                </div>
+
+                <div class="form-field">
+                    <label for="date">Date *</label>
+                    <p-datepicker
+                        id="date"
+                        formControlName="date"
+                        [showIcon]="true"
+                        dateFormat="dd/mm/yy"
+                        [style]="{ width: '100%' }">
+                    </p-datepicker>
+                </div>
+
+                <div class="form-field">
+                    <label for="project">Project *</label>
+                    <p-select
+                        id="project"
+                        formControlName="project"
+                        [options]="projects"
+                        optionLabel="Name_Project"
+                        placeholder="Select Project"
+                        [style]="{ width: '100%' }">
+                    </p-select>
+                </div>
+
+                <div class="form-field">
+                    <label for="productionLine">Production Line *</label>
+                    <p-select
+                        id="productionLine"
+                        formControlName="productionLine"
+                        [options]="productionLines"
+                        optionLabel="name"
+                        placeholder="Select Line"
+                        [style]="{ width: '100%' }">
+                    </p-select>
+                </div>
+
+                <div class="form-field">
+                    <label for="partNumber">Part Number *</label>
+                    <p-select
+                        id="partNumber"
+                        formControlName="partNumber"
+                        [options]="parts"
+                        optionLabel="PN_Part"
+                        placeholder="Select Part"
+                        [style]="{ width: '100%' }">
+                    </p-select>
+                </div>
+
+                <div class="form-field">
+                    <label for="hour">Hour *</label>
+                    <p-select
+                        id="hour"
+                        formControlName="hour"
+                        [options]="hours"
+                        optionLabel="label"
+                        placeholder="Select Hour"
+                        [style]="{ width: '100%' }">
+                    </p-select>
+                </div>
+            </div>
+        </form>
+    </p-card>
+
+    <!-- Production Actors -->
+    <p-card styleClass="actors-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Production Actors</h2>
+            </div>
+        </ng-template>
+
+        <div class="actors-grid">
+            <div class="form-field">
+                <label for="lineLeader">
+                    <i class="pi pi-star"></i> Line Leader ID
+                </label>
+                <input
+                    id="lineLeader"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="lineLeaderId"
+                    placeholder="Scan Line Leader badge"
+                    class="w-full">
+            </div>
+
+            <div class="form-field">
+                <label for="qualityAgent">
+                    <i class="pi pi-check-circle"></i> Quality Agent ID
+                </label>
+                <input
+                    id="qualityAgent"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="qualityAgentId"
+                    placeholder="Scan Quality Agent badge"
+                    class="w-full">
+            </div>
+
+            <div class="form-field">
+                <label for="maintenanceTech">
+                    <i class="pi pi-wrench"></i> Maintenance Technician ID
+                </label>
+                <input
+                    id="maintenanceTech"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="maintenanceTechId"
+                    placeholder="Scan Maintenance Tech badge"
+                    class="w-full">
+            </div>
+
+            <div class="form-field">
+                <label for="pqc">
+                    <i class="pi pi-shield"></i> PQC ID
+                </label>
+                <input
+                    id="pqc"
+                    type="text"
+                    pInputText
+                    [(ngModel)]="pqcId"
+                    placeholder="Scan PQC badge"
+                    class="w-full">
+            </div>
+        </div>
+    </p-card>
+
+    <!-- Output Metrics -->
+    <div class="metrics-grid-extended">
+        <p-card styleClass="metric-card">
+            <div class="metric-content">
+                <label class="metric-label">Output</label>
+                <p-inputNumber
+                    [(ngModel)]="output"
+                    [showButtons]="true"
+                    [min]="0"
+                    (ngModelChange)="onOutputChange()"
+                    inputStyleClass="metric-input">
+                </p-inputNumber>
+            </div>
+        </p-card>
+
+        <p-card styleClass="metric-card scrap-card">
+            <div class="metric-content">
+                <label class="metric-label">
+                    <i class="pi pi-trash"></i> Scrap
+                </label>
+                <p-inputNumber
+                    [(ngModel)]="scrap"
+                    [showButtons]="true"
+                    [min]="0"
+                    (ngModelChange)="onScrapChange()"
+                    inputStyleClass="metric-input scrap-input">
+                </p-inputNumber>
+            </div>
+        </p-card>
+
+        <p-card styleClass="metric-card">
+            <div class="metric-content">
+                <label class="metric-label">Target</label>
+                <span class="metric-value">{{ target }}</span>
+            </div>
+        </p-card>
+
+        <p-card styleClass="metric-card scrap-target-card">
+            <div class="metric-content">
+                <label class="metric-label">
+                    <i class="pi pi-flag"></i> Scrap Target
+                </label>
+                <span class="metric-value">{{ scrapTarget }}</span>
+            </div>
+        </p-card>
+
+        <p-card styleClass="metric-card" [ngClass]="{'metric-success': efficiency >= 100, 'metric-warning': efficiency >= 80 && efficiency < 100, 'metric-danger': efficiency < 80}">
+            <div class="metric-content">
+                <label class="metric-label">Efficiency</label>
+                <span class="metric-value">{{ efficiency }}%</span>
+            </div>
+        </p-card>
+
+        <p-card styleClass="metric-card" [ngClass]="{'metric-success': scrapRate <= 1, 'metric-warning': scrapRate > 1 && scrapRate <= 2, 'metric-danger': scrapRate > 2}">
+            <div class="metric-content">
+                <label class="metric-label">Scrap Rate</label>
+                <span class="metric-value">{{ scrapRate }}%</span>
+            </div>
+        </p-card>
+
+        <p-card styleClass="metric-card action-card">
+            <p-button
+                label="Save Production"
+                icon="pi pi-save"
+                styleClass="w-full"
+                (click)="saveProduction()">
+            </p-button>
+        </p-card>
+    </div>
+
+    <!-- Team Assignment Section -->
+    <p-card styleClass="team-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Production Team / Workstation</h2>
+                <p-tag [value]="assignedEmployees.length + ' Assigned'" severity="info"></p-tag>
+            </div>
+        </ng-template>
+
+        <div class="team-assignment-form">
+            <div class="form-row">
+                <div class="form-field flex-grow">
+                    <label for="employeeScan">Scan ID Card</label>
+                    <input
+                        id="employeeScan"
+                        type="text"
+                        pInputText
+                        [(ngModel)]="employeeIdScan"
+                        placeholder="Scan employee badge"
+                        class="w-full">
+                </div>
+
+                <div class="form-field">
+                    <label for="workstation">Workstation</label>
+                    <p-select
+                        id="workstation"
+                        [(ngModel)]="selectedWorkstation"
+                        [options]="workstations"
+                        optionLabel="Name_Workstation"
+                        placeholder="Select Workstation"
+                        [style]="{ width: '200px' }">
+                    </p-select>
+                </div>
+
+                <div class="form-field button-field">
+                    <label>&nbsp;</label>
+                    <p-button
+                        icon="pi pi-plus"
+                        label="Add"
+                        (click)="addEmployee()">
+                    </p-button>
+                </div>
+            </div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <p-table [value]="assignedEmployees" [tableStyle]="{ 'min-width': '50rem' }">
+            <ng-template pTemplate="header">
+                <tr>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>ID</th>
+                    <th>Workstation</th>
+                    <th>Qualification</th>
+                    <th>Actions</th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-emp>
+                <tr>
+                    <td>
+                        <p-avatar
+                            [image]="emp.Picture"
+                            shape="circle"
+                            size="large">
+                        </p-avatar>
+                    </td>
+                    <td>
+                        <span class="employee-name">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
+                    </td>
+                    <td>{{ emp.Id_Emp }}</td>
+                    <td>{{ emp.workstation }}</td>
+                    <td>
+                        <p-tag
+                            [value]="emp.qualification"
+                            [severity]="getQualificationSeverity(emp.qualificationLevel)">
+                        </p-tag>
+                    </td>
+                    <td>
+                        <p-button
+                            icon="pi pi-trash"
+                            severity="danger"
+                            [text]="true"
+                            [rounded]="true"
+                            (click)="removeEmployee(emp)">
+                        </p-button>
+                    </td>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="6" class="text-center">
+                        <div class="empty-state">
+                            <i class="pi pi-users empty-icon"></i>
+                            <p>No employees assigned yet</p>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </p-card>
+
+    <!-- Downtime Tracking Section -->
+    <p-card styleClass="downtime-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Downtime / Hour</h2>
+                <div class="header-actions">
+                    <p-button
+                        label="Create Ticket"
+                        icon="pi pi-plus"
+                        (click)="openDowntimeDialog()">
+                    </p-button>
+                </div>
+            </div>
+        </ng-template>
+
+        <div class="downtime-form">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="downtimeMinutes">Time / Min</label>
+                    <p-inputNumber
+                        id="downtimeMinutes"
+                        [(ngModel)]="downtimeMinutes"
+                        [min]="0"
+                        suffix=" min"
+                        [style]="{ width: '100%' }">
+                    </p-inputNumber>
+                </div>
+
+                <div class="form-field">
+                    <label for="problem">Problem</label>
+                    <p-select
+                        id="problem"
+                        [(ngModel)]="selectedProblem"
+                        [options]="downtimeProblems"
+                        optionLabel="Name_DowntimeProblems"
+                        placeholder="Select Problem"
+                        [style]="{ width: '100%' }">
+                    </p-select>
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="comment">Action / Comment</label>
+                <textarea
+                    id="comment"
+                    pTextarea
+                    [(ngModel)]="downtimeComment"
+                    rows="3"
+                    class="w-full"
+                    placeholder="Describe the issue and actions taken...">
+                </textarea>
+            </div>
+
+            <div class="form-actions">
+                <p-button
+                    label="Save Downtime"
+                    icon="pi pi-check"
+                    severity="success"
+                    (click)="saveDowntime()">
+                </p-button>
+            </div>
+        </div>
+    </p-card>
+
+    <!-- Hourly History Table -->
+    <p-card styleClass="history-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Hourly Production History</h2>
+                <p-tag [value]="hourlyHistory.length + ' Hours Logged'" severity="info"></p-tag>
+            </div>
+        </ng-template>
+
+        <p-table [value]="hourlyHistory" [tableStyle]="{ 'min-width': '50rem' }" styleClass="p-datatable-sm">
+            <ng-template pTemplate="header">
+                <tr>
+                    <th>Hour</th>
+                    <th>Time</th>
+                    <th>Output</th>
+                    <th>Target</th>
+                    <th>Efficiency</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-record>
+                <tr [ngClass]="{'overtime-row': record.isOvertime}">
+                    <td><strong>H{{ record.hour }}</strong></td>
+                    <td>
+                        <span class="time-range">{{ record.startTime }} - {{ record.endTime }}</span>
+                    </td>
+                    <td>{{ record.output }}</td>
+                    <td>{{ record.target }}</td>
+                    <td>
+                        <span [ngClass]="{
+                            'efficiency-good': record.efficiency >= 95,
+                            'efficiency-warning': record.efficiency >= 80 && record.efficiency < 95,
+                            'efficiency-bad': record.efficiency < 80
+                        }">{{ record.efficiency }}%</span>
+                    </td>
+                    <td>
+                        <p-tag
+                            [value]="record.isOvertime ? 'Overtime' : 'Regular'"
+                            [severity]="record.isOvertime ? 'warn' : 'info'">
+                        </p-tag>
+                    </td>
+                    <td>
+                        <p-tag
+                            [value]="record.efficiency >= 95 ? 'On Track' : record.efficiency >= 80 ? 'Below Target' : 'Critical'"
+                            [severity]="record.efficiency >= 95 ? 'success' : record.efficiency >= 80 ? 'warn' : 'danger'">
+                        </p-tag>
+                    </td>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="7" class="text-center">
+                        <div class="empty-state">
+                            <i class="pi pi-clock empty-icon"></i>
+                            <p>No hourly records yet</p>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </p-card>
+</div>
+
+<!-- Downtime Dialog -->
+<p-dialog
+    header="Create Downtime Ticket"
+    [(visible)]="showDowntimeDialog"
+    [modal]="true"
+    [style]="{ width: '500px' }"
+    [draggable]="false"
+    [resizable]="false">
+
+    <div class="dialog-content">
+        <div class="form-field">
+            <label for="dialogProblem">Problem Category *</label>
+            <p-select
+                id="dialogProblem"
+                [(ngModel)]="selectedProblem"
+                [options]="downtimeProblems"
+                optionLabel="Name_DowntimeProblems"
+                placeholder="Select Problem"
+                [style]="{ width: '100%' }">
+            </p-select>
+        </div>
+
+        <div class="form-field">
+            <label for="dialogMinutes">Duration (minutes) *</label>
+            <p-inputNumber
+                id="dialogMinutes"
+                [(ngModel)]="downtimeMinutes"
+                [min]="1"
+                suffix=" min"
+                [style]="{ width: '100%' }">
+            </p-inputNumber>
+        </div>
+
+        <div class="form-field">
+            <label for="dialogComment">Description</label>
+            <textarea
+                id="dialogComment"
+                pTextarea
+                [(ngModel)]="downtimeComment"
+                rows="4"
+                class="w-full"
+                placeholder="Describe the downtime issue...">
+            </textarea>
+        </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <p-button
+            label="Cancel"
+            icon="pi pi-times"
+            [text]="true"
+            (click)="closeDowntimeDialog()">
+        </p-button>
+        <p-button
+            label="Create Ticket"
+            icon="pi pi-check"
+            (click)="saveDowntime()">
+        </p-button>
+    </ng-template>
+</p-dialog>
+
+<p-toast position="top-right"></p-toast>

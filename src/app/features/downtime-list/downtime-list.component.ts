@@ -11,7 +11,10 @@ import { DialogModule } from 'primeng/dialog';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { TooltipModule } from 'primeng/tooltip';
-import { MessageService } from 'primeng/api';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { DatePickerModule } from 'primeng/datepicker';
+import { MessageService, ConfirmationService } from 'primeng/api';
 import { DowntimeListService } from './downtime-list.service';
 import { DowntimeTicket, Zone, Machine } from '../../core/models';
 
@@ -30,9 +33,12 @@ import { DowntimeTicket, Zone, Machine } from '../../core/models';
         DialogModule,
         TextareaModule,
         ToastModule,
-        TooltipModule
+        TooltipModule,
+        ConfirmDialogModule,
+        InputNumberModule,
+        DatePickerModule
     ],
-    providers: [MessageService],
+    providers: [MessageService, ConfirmationService],
     templateUrl: './downtime-list.component.html',
     styleUrls: ['./downtime-list.component.scss']
 })
@@ -51,8 +57,12 @@ export class DowntimeListComponent implements OnInit {
     // Dialog
     showDetailDialog = false;
     showCloseDialog = false;
+    showEditDialog = false;
     selectedTicket: DowntimeTicket | null = null;
     resolution = '';
+
+    // Edit Form
+    editForm: Partial<DowntimeTicket> = {};
 
     // Stats
     openCount = 0;
@@ -77,7 +87,8 @@ export class DowntimeListComponent implements OnInit {
 
     constructor(
         private downtimeService: DowntimeListService,
-        private messageService: MessageService
+        private messageService: MessageService,
+        private confirmationService: ConfirmationService
     ) {}
 
     ngOnInit(): void {
@@ -153,12 +164,13 @@ export class DowntimeListComponent implements OnInit {
         }
 
         this.downtimeService.closeTicket(this.selectedTicket.Id_DowntimeTicket, this.resolution).subscribe({
-            next: () => {
-                if (this.selectedTicket) {
-                    this.selectedTicket.Status = 'Closed';
-                    this.selectedTicket.ClosedAt = new Date();
-                    this.selectedTicket.Resolution = this.resolution;
+            next: (updatedTicket) => {
+                // Update local ticket with response from API
+                const index = this.tickets.findIndex(t => t.Id_DowntimeTicket === this.selectedTicket!.Id_DowntimeTicket);
+                if (index !== -1) {
+                    this.tickets[index] = updatedTicket;
                 }
+                this.applyFilters();
                 this.calculateStats();
                 this.showCloseDialog = false;
                 this.messageService.add({
@@ -167,7 +179,8 @@ export class DowntimeListComponent implements OnInit {
                     detail: 'Ticket closed successfully'
                 });
             },
-            error: () => {
+            error: (err) => {
+                console.error('Error closing ticket:', err);
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
@@ -179,19 +192,25 @@ export class DowntimeListComponent implements OnInit {
 
     confirmLeaderClose(ticket: DowntimeTicket): void {
         this.downtimeService.confirmClose(ticket.Id_DowntimeTicket).subscribe({
-            next: () => {
-                ticket.LeaderConfirmeClosedAt = new Date();
+            next: (updatedTicket) => {
+                // Update local ticket with response from API
+                const index = this.tickets.findIndex(t => t.Id_DowntimeTicket === ticket.Id_DowntimeTicket);
+                if (index !== -1) {
+                    this.tickets[index] = updatedTicket;
+                }
+                this.applyFilters();
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Success',
                     detail: 'Leader confirmation recorded'
                 });
             },
-            error: () => {
+            error: (err) => {
+                console.error('Error confirming closure:', err);
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
-                    detail: 'Failed to confirm closure'
+                    detail: err?.error?.error || 'Failed to confirm closure'
                 });
             }
         });
@@ -227,5 +246,94 @@ export class DowntimeListComponent implements OnInit {
 
     getTotalDowntimeFormatted(): string {
         return this.formatDuration(this.totalDowntimeMinutes);
+    }
+
+    // ==================== EDIT FUNCTIONALITY ====================
+
+    openEditDialog(ticket: DowntimeTicket): void {
+        this.selectedTicket = ticket;
+        this.editForm = {
+            ...ticket,
+            DowntimeStartsAt: new Date(ticket.DowntimeStartsAt)
+        };
+        this.showEditDialog = true;
+    }
+
+    saveEdit(): void {
+        if (!this.selectedTicket || !this.editForm.Zone || !this.editForm.ImpactedMachine) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please fill in all required fields'
+            });
+            return;
+        }
+
+        this.downtimeService.updateTicket(this.selectedTicket.Id_DowntimeTicket, this.editForm).subscribe({
+            next: (updatedTicket) => {
+                // Update the ticket in the local array
+                const index = this.tickets.findIndex(t => t.Id_DowntimeTicket === this.selectedTicket!.Id_DowntimeTicket);
+                if (index !== -1) {
+                    this.tickets[index] = {
+                        ...this.tickets[index],
+                        ...this.editForm
+                    };
+                    this.applyFilters();
+                    this.calculateStats();
+                }
+
+                this.showEditDialog = false;
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Ticket updated successfully'
+                });
+            },
+            error: () => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to update ticket'
+                });
+            }
+        });
+    }
+
+    // ==================== DELETE FUNCTIONALITY ====================
+
+    confirmDelete(ticket: DowntimeTicket): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete ticket <strong>${ticket.TicketNo}</strong>?<br><br>This action cannot be undone.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () => {
+                this.deleteTicket(ticket);
+            }
+        });
+    }
+
+    deleteTicket(ticket: DowntimeTicket): void {
+        this.downtimeService.deleteTicket(ticket.Id_DowntimeTicket).subscribe({
+            next: () => {
+                // Remove the ticket from the local array
+                this.tickets = this.tickets.filter(t => t.Id_DowntimeTicket !== ticket.Id_DowntimeTicket);
+                this.applyFilters();
+                this.calculateStats();
+
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: `Ticket ${ticket.TicketNo} deleted successfully`
+                });
+            },
+            error: () => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to delete ticket'
+                });
+            }
+        });
     }
 }

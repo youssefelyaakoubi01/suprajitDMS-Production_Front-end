@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { interval, Subscription, forkJoin } from 'rxjs';
+import { interval, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
@@ -65,22 +65,19 @@ export class DmsDashboardComponent implements OnInit, OnDestroy {
 
     loadDashboardData(): void {
         this.isLoading = true;
-        forkJoin({
-            kpis: this.dashboardService.getKPIs(),
-            lines: this.dashboardService.getProductionLines(),
-            output: this.dashboardService.getOutputPerHour(),
-            downtime: this.dashboardService.getDowntimeAnalysis()
-        }).subscribe({
+        // Single API call to get all dashboard data
+        this.dashboardService.getDashboardData().subscribe({
             next: (data) => {
                 this.kpis = data.kpis;
-                this.productionLines = data.lines;
-                this.setupOutputChart(data.output);
-                this.setupDowntimeChart(data.downtime);
-                this.lastUpdated = new Date();
+                this.productionLines = data.production_lines;
+                this.setupOutputChart(data.output_chart);
+                this.setupDowntimeChart(data.downtime_chart);
+                this.lastUpdated = new Date(data.last_updated);
                 this.isLoading = false;
             },
-            error: () => {
+            error: (error) => {
                 this.isLoading = false;
+                console.error('Dashboard error:', error);
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
@@ -91,21 +88,18 @@ export class DmsDashboardComponent implements OnInit, OnDestroy {
     }
 
     startAutoRefresh(): void {
-        // Auto-refresh every 5 seconds as per DMS-Production specs
-        this.refreshSubscription = interval(5000)
+        // Auto-refresh every 30 seconds (reduced from 5s to avoid excessive API calls)
+        this.refreshSubscription = interval(30000)
             .pipe(
-                switchMap(() =>
-                    forkJoin({
-                        kpis: this.dashboardService.getKPIs(),
-                        lines: this.dashboardService.getProductionLines()
-                    })
-                )
+                switchMap(() => this.dashboardService.getDashboardData())
             )
             .subscribe({
                 next: (data) => {
                     this.kpis = data.kpis;
-                    this.productionLines = data.lines;
-                    this.lastUpdated = new Date();
+                    this.productionLines = data.production_lines;
+                    this.setupOutputChart(data.output_chart);
+                    this.setupDowntimeChart(data.downtime_chart);
+                    this.lastUpdated = new Date(data.last_updated);
                 }
             });
     }

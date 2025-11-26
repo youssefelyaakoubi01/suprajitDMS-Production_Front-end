@@ -1,0 +1,225 @@
+<div class="production-list-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Production Records</h1>
+            <p class="page-subtitle">View and manage hourly production data</p>
+        </div>
+        <div class="header-actions">
+            <p-button
+                label="Export"
+                icon="pi pi-download"
+                [text]="true"
+                (onClick)="exportData()"></p-button>
+            <p-button
+                label="New Production"
+                icon="pi pi-plus"
+                (onClick)="newProduction()"></p-button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <p-card styleClass="filter-card">
+        <div class="filter-row">
+            <div class="filter-field">
+                <span class="p-input-icon-left w-full">
+                    <i class="pi pi-search"></i>
+                    <input
+                        type="text"
+                        pInputText
+                        [(ngModel)]="globalFilterValue"
+                        (input)="applyGlobalFilter($event)"
+                        placeholder="Search records..."
+                        class="w-full">
+                </span>
+            </div>
+
+            <div class="filter-field">
+                <p-datepicker
+                    [(ngModel)]="filterDate"
+                    [showIcon]="true"
+                    placeholder="Select date"
+                    (onSelect)="onFilterChange()"
+                    (onClear)="onFilterChange()"
+                    [style]="{ width: '200px' }"></p-datepicker>
+            </div>
+
+            <div class="filter-field">
+                <p-select
+                    [(ngModel)]="filterShift"
+                    [options]="shifts"
+                    optionLabel="name"
+                    placeholder="All shifts"
+                    [showClear]="true"
+                    (onChange)="onFilterChange()"
+                    [style]="{ width: '150px' }"></p-select>
+            </div>
+
+            <div class="filter-field">
+                <p-select
+                    [(ngModel)]="filterProject"
+                    [options]="projects"
+                    optionLabel="Name_Project"
+                    placeholder="All projects"
+                    [showClear]="true"
+                    (onChange)="onFilterChange()"
+                    [style]="{ width: '200px' }"></p-select>
+            </div>
+
+            <div class="filter-field">
+                <p-select
+                    [(ngModel)]="filterLine"
+                    [options]="productionLines"
+                    optionLabel="name"
+                    placeholder="All lines"
+                    [showClear]="true"
+                    [disabled]="!filterProject"
+                    (onChange)="onFilterChange()"
+                    [style]="{ width: '200px' }"></p-select>
+            </div>
+
+            <div class="filter-field">
+                <p-select
+                    [(ngModel)]="filterPart"
+                    [options]="parts"
+                    optionLabel="PN_Part"
+                    placeholder="All parts"
+                    [showClear]="true"
+                    [disabled]="!filterProject"
+                    (onChange)="onFilterChange()"
+                    [style]="{ width: '200px' }"></p-select>
+            </div>
+
+            <p-button
+                label="Clear"
+                icon="pi pi-filter-slash"
+                [text]="true"
+                (click)="clearFilters()">
+            </p-button>
+        </div>
+    </p-card>
+
+    <!-- Production Table -->
+    <p-card styleClass="table-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <h2 class="card-title">Production List</h2>
+                <p-tag [value]="filteredProductions.length + ' records'" severity="info"></p-tag>
+            </div>
+        </ng-template>
+
+        <p-table
+            [value]="filteredProductions"
+            [loading]="isLoading"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50, 100]"
+            [rowHover]="true"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} records"
+            styleClass="p-datatable-sm">
+
+            <ng-template pTemplate="header">
+                <tr>
+                    <th pSortableColumn="Date_HourlyProd">Date <p-sortIcon field="Date_HourlyProd"></p-sortIcon></th>
+                    <th pSortableColumn="Shift_HourlyProd">Shift <p-sortIcon field="Shift_HourlyProd"></p-sortIcon></th>
+                    <th pSortableColumn="Hour_HourlyProd">Hour <p-sortIcon field="Hour_HourlyProd"></p-sortIcon></th>
+                    <th>Project</th>
+                    <th>Production Line</th>
+                    <th>Part Number</th>
+                    <th>Result</th>
+                    <th>Target</th>
+                    <th>Efficiency</th>
+                    <th>HC</th>
+                    <th>Actions</th>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="body" let-production>
+                <tr>
+                    <td>
+                        <span class="datetime">{{ formatDate(production.Date_HourlyProd) }}</span>
+                    </td>
+                    <td>
+                        <span>{{ production.shiftName || production.Shift_HourlyProd }}</span>
+                    </td>
+                    <td>
+                        <p-tag [value]="'H' + production.Hour_HourlyProd" severity="secondary"></p-tag>
+                        <div class="text-xs text-color-secondary">{{ formatTime(production.Hour_HourlyProd) }}</div>
+                    </td>
+                    <td>
+                        <span class="project-name">{{ production.projectName || '-' }}</span>
+                    </td>
+                    <td>
+                        <span>{{ production.lineName || '-' }}</span>
+                    </td>
+                    <td>
+                        <span class="part-number">{{ production.partNumber || '-' }}</span>
+                    </td>
+                    <td>
+                        <span class="result-value">{{ production.Result_HourlyProdPN }}</span>
+                    </td>
+                    <td>
+                        <span class="target-value">{{ production.Target_HourlyProdPN }}</span>
+                    </td>
+                    <td>
+                        <p-tag
+                            [value]="production.efficiency + '%'"
+                            [severity]="getEfficiencySeverity(production.efficiency || 0)">
+                        </p-tag>
+                    </td>
+                    <td>
+                        <div class="headcount">
+                            <i class="pi pi-users"></i>
+                            <span>{{ production.HC_HourlyProdPN }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <p-button
+                                icon="pi pi-eye"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="secondary"
+                                pTooltip="View Details"
+                                (onClick)="viewDetails(production)"></p-button>
+                            <p-button
+                                icon="pi pi-pencil"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="info"
+                                pTooltip="Edit"
+                                (onClick)="editProduction(production)"></p-button>
+                            <p-button
+                                icon="pi pi-trash"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="danger"
+                                pTooltip="Delete"
+                                (onClick)="deleteProduction(production)"></p-button>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="11">
+                        <div class="empty-state">
+                            <i class="pi pi-inbox empty-icon"></i>
+                            <p>No production records found</p>
+                            <p class="empty-subtitle">Try adjusting your filters or create a new production record</p>
+                            <p-button
+                                label="Create New Production"
+                                icon="pi pi-plus"
+                                (onClick)="newProduction()"></p-button>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </p-card>
+</div>
+
+<p-toast position="top-right"></p-toast>
+<p-confirmDialog></p-confirmDialog>

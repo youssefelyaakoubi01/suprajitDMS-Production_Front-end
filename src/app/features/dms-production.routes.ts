@@ -15,7 +15,15 @@ export default [
         loadComponent: () => import('./production/production.component').then(m => m.ProductionComponent)
     },
     {
+        path: 'production-list',
+        loadComponent: () => import('./production/production-list.component').then(m => m.ProductionListComponent)
+    },
+    {
         path: 'downtime-list',
         loadComponent: () => import('./downtime-list/downtime-list.component').then(m => m.DowntimeListComponent)
+    },
+    {
+        path: 'settings/shifts',
+        loadComponent: () => import('./settings/shifts.component').then(m => m.ShiftsComponent)
     }
 ] as Routes;
