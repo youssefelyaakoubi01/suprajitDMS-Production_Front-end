@@ -106,7 +106,11 @@ export class ProductionListComponent implements OnInit {
         const params: any = {};
 
         if (this.filterDate) {
-            params.date = this.filterDate.toISOString().split('T')[0];
+            // Format date without timezone conversion
+            const year = this.filterDate.getFullYear();
+            const month = String(this.filterDate.getMonth() + 1).padStart(2, '0');
+            const day = String(this.filterDate.getDate()).padStart(2, '0');
+            params.date = `${year}-${month}-${day}`;
         }
         if (this.filterShift) {
             params.shift = this.filterShift.id;
@@ -117,6 +121,8 @@ export class ProductionListComponent implements OnInit {
         if (this.filterPart) {
             params.partId = this.filterPart.Id_Part;
         }
+
+        console.log('Loading productions with params:', params);
 
         this.productionService.getHourlyProductions(params).subscribe({
             next: (productions) => {

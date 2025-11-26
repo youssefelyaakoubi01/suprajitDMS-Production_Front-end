@@ -11,6 +11,25 @@
             <p class="dashboard-subtitle">Real-time production monitoring</p>
         </div>
         <div class="header-actions">
+            <p-datepicker
+                [(ngModel)]="selectedDate"
+                (onSelect)="onDateChange()"
+                [showIcon]="true"
+                [maxDate]="today"
+                dateFormat="dd/mm/yy"
+                [style]="{'width': '150px'}"
+                styleClass="date-picker">
+            </p-datepicker>
+            <p-select
+                [options]="projectOptions"
+                [(ngModel)]="selectedProjectId"
+                (onChange)="onProjectChange()"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select Project"
+                [style]="{'min-width': '200px'}"
+                styleClass="project-dropdown">
+            </p-select>
             <span class="last-updated">Last updated: {{ lastUpdated | date:'HH:mm:ss' }}</span>
             <p-button icon="pi pi-refresh" [rounded]="true" [text]="true" (click)="loadDashboardData()"></p-button>
         </div>

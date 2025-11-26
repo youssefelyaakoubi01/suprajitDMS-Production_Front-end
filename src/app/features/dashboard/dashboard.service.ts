@@ -4,7 +4,7 @@ import { map, catchError } from 'rxjs/operators';
 import { KPI, ProductionLine } from '../../core/models';
 import { ApiService } from '../../core/services/api.service';
 
-interface DashboardResponse {
+export interface DashboardResponse {
     kpis: KPI[];
     production_lines: ProductionLine[];
     output_chart: { labels: string[]; data: number[]; targets: number[] };
@@ -17,24 +17,36 @@ interface DashboardResponse {
 })
 export class DashboardService {
     private readonly endpoint = 'production/dashboard';
-    private cachedData: DashboardResponse | null = null;
+    private cachedData: Map<string, DashboardResponse> = new Map();
 
     constructor(private api: ApiService) {}
 
     /**
-     * Get all dashboard data in one API call
+     * Get all dashboard data in one API call, optionally filtered by project and date
+     * @param projectId - Optional project ID to filter dashboard data
+     * @param date - Optional date string (YYYY-MM-DD) to filter dashboard data
      */
-    getDashboardData(): Observable<DashboardResponse> {
-        return this.api.get<DashboardResponse>(this.endpoint).pipe(
+    getDashboardData(projectId?: number, date?: string): Observable<DashboardResponse> {
+        const cacheKey = `${projectId || 'all'}_${date || 'today'}`;
+        const params: Record<string, string | number> = {};
+        if (projectId) {
+            params['project'] = projectId;
+        }
+        if (date) {
+            params['date'] = date;
+        }
+
+        return this.api.get<DashboardResponse>(this.endpoint, Object.keys(params).length > 0 ? params : undefined).pipe(
             map(response => {
-                this.cachedData = response;
+                this.cachedData.set(cacheKey, response);
                 return response;
             }),
             catchError(error => {
                 console.error('Error fetching dashboard data:', error);
                 // Return cached data if available, otherwise return empty data
-                if (this.cachedData) {
-                    return of(this.cachedData);
+                const cached = this.cachedData.get(cacheKey);
+                if (cached) {
+                    return of(cached);
                 }
                 return of(this.getEmptyDashboardData());
             })

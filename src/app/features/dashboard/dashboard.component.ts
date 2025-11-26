@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { interval, Subscription } from 'rxjs';
+import { interval, Subscription, forkJoin } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
@@ -10,17 +11,21 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
 import { MessageService } from 'primeng/api';
 import { DashboardService } from './dashboard.service';
+import { ProductionService } from '../../core/services/production.service';
 import { KpiCardComponent } from './components/kpi-card/kpi-card.component';
 import { ProductionLineCardComponent } from './components/production-line-card/production-line-card.component';
-import { KPI, ProductionLine } from '../../core/models';
+import { KPI, ProductionLine, Project } from '../../core/models';
 
 @Component({
     selector: 'app-dms-dashboard',
     standalone: true,
     imports: [
         CommonModule,
+        FormsModule,
         CardModule,
         ChartModule,
         TableModule,
@@ -28,6 +33,8 @@ import { KPI, ProductionLine } from '../../core/models';
         ToastModule,
         ProgressSpinnerModule,
         ButtonModule,
+        SelectModule,
+        DatePickerModule,
         KpiCardComponent,
         ProductionLineCardComponent
     ],
@@ -45,18 +52,56 @@ export class DmsDashboardComponent implements OnInit, OnDestroy {
     isLoading = true;
     lastUpdated: Date = new Date();
 
+    // Project selection
+    projects: Project[] = [];
+    selectedProjectId: number | null = null;
+    projectOptions: { label: string; value: number | null }[] = [];
+
+    // Date selection
+    selectedDate: Date = new Date();
+    today: Date = new Date();
+
     private refreshSubscription?: Subscription;
 
     constructor(
         private dashboardService: DashboardService,
+        private productionService: ProductionService,
         private messageService: MessageService,
         private router: Router
     ) {}
 
     ngOnInit(): void {
         this.initChartOptions();
+        this.loadProjects();
         this.loadDashboardData();
         this.startAutoRefresh();
+    }
+
+    loadProjects(): void {
+        this.productionService.getProjects().subscribe({
+            next: (response: any) => {
+                // Handle both array response and paginated response (with results property)
+                const projects = Array.isArray(response) ? response : (response.results || []);
+                this.projects = projects;
+                this.projectOptions = [
+                    { label: 'All Projects', value: null },
+                    ...projects.map((p: any) => ({ label: p.name || p.Name_Project, value: p.id || p.Id_Project }))
+                ];
+            },
+            error: (error) => {
+                console.error('Error loading projects:', error);
+            }
+        });
+    }
+
+    onProjectChange(): void {
+        this.restartAutoRefresh();
+        this.loadDashboardData();
+    }
+
+    onDateChange(): void {
+        this.restartAutoRefresh();
+        this.loadDashboardData();
     }
 
     ngOnDestroy(): void {
@@ -65,8 +110,10 @@ export class DmsDashboardComponent implements OnInit, OnDestroy {
 
     loadDashboardData(): void {
         this.isLoading = true;
-        // Single API call to get all dashboard data
-        this.dashboardService.getDashboardData().subscribe({
+        // Single API call to get all dashboard data, filtered by project and date
+        const projectId = this.selectedProjectId ?? undefined;
+        const dateStr = this.formatDate(this.selectedDate);
+        this.dashboardService.getDashboardData(projectId, dateStr).subscribe({
             next: (data) => {
                 this.kpis = data.kpis;
                 this.productionLines = data.production_lines;
@@ -89,9 +136,11 @@ export class DmsDashboardComponent implements OnInit, OnDestroy {
 
     startAutoRefresh(): void {
         // Auto-refresh every 30 seconds (reduced from 5s to avoid excessive API calls)
+        const projectId = this.selectedProjectId ?? undefined;
+        const dateStr = this.formatDate(this.selectedDate);
         this.refreshSubscription = interval(30000)
             .pipe(
-                switchMap(() => this.dashboardService.getDashboardData())
+                switchMap(() => this.dashboardService.getDashboardData(projectId, dateStr))
             )
             .subscribe({
                 next: (data) => {
@@ -102,6 +151,18 @@ export class DmsDashboardComponent implements OnInit, OnDestroy {
                     this.lastUpdated = new Date(data.last_updated);
                 }
             });
+    }
+
+    restartAutoRefresh(): void {
+        this.refreshSubscription?.unsubscribe();
+        this.startAutoRefresh();
+    }
+
+    private formatDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     showRefreshToast(): void {

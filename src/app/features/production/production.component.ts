@@ -1011,20 +1011,35 @@ export class ProductionComponent implements OnInit, OnDestroy {
             return;
         }
 
+        // Validate session data before saving
+        if (!this.session.date || !this.session.shift || !this.session.part || !this.session.productionLine) {
+            console.error('Missing session data:', {
+                date: this.session.date,
+                shift: this.session.shift,
+                part: this.session.part,
+                productionLine: this.session.productionLine
+            });
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Session Error',
+                detail: 'Please complete the session setup (Date, Shift, Part, Production Line)'
+            });
+            return;
+        }
+
         // Mark hour as in progress
         hour.status = 'in_progress';
 
         const productionData = {
-            Date_HourlyProd: this.session.date,
-            Shift_HourlyProd: this.session.shift!.id.toString(),
-            Hour_HourlyProd: hour.hour,
+            date: this.session.date,
+            shift: this.session.shift.id,
+            hour: hour.hour,
             hour_type: hour.hourType || 'normal',
-            Id_Part: this.session.part!.Id_Part,
-            Result_HourlyProdPN: this.hourProductionInput.output,
-            Target_HourlyProdPN: hour.target,
-            HC_HourlyProdPN: this.session.team.length,
-            Id_ProdLine: this.session.productionLine!.id,
-            Scrap_HourlyProdPN: this.hourProductionInput.scrap,
+            part: this.session.part.Id_Part,
+            result: this.hourProductionInput.output,
+            target: hour.target,
+            headcount: this.session.team.length || 0,
+            production_line: this.session.productionLine.id,
             // Order Number
             order_no: this.session.orderNo || '',
             // Production Supervisors & Key Personnel
@@ -1033,6 +1048,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             maintenance_tech: this.session.actors.maintenanceTech || '',
             pqc: this.session.actors.pqc || ''
         };
+
+        console.log('Sending production data:', productionData);
 
         // Check if this is an update (hourlyProductionId exists) or a new creation
         const isUpdate = hour.hourlyProductionId && typeof hour.hourlyProductionId === 'number' && hour.hourlyProductionId > 0;

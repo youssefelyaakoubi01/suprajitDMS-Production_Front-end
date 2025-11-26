@@ -217,20 +217,21 @@ export class ProductionService {
         );
     }
 
-    saveHourlyProduction(data: Partial<HourlyProduction> & { hour_type?: string; order_no?: string; line_leader?: string; quality_agent?: string; maintenance_tech?: string; pqc?: string }): Observable<HourlyProduction> {
-        // Map front-end field names to Django API field names
+    saveHourlyProduction(data: any): Observable<HourlyProduction> {
+        // Support both old field names (Date_HourlyProd) and new field names (date)
+        const inputDate = data.date || data.Date_HourlyProd;
         const apiData: any = {
-            date: data.Date_HourlyProd instanceof Date
-                ? data.Date_HourlyProd.toISOString().split('T')[0]
-                : data.Date_HourlyProd,
-            shift: typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd,
-            hour: data.Hour_HourlyProd,
+            date: inputDate instanceof Date
+                ? inputDate.toISOString().split('T')[0]
+                : inputDate,
+            shift: data.shift || (typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd),
+            hour: data.hour || data.Hour_HourlyProd,
             hour_type: data.hour_type || 'normal',
-            part: data.Id_Part,
-            production_line: data.Id_ProdLine,
-            result: data.Result_HourlyProdPN || 0,
-            target: data.Target_HourlyProdPN || 0,
-            headcount: data.HC_HourlyProdPN || 0,
+            part: data.part || data.Id_Part,
+            production_line: data.production_line || data.Id_ProdLine,
+            result: data.result ?? data.Result_HourlyProdPN ?? 0,
+            target: data.target ?? data.Target_HourlyProdPN ?? 0,
+            headcount: data.headcount ?? data.HC_HourlyProdPN ?? 0,
             // Order Number
             order_no: data.order_no || '',
             // Production Supervisors & Key Personnel
@@ -243,27 +244,29 @@ export class ProductionService {
         console.log('saveHourlyProduction - Input data:', data);
         console.log('saveHourlyProduction - API data being sent:', apiData);
 
-        if (data.Id_HourlyProd) {
-            return this.coreService.updateHourlyProduction(data.Id_HourlyProd, apiData);
+        const existingId = data.id || data.Id_HourlyProd;
+        if (existingId) {
+            return this.coreService.updateHourlyProduction(existingId, apiData);
         } else {
             return this.coreService.createHourlyProduction(apiData);
         }
     }
 
-    updateHourlyProduction(id: number, data: Partial<HourlyProduction> & { hour_type?: string; order_no?: string; line_leader?: string; quality_agent?: string; maintenance_tech?: string; pqc?: string }): Observable<HourlyProduction> {
-        // Map front-end field names to Django API field names
+    updateHourlyProduction(id: number, data: any): Observable<HourlyProduction> {
+        // Support both old field names (Date_HourlyProd) and new field names (date)
+        const inputDate = data.date || data.Date_HourlyProd;
         const apiData: any = {
-            date: data.Date_HourlyProd instanceof Date
-                ? data.Date_HourlyProd.toISOString().split('T')[0]
-                : data.Date_HourlyProd,
-            shift: typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd,
-            hour: data.Hour_HourlyProd,
+            date: inputDate instanceof Date
+                ? inputDate.toISOString().split('T')[0]
+                : inputDate,
+            shift: data.shift || (typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd),
+            hour: data.hour || data.Hour_HourlyProd,
             hour_type: data.hour_type || 'normal',
-            part: data.Id_Part,
-            production_line: data.Id_ProdLine,
-            result: data.Result_HourlyProdPN || 0,
-            target: data.Target_HourlyProdPN || 0,
-            headcount: data.HC_HourlyProdPN || 0,
+            part: data.part || data.Id_Part,
+            production_line: data.production_line || data.Id_ProdLine,
+            result: data.result ?? data.Result_HourlyProdPN ?? 0,
+            target: data.target ?? data.Target_HourlyProdPN ?? 0,
+            headcount: data.headcount ?? data.HC_HourlyProdPN ?? 0,
             // Order Number
             order_no: data.order_no || '',
             // Production Supervisors & Key Personnel
