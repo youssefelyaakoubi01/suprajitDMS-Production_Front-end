@@ -222,7 +222,7 @@ export class ProductionService {
         const inputDate = data.date || data.Date_HourlyProd;
         const apiData: any = {
             date: inputDate instanceof Date
-                ? inputDate.toISOString().split('T')[0]
+                ? this.formatLocalDate(inputDate)
                 : inputDate,
             shift: data.shift || (typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd),
             hour: data.hour || data.Hour_HourlyProd,
@@ -257,7 +257,7 @@ export class ProductionService {
         const inputDate = data.date || data.Date_HourlyProd;
         const apiData: any = {
             date: inputDate instanceof Date
-                ? inputDate.toISOString().split('T')[0]
+                ? this.formatLocalDate(inputDate)
                 : inputDate,
             shift: data.shift || (typeof data.Shift_HourlyProd === 'string' ? parseInt(data.Shift_HourlyProd, 10) : data.Shift_HourlyProd),
             hour: data.hour || data.Hour_HourlyProd,
@@ -385,5 +385,16 @@ export class ProductionService {
 
     deleteTeamAssignment(id: number): Observable<void> {
         return this.coreService.deleteTeamAssignment(id);
+    }
+
+    /**
+     * Format a Date object to YYYY-MM-DD string using local timezone
+     * This prevents timezone conversion issues where toISOString() would shift the date
+     */
+    private formatLocalDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 }

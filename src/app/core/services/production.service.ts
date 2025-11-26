@@ -130,7 +130,7 @@ export class ProductionService {
     }
 
     updateDowntime(id: number, downtime: Partial<Downtime>): Observable<Downtime> {
-        return this.api.put<Downtime>(`${this.endpoint}/downtimes/${id}`, downtime);
+        return this.api.patch<Downtime>(`${this.endpoint}/downtimes/${id}`, downtime);
     }
 
     deleteDowntime(id: number): Observable<void> {

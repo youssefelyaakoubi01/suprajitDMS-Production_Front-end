@@ -14,6 +14,7 @@ export interface ProductionDowntime {
     comment: string;
     status: 'open' | 'in_progress' | 'closed';
     resolution: string;
+    assigned_to?: string;
     closed_at: string | null;
     leader_confirmed_at: string | null;
     created_at: string;
@@ -69,6 +70,18 @@ export class DowntimeListService {
      */
     updateTicket(ticketId: number, data: Partial<DowntimeTicket>): Observable<DowntimeTicket> {
         const apiData = this.mapToApiFormat(data);
+        console.log('updateTicket - Sending PATCH to:', `production/downtimes/${ticketId}`, 'with data:', apiData);
+        return this.api.patch<ProductionDowntime>(`production/downtimes/${ticketId}`, apiData).pipe(
+            map((d: ProductionDowntime) => this.mapToDowntimeTicket(d))
+        );
+    }
+
+    /**
+     * Update only duration and comment (safe update)
+     */
+    updateTicketBasic(ticketId: number, duration: number, comment: string): Observable<DowntimeTicket> {
+        const apiData = { duration, comment };
+        console.log('updateTicketBasic - Sending PATCH to:', `production/downtimes/${ticketId}`, 'with data:', apiData);
         return this.api.patch<ProductionDowntime>(`production/downtimes/${ticketId}`, apiData).pipe(
             map((d: ProductionDowntime) => this.mapToDowntimeTicket(d))
         );
@@ -160,7 +173,7 @@ export class DowntimeListService {
             DowntimeStartsAt: new Date(d.created_at),
             TicketCreatedAt: new Date(d.created_at),
             ClosedAt: d.closed_at ? new Date(d.closed_at) : null,
-            AssignedTo: 'Production Team',
+            AssignedTo: d.assigned_to || 'Production Team',
             AssignedToId: 0,
             LeaderConfirmeClosedAt: d.leader_confirmed_at ? new Date(d.leader_confirmed_at) : null,
             Description: d.problem_name || 'Downtime Issue',
@@ -188,22 +201,31 @@ export class DowntimeListService {
 
     /**
      * Map frontend format to API format
+     * Note: status is excluded because it should be changed via close/reopen endpoints
      */
     private mapToApiFormat(ticket: Partial<DowntimeTicket>): any {
         const apiData: any = {};
 
-        if (ticket.DowntimeDuration !== undefined) {
+        if (ticket.DowntimeDuration !== undefined && ticket.DowntimeDuration !== null) {
             apiData.duration = ticket.DowntimeDuration;
         }
-        if (ticket.Description !== undefined) {
+        if (ticket.Description !== undefined && ticket.Description !== null) {
             apiData.comment = ticket.Description;
         }
         if (ticket.Resolution !== undefined) {
-            apiData.resolution = ticket.Resolution;
+            apiData.resolution = ticket.Resolution || '';
         }
-        if (ticket.Status !== undefined) {
-            apiData.status = this.mapStatusToApi(ticket.Status);
+        // Map AssignedTo (string) to assigned_to for the backend
+        if (ticket.AssignedTo !== undefined) {
+            apiData.assigned_to = ticket.AssignedTo || '';
         }
+        // Don't include status in PATCH - use dedicated endpoints for status changes
+        // if (ticket.Status !== undefined && ticket.Status !== null) {
+        //     apiData.status = this.mapStatusToApi(ticket.Status);
+        // }
+
+        console.log('mapToApiFormat - Input:', ticket);
+        console.log('mapToApiFormat - Output:', apiData);
 
         return apiData;
     }

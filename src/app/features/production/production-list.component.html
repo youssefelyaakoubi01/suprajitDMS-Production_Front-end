@@ -145,7 +145,7 @@
                     </td>
                     <td>
                         <p-tag [value]="'H' + production.Hour_HourlyProd" severity="secondary"></p-tag>
-                        <div class="text-xs text-color-secondary">{{ formatTime(production.Hour_HourlyProd) }}</div>
+                        <div class="text-xs text-color-secondary">{{ formatTime(production.Hour_HourlyProd, production.Shift_HourlyProd) }}</div>
                     </td>
                     <td>
                         <span class="project-name">{{ production.projectName || '-' }}</span>

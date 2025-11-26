@@ -273,9 +273,31 @@ export class ProductionListComponent implements OnInit {
         });
     }
 
-    formatTime(hour: number): string {
-        const startHour = hour - 1;
-        return `${startHour.toString().padStart(2, '0')}:00 - ${hour.toString().padStart(2, '0')}:00`;
+    formatTime(hour: number, shiftId?: number | string): string {
+        // Get shift start hour based on shift ID
+        const shiftStartHour = this.getShiftStartHour(shiftId);
+        // Calculate actual start and end hours based on shift start + hour offset
+        const startHour = (shiftStartHour + hour - 1) % 24;
+        const endHour = (shiftStartHour + hour) % 24;
+        return `${startHour.toString().padStart(2, '0')}:00 - ${endHour.toString().padStart(2, '0')}:00`;
+    }
+
+    getShiftStartHour(shiftId?: number | string): number {
+        if (!shiftId) return 6; // Default to morning shift
+
+        // Find shift from loaded shifts
+        const shift = this.shifts.find(s => String(s.id) === String(shiftId));
+        if (shift?.startHour !== undefined) {
+            return shift.startHour;
+        }
+
+        // Fallback to default shift hours
+        const shiftMap: Record<string, number> = {
+            '1': 6,  // Morning: 06:00
+            '2': 14, // Afternoon: 14:00
+            '3': 22  // Night: 22:00
+        };
+        return shiftMap[String(shiftId)] || 6;
     }
 
     enrichProduction(production: ProductionListItem): ProductionListItem {

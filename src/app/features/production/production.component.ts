@@ -527,31 +527,70 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     saveTeamAssignmentsForHour(hourlyProductionId: number): void {
-        // Save each team member as a team assignment
+        // First, get existing assignments for this hourly production
+        this.productionService.getTeamAssignments(hourlyProductionId).subscribe({
+            next: (existingAssignments) => {
+                const existingEmployeeIds = new Set(existingAssignments.map(a => a.employee || a.Id_Emp));
+
+                // Only create assignments for employees not already assigned
+                this.session.team.forEach(member => {
+                    if (existingEmployeeIds.has(member.Id_Emp)) {
+                        console.log(`Employee ${member.Id_Emp} already assigned, skipping...`);
+                        return;
+                    }
+
+                    // Find the workstation ID from the workstation name
+                    const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
+                    const workstationId = workstation?.Id_Workstation || this.workstations[0]?.Id_Workstation;
+
+                    if (!workstationId) {
+                        console.warn('No workstation found for team assignment');
+                        return;
+                    }
+
+                    const assignmentData = {
+                        hourly_production: hourlyProductionId,
+                        employee: member.Id_Emp,
+                        workstation: workstationId
+                    };
+
+                    this.productionService.createTeamAssignment(assignmentData).subscribe({
+                        next: (response) => {
+                            console.log('Team assignment saved:', response);
+                        },
+                        error: (err) => {
+                            // Silently handle duplicate errors (race condition)
+                            if (err.status === 400 && err.error?.non_field_errors) {
+                                console.log('Team assignment already exists (race condition), skipping...');
+                            } else {
+                                console.error('Error saving team assignment:', err.error);
+                            }
+                        }
+                    });
+                });
+            },
+            error: (err) => {
+                console.error('Error fetching existing team assignments:', err);
+                // Fallback: try to create all assignments anyway
+                this.createAllTeamAssignments(hourlyProductionId);
+            }
+        });
+    }
+
+    private createAllTeamAssignments(hourlyProductionId: number): void {
         this.session.team.forEach(member => {
-            // Find the workstation ID from the workstation name
             const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
             const workstationId = workstation?.Id_Workstation || this.workstations[0]?.Id_Workstation;
 
-            if (!workstationId) {
-                console.warn('No workstation found for team assignment');
-                return;
-            }
+            if (!workstationId) return;
 
             this.productionService.createTeamAssignment({
                 hourly_production: hourlyProductionId,
                 employee: member.Id_Emp,
                 workstation: workstationId
             }).subscribe({
-                next: (response) => {
-                    console.log('Team assignment saved:', response);
-                },
-                error: (err) => {
-                    // Ignore duplicate errors (employee already assigned)
-                    if (err.status !== 400) {
-                        console.error('Error saving team assignment:', err);
-                    }
-                }
+                next: (response) => console.log('Team assignment saved:', response),
+                error: () => {} // Silently ignore duplicates
             });
         });
     }
@@ -607,6 +646,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
             if (line) {
                 this.loadWorkstations(line.id);
                 this.loadShiftsForProductionLine(line.id);
+            }
+        });
+
+        // Watch for date changes - keep session.date in sync with form
+        this.shiftSetupForm.get('date')?.valueChanges.subscribe((date: Date) => {
+            if (date) {
+                this.session.date = date;
+                console.log('Session date updated to:', date);
             }
         });
     }
