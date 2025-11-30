@@ -23,7 +23,7 @@ export interface Zone {
     Code_Zone: string;
 }
 
-export interface Machine {
+export interface DowntimeMachine {
     Id_Machine: number;
     Name_Machine: string;
     Code_Machine: string;

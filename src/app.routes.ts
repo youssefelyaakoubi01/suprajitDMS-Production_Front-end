@@ -1,17 +1,24 @@
 import { Routes } from '@angular/router';
 import { AppLayout } from './app/layout/component/app.layout';
 import { AppDmsLayout } from './app/layout/component/app.dms-layout';
+import { AppDmsHrLayout } from './app/layout/component/app.dms-hr-layout';
 
 export const appRoutes: Routes = [
     {
         path: '',
-        redirectTo: 'dms-login',
+        redirectTo: 'dms-home',
         pathMatch: 'full'
+    },
+    // ==================== DMS HOME (SELECTOR) ====================
+    {
+        path: 'dms-home',
+        loadComponent: () => import('./app/features/dms-selector/dms-selector.component').then(m => m.DmsSelectorComponent)
     },
     {
         path: 'dms-login',
         loadComponent: () => import('./app/features/dms-login/dms-login.component').then(m => m.DmsLoginComponent)
     },
+    // ==================== DMS PRODUCTION ====================
     {
         path: 'dms-production',
         component: AppDmsLayout,
@@ -40,20 +47,10 @@ export const appRoutes: Routes = [
             {
                 path: 'settings/shifts',
                 loadComponent: () => import('./app/features/settings/shifts.component').then(m => m.ShiftsComponent)
-            }
-        ]
-    },
-    {
-        path: '',
-        component: AppLayout,
-        children: [
-            {
-                path: 'inventory',
-                loadComponent: () => import('./app/features/inventory/inventory.component').then(m => m.InventoryComponent)
             },
             {
-                path: 'hr',
-                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent)
+                path: 'downtime-declaration',
+                loadComponent: () => import('./app/features/downtime-declaration/downtime-declaration.component').then(m => m.DowntimeDeclarationComponent)
             },
             {
                 path: 'quality',
@@ -64,13 +61,131 @@ export const appRoutes: Routes = [
                 loadComponent: () => import('./app/features/maintenance/maintenance.component').then(m => m.MaintenanceComponent)
             },
             {
+                path: 'inventory',
+                loadComponent: () => import('./app/features/inventory/inventory.component').then(m => m.InventoryComponent)
+            }
+        ]
+    },
+    // ==================== DMS HR ====================
+    {
+        path: 'dms-hr',
+        component: AppDmsHrLayout,
+        children: [
+            {
+                path: '',
+                redirectTo: 'dashboard',
+                pathMatch: 'full'
+            },
+            {
+                path: 'dashboard',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'dashboard' }
+            },
+            {
+                path: 'employees',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'employees' }
+            },
+            {
+                path: 'formations',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'formations' }
+            },
+            {
+                path: 'qualifications',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'qualifications' }
+            },
+            {
+                path: 'versatility',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'versatility' }
+            },
+            {
+                path: 'recyclage',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'recyclage' }
+            },
+            {
+                path: 'teams',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'teams' }
+            }
+        ]
+    },
+    // ==================== DMS MAINTENANCE ====================
+    {
+        path: 'dms-maintenance',
+        component: AppDmsLayout,
+        children: [
+            {
+                path: '',
+                redirectTo: 'dashboard',
+                pathMatch: 'full'
+            },
+            {
+                path: 'dashboard',
+                loadComponent: () => import('./app/features/maintenance/maintenance.component').then(m => m.MaintenanceComponent)
+            }
+        ]
+    },
+    // ==================== DMS INVENTORY ====================
+    {
+        path: 'dms-inventory',
+        component: AppDmsLayout,
+        children: [
+            {
+                path: '',
+                redirectTo: 'dashboard',
+                pathMatch: 'full'
+            },
+            {
+                path: 'dashboard',
+                loadComponent: () => import('./app/features/inventory/inventory.component').then(m => m.InventoryComponent)
+            }
+        ]
+    },
+    // ==================== DMS QUALITY ====================
+    {
+        path: 'dms-quality',
+        component: AppDmsLayout,
+        children: [
+            {
+                path: '',
+                redirectTo: 'dashboard',
+                pathMatch: 'full'
+            },
+            {
+                path: 'dashboard',
+                loadComponent: () => import('./app/features/quality/quality.component').then(m => m.QualityComponent)
+            }
+        ]
+    },
+    // ==================== ANALYTICS ====================
+    {
+        path: 'analytics',
+        component: AppDmsLayout,
+        children: [
+            {
+                path: '',
+                redirectTo: 'kpi',
+                pathMatch: 'full'
+            },
+            {
                 path: 'kpi',
                 loadComponent: () => import('./app/features/kpi/kpi.component').then(m => m.KpiComponent)
             },
             {
                 path: 'lessons',
                 loadComponent: () => import('./app/features/lessons/lessons.component').then(m => m.LessonsComponent)
-            },
+            }
+        ]
+    },
+    // ==================== OTHER ====================
+    {
+        path: '',
+        component: AppLayout,
+        children: [
             {
                 path: 'uikit',
                 loadChildren: () => import('./app/pages/uikit/uikit.routes')

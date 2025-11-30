@@ -1,0 +1,401 @@
+<div class="hr-employees">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="pi pi-users"></i>
+            </div>
+            <div class="header-text">
+                <h1>Employees</h1>
+                <p>Manage your workforce</p>
+            </div>
+        </div>
+        <div class="header-stats">
+            <div class="stat-item">
+                <span class="stat-value">{{ employees.length }}</span>
+                <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-item success">
+                <span class="stat-value">{{ employees.filter(e => e.EmpStatus === 'Active').length }}</span>
+                <span class="stat-label">Active</span>
+            </div>
+            <div class="stat-item warning">
+                <span class="stat-value">{{ employees.filter(e => e.EmpStatus === 'On Leave').length }}</span>
+                <span class="stat-label">On Leave</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <p-card styleClass="toolbar-card">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <p-button
+                    label="New Employee"
+                    icon="pi pi-plus"
+                    (click)="openNewEmployeeDialog()">
+                </p-button>
+                <p-button
+                    label="Import"
+                    icon="pi pi-upload"
+                    severity="secondary"
+                    [outlined]="true"
+                    (click)="openImportDialog()">
+                </p-button>
+                <p-splitButton
+                    label="Export"
+                    icon="pi pi-download"
+                    [model]="exportItems"
+                    severity="secondary"
+                    [outlined]="true">
+                </p-splitButton>
+                <p-button
+                    *ngIf="selectedEmployees.length > 0"
+                    label="Delete Selected"
+                    icon="pi pi-trash"
+                    severity="danger"
+                    [outlined]="true"
+                    [badge]="selectedEmployees.length.toString()"
+                    (click)="deleteSelectedEmployees()">
+                </p-button>
+            </div>
+            <div class="toolbar-right">
+                <p-inputGroup>
+                    <p-inputGroupAddon>
+                        <i class="pi pi-search"></i>
+                    </p-inputGroupAddon>
+                    <input
+                        pInputText
+                        type="text"
+                        placeholder="Search employees..."
+                        [(ngModel)]="searchText"
+                        (input)="onGlobalFilter($event)" />
+                </p-inputGroup>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-row">
+            <p-select
+                [(ngModel)]="selectedDepartment"
+                [options]="departmentOptions"
+                placeholder="All Departments"
+                [showClear]="true"
+                styleClass="filter-select">
+            </p-select>
+            <p-select
+                [(ngModel)]="selectedCategory"
+                [options]="categoryOptions"
+                placeholder="All Categories"
+                [showClear]="true"
+                styleClass="filter-select">
+            </p-select>
+            <p-select
+                [(ngModel)]="selectedStatus"
+                [options]="statusOptions"
+                placeholder="All Statuses"
+                [showClear]="true"
+                styleClass="filter-select">
+            </p-select>
+            <p-button
+                icon="pi pi-filter-slash"
+                label="Clear"
+                [text]="true"
+                (click)="clearFilters()">
+            </p-button>
+        </div>
+    </p-card>
+
+    <!-- Data Table -->
+    <p-card styleClass="table-card">
+        <p-table
+            #dt
+            [value]="employees"
+            [(selection)]="selectedEmployees"
+            [rows]="10"
+            [paginator]="true"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [loading]="loading"
+            [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Departement_Emp', 'Categorie_Emp', 'BadgeNumber']"
+            [rowHover]="true"
+            dataKey="Id_Emp"
+            styleClass="p-datatable-striped"
+            responsiveLayout="scroll"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} employees">
+
+            <ng-template pTemplate="header">
+                <tr>
+                    <th style="width: 3rem">
+                        <p-tableHeaderCheckbox></p-tableHeaderCheckbox>
+                    </th>
+                    <th pSortableColumn="Prenom_Emp">Employee <p-sortIcon field="Prenom_Emp"></p-sortIcon></th>
+                    <th pSortableColumn="BadgeNumber">Badge # <p-sortIcon field="BadgeNumber"></p-sortIcon></th>
+                    <th pSortableColumn="Departement_Emp">Department <p-sortIcon field="Departement_Emp"></p-sortIcon></th>
+                    <th pSortableColumn="Categorie_Emp">Category <p-sortIcon field="Categorie_Emp"></p-sortIcon></th>
+                    <th pSortableColumn="team.name">Team <p-sortIcon field="team.name"></p-sortIcon></th>
+                    <th pSortableColumn="trajet.name">Trajet <p-sortIcon field="trajet.name"></p-sortIcon></th>
+                    <th pSortableColumn="EmpStatus">Status <p-sortIcon field="EmpStatus"></p-sortIcon></th>
+                    <th style="width: 10rem">Actions</th>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="body" let-employee>
+                <tr>
+                    <td>
+                        <p-tableCheckbox [value]="employee"></p-tableCheckbox>
+                    </td>
+                    <td>
+                        <div class="employee-cell">
+                            <p-avatar
+                                [label]="getInitials(employee)"
+                                shape="circle"
+                                size="large"
+                                [style]="{'background-color': employee.Genre_Emp === 'F' ? '#EC4899' : '#3B82F6', 'color': 'white'}">
+                            </p-avatar>
+                            <div class="employee-info">
+                                <span class="employee-name">{{ employee.Prenom_Emp }} {{ employee.Nom_Emp }}</span>
+                                <span class="employee-meta">
+                                    <i [class]="employee.Genre_Emp === 'F' ? 'pi pi-venus' : 'pi pi-mars'"></i>
+                                    {{ calculateSeniority(employee.DateEmbauche_Emp) }}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge-number">{{ employee.BadgeNumber }}</span>
+                    </td>
+                    <td>
+                        <p-chip [label]="employee.Departement_Emp" styleClass="department-chip"></p-chip>
+                    </td>
+                    <td>{{ employee.category_fk?.name || employee.Categorie_Emp }}</td>
+                    <td>{{ employee.team?.name || '-' }}</td>
+                    <td>{{ employee.trajet?.name || '-' }}</td>
+                    <td>
+                        <p-tag [value]="employee.EmpStatus" [severity]="getStatusSeverity(employee.EmpStatus)"></p-tag>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <p-button
+                                icon="pi pi-eye"
+                                [rounded]="true"
+                                [text]="true"
+                                pTooltip="View Details"
+                                (click)="viewEmployee(employee)">
+                            </p-button>
+                            <p-button
+                                icon="pi pi-pencil"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="info"
+                                pTooltip="Edit"
+                                (click)="editEmployee(employee)">
+                            </p-button>
+                            <p-button
+                                icon="pi pi-trash"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="danger"
+                                pTooltip="Delete"
+                                (click)="deleteEmployee(employee)">
+                            </p-button>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="8" class="text-center p-5">
+                        <div class="empty-state">
+                            <i class="pi pi-users"></i>
+                            <p>No employees found</p>
+                            <p-button label="Add Employee" icon="pi pi-plus" (click)="openNewEmployeeDialog()"></p-button>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </p-card>
+</div>
+
+<!-- Employee Dialog -->
+<p-dialog
+    [(visible)]="showEmployeeDialog"
+    [header]="isEditMode ? 'Edit Employee' : 'New Employee'"
+    [modal]="true"
+    [style]="{width: '650px'}"
+    [closable]="true"
+    [draggable]="false">
+
+    <form [formGroup]="employeeForm" class="employee-form">
+        <!-- Personal Information -->
+        <div class="form-section">
+            <h4><i class="pi pi-user"></i> Personal Information</h4>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="prenom">First Name *</label>
+                    <input pInputText id="prenom" formControlName="Prenom_Emp" placeholder="Enter first name" />
+                    <small *ngIf="employeeForm.get('Prenom_Emp')?.invalid && employeeForm.get('Prenom_Emp')?.touched" class="p-error">
+                        First name is required
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="nom">Last Name *</label>
+                    <input pInputText id="nom" formControlName="Nom_Emp" placeholder="Enter last name" />
+                    <small *ngIf="employeeForm.get('Nom_Emp')?.invalid && employeeForm.get('Nom_Emp')?.touched" class="p-error">
+                        Last name is required
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="dob">Date of Birth</label>
+                    <p-datepicker id="dob" formControlName="DateNaissance_Emp" [showIcon]="true" dateFormat="dd/mm/yy" placeholder="Select date"></p-datepicker>
+                </div>
+                <div class="form-field">
+                    <label for="gender">Gender *</label>
+                    <p-select id="gender" formControlName="Genre_Emp" [options]="genderOptions" placeholder="Select gender"></p-select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Employment Information -->
+        <div class="form-section">
+            <h4><i class="pi pi-briefcase"></i> Employment Information</h4>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="badge">Badge Number</label>
+                    <input pInputText id="badge" formControlName="BadgeNumber" placeholder="EMP000" />
+                </div>
+                <div class="form-field">
+                    <label for="hireDate">Hire Date *</label>
+                    <p-datepicker id="hireDate" formControlName="DateEmbauche_Emp" [showIcon]="true" dateFormat="dd/mm/yy" placeholder="Select date"></p-datepicker>
+                </div>
+                <div class="form-field">
+                    <label for="department">Department *</label>
+                    <p-select id="department" formControlName="Departement_Emp" [options]="departmentOptions" placeholder="Select department"></p-select>
+                </div>
+                <div class="form-field">
+                    <label for="category">Category *</label>
+                    <p-select id="category" formControlName="category_fk" [options]="categoryOptions" placeholder="Select category" optionLabel="label"></p-select>
+                </div>
+                <div class="form-field">
+                    <label for="team">Team</label>
+                    <p-select id="team" formControlName="team" [options]="teamOptions" placeholder="Select team" [showClear]="true" optionLabel="label"></p-select>
+                </div>
+                <div class="form-field">
+                    <label for="trajet">Trajet</label>
+                    <p-select id="trajet" formControlName="trajet" [options]="trajetOptions" placeholder="Select trajet" [showClear]="true" optionLabel="label"></p-select>
+                </div>
+                <div class="form-field">
+                    <label for="status">Status *</label>
+                    <p-select id="status" formControlName="EmpStatus" [options]="statusOptions" placeholder="Select status"></p-select>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showEmployeeDialog = false"></p-button>
+        <p-button label="Save" icon="pi pi-check" (click)="saveEmployee()" [loading]="saving"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Details Dialog -->
+<p-dialog
+    [(visible)]="showDetailsDialog"
+    header="Employee Details"
+    [modal]="true"
+    [style]="{width: '600px'}"
+    [closable]="true">
+
+    <div *ngIf="selectedEmployee" class="employee-details">
+        <div class="details-header">
+            <p-avatar
+                [label]="getInitials(selectedEmployee)"
+                shape="circle"
+                size="xlarge"
+                [style]="{'background-color': selectedEmployee.Genre_Emp === 'F' ? '#EC4899' : '#3B82F6', 'color': 'white', 'font-size': '1.5rem'}">
+            </p-avatar>
+            <div class="details-name">
+                <h3>{{ selectedEmployee.Prenom_Emp }} {{ selectedEmployee.Nom_Emp }}</h3>
+                <p>{{ selectedEmployee.category_fk?.name || selectedEmployee.Categorie_Emp }} - {{ selectedEmployee.Departement_Emp }}</p>
+                <p-tag [value]="selectedEmployee.EmpStatus" [severity]="getStatusSeverity(selectedEmployee.EmpStatus)"></p-tag>
+            </div>
+        </div>
+
+        <div class="details-grid">
+            <div class="detail-item">
+                <label>Badge Number</label>
+                <span>{{ selectedEmployee.BadgeNumber || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>Gender</label>
+                <span>{{ getGenderLabel(selectedEmployee.Genre_Emp) }}</span>
+            </div>
+            <div class="detail-item">
+                <label>Date of Birth</label>
+                <span>{{ selectedEmployee.DateNaissance_Emp | date:'MMM d, yyyy' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>Age</label>
+                <span>{{ calculateAge(selectedEmployee.DateNaissance_Emp) }} years</span>
+            </div>
+            <div class="detail-item">
+                <label>Hire Date</label>
+                <span>{{ selectedEmployee.DateEmbauche_Emp | date:'MMM d, yyyy' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>Team</label>
+                <span>{{ selectedEmployee.team?.name || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>Trajet</label>
+                <span>{{ selectedEmployee.trajet?.name || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>Seniority</label>
+                <span>{{ calculateSeniority(selectedEmployee.DateEmbauche_Emp) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Edit" icon="pi pi-pencil" (click)="editEmployee(selectedEmployee!); showDetailsDialog = false"></p-button>
+        <p-button label="Close" icon="pi pi-times" [text]="true" (click)="showDetailsDialog = false"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Import Dialog -->
+<p-dialog
+    [(visible)]="showImportDialog"
+    header="Import Employees"
+    [modal]="true"
+    [style]="{width: '500px'}">
+
+    <div class="import-container">
+        <div class="import-info">
+            <i class="pi pi-info-circle"></i>
+            <p>Upload an Excel file (.xlsx) with employee data. Download the template for the correct format.</p>
+        </div>
+        <p-fileUpload
+            mode="advanced"
+            accept=".xlsx,.xls"
+            [maxFileSize]="5000000"
+            (onUpload)="onFileUpload($event)"
+            chooseLabel="Choose File"
+            uploadLabel="Import"
+            cancelLabel="Cancel">
+            <ng-template pTemplate="empty">
+                <div class="upload-placeholder">
+                    <i class="pi pi-cloud-upload"></i>
+                    <p>Drag and drop file here or click to browse</p>
+                </div>
+            </ng-template>
+        </p-fileUpload>
+        <p-button label="Download Template" icon="pi pi-download" [text]="true" styleClass="mt-3"></p-button>
+    </div>
+</p-dialog>
+
+<!-- Toast & Confirm Dialog -->
+<p-toast position="top-right"></p-toast>
+<p-confirmDialog></p-confirmDialog>

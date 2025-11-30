@@ -59,6 +59,29 @@ export interface Workstation {
     Name_Workstation: string;
     Code_Workstation: string;
     Id_ProdLine: number;
+    machines_count?: number;
+}
+
+export interface Machine {
+    id: number;
+    name: string;
+    code: string;
+    workstation: number;
+    workstation_name?: string;
+    workstation_code?: string;
+    production_line_name?: string;
+    production_line_id?: number;
+    description?: string;
+    manufacturer?: string;
+    model_number?: string;
+    serial_number?: string;
+    status: 'operational' | 'maintenance' | 'breakdown' | 'idle';
+    installation_date?: string;
+    last_maintenance_date?: string;
+    next_maintenance_date?: string;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface Shift {

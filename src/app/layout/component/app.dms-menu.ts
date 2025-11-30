@@ -42,6 +42,11 @@ export class AppDmsMenu {
                         label: 'Downtime List',
                         icon: 'pi pi-fw pi-clock',
                         routerLink: ['/dms-production/downtime-list']
+                    },
+                    {
+                        label: 'Declare Downtime',
+                        icon: 'pi pi-fw pi-exclamation-triangle',
+                        routerLink: ['/dms-production/downtime-declaration']
                     }
                 ]
             },
@@ -61,9 +66,9 @@ export class AppDmsMenu {
                 label: 'Navigation',
                 items: [
                     {
-                        label: 'Back to Main',
+                        label: 'Back to DMS Home',
                         icon: 'pi pi-fw pi-arrow-left',
-                        routerLink: ['/inventory']
+                        routerLink: ['/dms-home']
                     }
                 ]
             }

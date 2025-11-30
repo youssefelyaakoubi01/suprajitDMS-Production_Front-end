@@ -1,77 +1,667 @@
 <div class="hr-container">
+    <!-- Page Header -->
     <div class="page-header">
         <div>
-            <h1 class="page-title">HR & Employees</h1>
-            <p class="page-subtitle">Manage employees and qualifications</p>
+            <h1 class="page-title">DMS - Human Resources</h1>
+            <p class="page-subtitle">Manage employees, formations, qualifications and teams</p>
         </div>
-        <p-button label="Add Employee" icon="pi pi-plus"></p-button>
+        <div class="header-actions">
+            <p-button label="Import Excel" icon="pi pi-upload" severity="secondary"
+                (click)="openImportDialog()"></p-button>
+            <p-button label="Export" icon="pi pi-download" severity="secondary" (click)="exportEmployees()"></p-button>
+            <p-button label="Add Employee" icon="pi pi-plus" (click)="openNewEmployeeDialog()"></p-button>
+        </div>
     </div>
 
-    <p-tabs value="0">
+    <!-- Main Tabs -->
+    <p-tabs [value]="activeTab" (onChange)="onTabChange($event)">
         <p-tablist>
-            <p-tab value="0">Employee Directory</p-tab>
-            <p-tab value="1">Qualification Matrix</p-tab>
-            <p-tab value="2">Attendance</p-tab>
+            <p-tab value="0"><i class="pi pi-chart-bar mr-2"></i>Dashboard</p-tab>
+            <p-tab value="1"><i class="pi pi-users mr-2"></i>Employees</p-tab>
+            <p-tab value="2"><i class="pi pi-book mr-2"></i>Formations</p-tab>
+            <p-tab value="3"><i class="pi pi-th-large mr-2"></i>Versatility Matrix</p-tab>
+            <p-tab value="4"><i class="pi pi-refresh mr-2"></i>Recyclage</p-tab>
+            <p-tab value="5"><i class="pi pi-sitemap mr-2"></i>Teams & Trainers</p-tab>
         </p-tablist>
+
         <p-tabpanels>
+            <!-- TAB 0: Dashboard -->
             <p-tabpanel value="0">
-                <div class="search-bar mt-4">
-                    <span class="p-input-icon-left">
+                <div class="dashboard-grid" *ngIf="dashboardStats">
+                    <!-- KPI Cards -->
+                    <div class="kpi-row">
+                        <p-card styleClass="kpi-card kpi-primary">
+                            <div class="kpi-content">
+                                <div class="kpi-icon"><i class="pi pi-users"></i></div>
+                                <div class="kpi-info">
+                                    <span class="kpi-value">{{ dashboardStats.totalEmployees }}</span>
+                                    <span class="kpi-label">Total Employees</span>
+                                </div>
+                            </div>
+                        </p-card>
+
+                        <p-card styleClass="kpi-card kpi-success">
+                            <div class="kpi-content">
+                                <div class="kpi-icon"><i class="pi pi-check-circle"></i></div>
+                                <div class="kpi-info">
+                                    <span class="kpi-value">{{ dashboardStats.activeEmployees }}</span>
+                                    <span class="kpi-label">Active Employees</span>
+                                </div>
+                            </div>
+                        </p-card>
+
+                        <p-card styleClass="kpi-card kpi-warning">
+                            <div class="kpi-content">
+                                <div class="kpi-icon"><i class="pi pi-exclamation-triangle"></i></div>
+                                <div class="kpi-info">
+                                    <span class="kpi-value">{{ dashboardStats.employeesRequiringRecyclage }}</span>
+                                    <span class="kpi-label">Require Recyclage</span>
+                                </div>
+                            </div>
+                        </p-card>
+
+                        <p-card styleClass="kpi-card kpi-info">
+                            <div class="kpi-content">
+                                <div class="kpi-icon"><i class="pi pi-percentage"></i></div>
+                                <div class="kpi-info">
+                                    <span class="kpi-value">{{ dashboardStats.qualificationCompletionRate }}%</span>
+                                    <span class="kpi-label">Qualification Rate</span>
+                                </div>
+                            </div>
+                        </p-card>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="charts-row">
+                        <p-card header="Employees by Department">
+                            <div class="chart-container">
+                                <p-chart type="doughnut" [data]="employeesByDeptChart"
+                                    [options]="chartOptions"></p-chart>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Employees by Category">
+                            <div class="chart-container">
+                                <p-chart type="pie" [data]="employeesByCategoryChart"
+                                    [options]="chartOptions"></p-chart>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Formations by Type" *ngIf="formationStats">
+                            <div class="chart-container">
+                                <p-chart type="bar" [data]="formationsByTypeChart" [options]="chartOptions"></p-chart>
+                            </div>
+                        </p-card>
+                    </div>
+
+                    <!-- Formation Stats -->
+                    <div class="stats-row" *ngIf="formationStats">
+                        <p-card header="Formation Overview">
+                            <div class="formation-stats">
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ formationStats.totalFormations }}</span>
+                                    <span class="stat-label">Total Formations</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value text-warning">{{ formationStats.plannedFormations }}</span>
+                                    <span class="stat-label">Planned</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value text-success">{{ formationStats.completedFormations
+                                        }}</span>
+                                    <span class="stat-label">Completed</span>
+                                </div>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Versatility Score">
+                            <div class="versatility-score">
+                                <div class="score-circle">
+                                    <span class="score-value">{{ dashboardStats.averageVersatility | number:'1.1-1'
+                                        }}</span>
+                                    <span class="score-max">/ 4</span>
+                                </div>
+                                <p-progressBar [value]="(dashboardStats.averageVersatility / 4) * 100"
+                                    [showValue]="false"></p-progressBar>
+                                <span class="score-label">Average Versatility Level</span>
+                            </div>
+                        </p-card>
+                    </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 1: Employee Directory -->
+            <p-tabpanel value="1">
+                <!-- Filters -->
+                <div class="filters-bar">
+                    <span class="p-input-icon-left flex-grow-1">
                         <i class="pi pi-search"></i>
-                        <input type="text" pInputText [(ngModel)]="searchTerm" placeholder="Search employees..." />
+                        <input type="text" pInputText [(ngModel)]="searchTerm"
+                            placeholder="Search by name, ID or badge..." class="w-full" />
                     </span>
+                    <p-select [options]="departments" [(ngModel)]="selectedDepartment" optionLabel="department"
+                        optionValue="department" placeholder="Department" [showClear]="true"
+                        class="filter-dropdown"></p-select>
+                    <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="categoryDescription"
+                        optionValue="categoryDescription" placeholder="Category" [showClear]="true"
+                        class="filter-dropdown"></p-select>
+                    <p-select [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label"
+                        optionValue="value" placeholder="Status" [showClear]="true" class="filter-dropdown"></p-select>
+                    <p-button icon="pi pi-filter-slash" severity="secondary" [text]="true" (click)="clearFilters()"
+                        pTooltip="Clear filters"></p-button>
                 </div>
 
-                <p-table [value]="filteredEmployees" [paginator]="true" [rows]="10" [rowHover]="true" class="mt-4">
+                <!-- Employee Table -->
+                <p-table #employeeTable [value]="filteredEmployees" [paginator]="true" [rows]="10" [rowHover]="true"
+                    [loading]="loading" [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'Departement_Emp']">
                     <ng-template pTemplate="header">
                         <tr>
-                            <th>Photo</th>
+                            <th style="width: 60px">Photo</th>
                             <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
-                            <th>ID</th>
-                            <th pSortableColumn="Categorie_Emp">Category <p-sortIcon field="Categorie_Emp"></p-sortIcon></th>
-                            <th pSortableColumn="Departement_Emp">Department <p-sortIcon field="Departement_Emp"></p-sortIcon></th>
-                            <th>Hire Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th style="width: 80px">ID</th>
+                            <th pSortableColumn="Categorie_Emp">Category <p-sortIcon field="Categorie_Emp"></p-sortIcon>
+                            </th>
+                            <th pSortableColumn="team.name">Team <p-sortIcon field="team.name"></p-sortIcon></th>
+                            <th pSortableColumn="trajet.name">Trajet <p-sortIcon field="trajet.name"></p-sortIcon></th>
+                            <th pSortableColumn="Departement_Emp">Department <p-sortIcon
+                                    field="Departement_Emp"></p-sortIcon></th>
+                            <th pSortableColumn="DateEmbauche_Emp">Hire Date <p-sortIcon
+                                    field="DateEmbauche_Emp"></p-sortIcon></th>
+                            <th style="width: 100px">Status</th>
+                            <th style="width: 150px">Actions</th>
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-emp>
                         <tr>
-                            <td><p-avatar [image]="emp.Picture" shape="circle" size="large"></p-avatar></td>
-                            <td><span class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span></td>
-                            <td>{{ emp.Id_Emp }}</td>
-                            <td>{{ emp.Categorie_Emp }}</td>
+                            <td>
+                                <p-avatar *ngIf="emp.Picture" [image]="emp.Picture" shape="circle"
+                                    size="large"></p-avatar>
+                                <p-avatar *ngIf="!emp.Picture" [label]="getInitials(emp)" shape="circle" size="large"
+                                    styleClass="bg-primary text-white"></p-avatar>
+                            </td>
+                            <td>
+                                <span class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
+                                <br><small class="text-color-secondary">{{ emp.Genre_Emp === 'M' ? 'Male' : 'Female'
+                                    }}</small>
+                            </td>
+                            <td><span class="font-mono">{{ emp.Id_Emp }}</span></td>
+                            <td>{{ emp.category_fk?.name || emp.Categorie_Emp }}</td>
+                            <td>{{ getTeamName(emp.team) }}</td>
+                            <td>{{ getTrajetName(emp.trajet) }}</td>
                             <td>{{ emp.Departement_Emp }}</td>
                             <td>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
-                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag></td>
+                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag>
+                            </td>
                             <td>
-                                <p-button icon="pi pi-eye" [rounded]="true" [text]="true" (click)="viewEmployee(emp)"></p-button>
-                                <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"></p-button>
+                                <p-button icon="pi pi-eye" [rounded]="true" [text]="true" severity="info"
+                                    (click)="viewEmployee(emp)" pTooltip="View"></p-button>
+                                <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" (click)="editEmployee(emp)"
+                                    pTooltip="Edit"></p-button>
+                                <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                    (click)="deleteEmployee(emp)" pTooltip="Delete"></p-button>
+                            </td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="8" class="text-center p-4">
+                                <i class="pi pi-inbox text-4xl text-color-secondary mb-3"></i>
+                                <p>No employees found</p>
                             </td>
                         </tr>
                     </ng-template>
                 </p-table>
             </p-tabpanel>
 
-            <p-tabpanel value="1">
-                <p-card class="mt-4">
-                    <div class="text-center p-4">
-                        <i class="pi pi-table text-4xl text-color-secondary mb-3"></i>
-                        <p>Qualification matrix will be displayed here</p>
+            <!-- TAB 2: Formations -->
+            <p-tabpanel value="2">
+                <div class="tab-header">
+                    <h3>Training & Formations</h3>
+                    <div class="tab-actions">
+                        <p-button label="New Qualification" icon="pi pi-plus-circle" severity="secondary"
+                            (click)="openNewQualificationDialog()"></p-button>
+                        <p-button label="New Formation" icon="pi pi-plus" (click)="openNewFormationDialog()"></p-button>
                     </div>
+                </div>
+
+                <div class="formations-grid">
+                    <!-- Formations List -->
+                    <p-card header="Available Formations">
+                        <p-table [value]="formations" [rows]="5" [paginator]="true">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Process</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-formation>
+                                <tr>
+                                    <td class="font-semibold">{{ formation.name_formation }}</td>
+                                    <td><p-tag [value]="formation.type_formation"></p-tag></td>
+                                    <td>{{ processes | json }}</td>
+                                    <td>
+                                        <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"
+                                            (click)="editFormation(formation)"></p-button>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </p-card>
+
+                    <!-- Trainers List -->
+                    <p-card header="Trainers (Formateurs)">
+                        <div class="trainers-list">
+                            <div class="trainer-card" *ngFor="let trainer of formateurs">
+                                <p-avatar [label]="trainer.name.charAt(0)" shape="circle" size="large"
+                                    styleClass="bg-purple-500 text-white"></p-avatar>
+                                <div class="trainer-info">
+                                    <span class="trainer-name">{{ trainer.name }}</span>
+                                    <span class="trainer-email">{{ trainer.email || trainer.login }}</span>
+                                </div>
+                                <p-tag [value]="trainer.is_active ? 'Active' : 'Inactive'"
+                                    [severity]="trainer.is_active ? 'success' : 'danger'"></p-tag>
+                                <p-badge *ngIf="trainer.IsAdmin" value="Admin" severity="info"></p-badge>
+                            </div>
+                        </div>
+                        <p-button label="Add Trainer" icon="pi pi-plus" [text]="true" class="mt-3"
+                            (click)="openNewFormateurDialog()"></p-button>
+                    </p-card>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 3: Versatility Matrix -->
+            <p-tabpanel value="3">
+                <div class="tab-header">
+                    <h3>Versatility Matrix</h3>
+                    <div class="legend">
+                        <span *ngFor="let level of qualificationLevels" class="legend-item">
+                            <span class="legend-color" [style.background-color]="level.color"></span>
+                            {{ level.label }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="matrix-container" *ngIf="versatilityMatrix">
+                    <table class="versatility-table">
+                        <thead>
+                            <tr>
+                                <th class="employee-header">Employee</th>
+                                <th *ngFor="let ws of versatilityMatrix.workstations" class="ws-header">
+                                    {{ ws.desc_workstation }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let emp of versatilityMatrix.employees">
+                                <td class="employee-cell">
+                                    <div class="employee-info-mini">
+                                        <p-avatar [label]="getInitials(emp)" shape="circle"
+                                            styleClass="bg-primary text-white"></p-avatar>
+                                        <span>{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
+                                    </div>
+                                </td>
+                                <td *ngFor="let ws of versatilityMatrix.workstations" class="level-cell">
+                                    <div class="level-indicator"
+                                        [style.background-color]="getVersatilityColor(getVersatilityLevel(emp.Id_Emp, ws.id_workstation))"
+                                        [pTooltip]="qualificationLevels[getVersatilityLevel(emp.Id_Emp, ws.id_workstation)].label"
+                                        (click)="updateVersatility(emp.Id_Emp, ws.id_workstation, (getVersatilityLevel(emp.Id_Emp, ws.id_workstation) + 1) % 5)">
+                                        {{ getVersatilityLevel(emp.Id_Emp, ws.id_workstation) }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 4: Recyclage -->
+            <p-tabpanel value="4">
+                <div class="tab-header">
+                    <h3>Employee Recyclage (Retraining)</h3>
+                    <p class="text-color-secondary">Employees who have completed 1 year since hiring and require
+                        retraining</p>
+                </div>
+
+                <p-card>
+                    <p-table [value]="recyclageEmployees" [rows]="10" [paginator]="true">
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th>Employee</th>
+                                <th>Hire Date</th>
+                                <th>Days Until Recyclage</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-rec>
+                            <tr>
+                                <td>
+                                    <div class="employee-info-mini">
+                                        <p-avatar [label]="getInitials(rec.Employee)" shape="circle"
+                                            styleClass="bg-primary text-white"></p-avatar>
+                                        <div>
+                                            <span class="font-semibold">{{ rec.Employee.Prenom_Emp }} {{
+                                                rec.Employee.Nom_Emp }}</span>
+                                            <br><small class="text-color-secondary">{{ rec.Employee.Categorie_Emp
+                                                }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ rec.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
+                                <td>
+                                    <span
+                                        [class]="rec.isOverdue ? 'text-danger font-bold' : (rec.daysUntilRecyclage <= 30 ? 'text-warning font-bold' : '')">
+                                        {{ rec.isOverdue ? 'Overdue by ' + (-rec.daysUntilRecyclage) + ' days' :
+                                        rec.daysUntilRecyclage + ' days remaining' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <p-tag [severity]="getRecyclageSeverity(rec)"
+                                        [value]="rec.isOverdue ? 'OVERDUE' : (rec.daysUntilRecyclage <= 30 ? 'DUE SOON' : 'OK')"></p-tag>
+                                </td>
+                                <td>
+                                    <p-button label="Plan Recyclage" icon="pi pi-calendar" size="small"
+                                        (click)="planRecyclage(rec)"></p-button>
+                                </td>
+                            </tr>
+                        </ng-template>
+                        <ng-template pTemplate="emptymessage">
+                            <tr>
+                                <td colspan="5" class="text-center p-4">
+                                    <i class="pi pi-check-circle text-4xl text-success mb-3"></i>
+                                    <p>No employees require recyclage at this time</p>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
                 </p-card>
             </p-tabpanel>
 
-            <p-tabpanel value="2">
-                <p-card class="mt-4">
-                    <div class="text-center p-4">
-                        <i class="pi pi-calendar text-4xl text-color-secondary mb-3"></i>
-                        <p>Attendance tracker will be displayed here</p>
-                    </div>
-                </p-card>
+            <!-- TAB 5: Teams & Trainers -->
+            <p-tabpanel value="5">
+                <div class="teams-trainers-grid">
+                    <!-- Teams -->
+                    <p-card header="Teams">
+                        <div class="team-list">
+                            <div class="team-card" *ngFor="let team of teams">
+                                <i class="pi pi-users team-icon"></i>
+                                <div class="team-info">
+                                    <span class="team-name">{{ team.name }}</span>
+                                    <span class="team-members">{{ getEmployeeCountByTeam(team.id) }} members</span>
+                                </div>
+                                <p-button icon="pi pi-eye" [rounded]="true" [text]="true"></p-button>
+                            </div>
+                        </div>
+                        <p-button label="New Team" icon="pi pi-plus" [text]="true" class="mt-3"
+                            (click)="openNewTeamDialog()"></p-button>
+                    </p-card>
+
+                    <!-- Categories -->
+                    <p-card header="Employee Categories">
+                        <div class="category-list">
+                            <div class="category-item" *ngFor="let cat of categories">
+                                <span class="category-name">{{ cat.name }}</span>
+                                <p-badge [value]="getEmployeeCountByCategory(cat.name)"></p-badge>
+                            </div>
+                        </div>
+                    </p-card>
+
+                    <!-- Departments -->
+                    <p-card header="Departments">
+                        <div class="department-list">
+                            <div class="department-item" *ngFor="let dept of departments">
+                                <span class="department-name">{{ dept.department }}</span>
+                                <p-badge [value]="getEmployeeCountByDepartment(dept.department)"
+                                    severity="info"></p-badge>
+                            </div>
+                        </div>
+                    </p-card>
+                </div>
             </p-tabpanel>
         </p-tabpanels>
     </p-tabs>
 </div>
 
+<!-- Employee Dialog -->
+<p-dialog [(visible)]="showEmployeeDialog" [header]="isEditMode ? 'Edit Employee' : 'New Employee'" [modal]="true"
+    [style]="{width: '650px'}" [closable]="true">
+    <form [formGroup]="employeeForm" class="employee-form">
+        <!-- Photo Upload Section -->
+        <div class="photo-upload-section" style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-ground); border-radius: 8px;">
+            <div class="photo-preview" style="flex-shrink: 0;">
+                <p-avatar *ngIf="employeePhotoPreview" [image]="employeePhotoPreview" shape="circle" size="xlarge"
+                    style="width: 80px; height: 80px;"></p-avatar>
+                <p-avatar *ngIf="!employeePhotoPreview" icon="pi pi-user" shape="circle" size="xlarge"
+                    style="width: 80px; height: 80px; background: var(--primary-color); color: white;"></p-avatar>
+            </div>
+            <div class="photo-actions" style="flex-grow: 1;">
+                <label for="photoUpload" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Employee Photo</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="file" id="photoUpload" accept="image/*" (change)="onPhotoSelect($event)"
+                        style="display: none;" #photoInput />
+                    <p-button label="Choose Photo" icon="pi pi-upload" [outlined]="true" size="small"
+                        (click)="photoInput.click()"></p-button>
+                    <p-button *ngIf="employeePhotoPreview" icon="pi pi-trash" [outlined]="true" severity="danger"
+                        size="small" (click)="removePhoto()"></p-button>
+                </div>
+                <small style="color: var(--text-color-secondary); margin-top: 0.25rem; display: block;">
+                    JPG, PNG or GIF. Max 2MB.
+                </small>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="prenom">First Name *</label>
+                <input pInputText id="prenom" formControlName="Prenom_Emp" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="nom">Last Name *</label>
+                <input pInputText id="nom" formControlName="Nom_Emp" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="dob">Date of Birth</label>
+                <p-datepicker id="dob" formControlName="DateNaissance_Emp" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="genre">Gender *</label>
+                <p-select id="genre" [options]="genderOptions" formControlName="Genre_Emp" optionLabel="label"
+                    optionValue="value" class="w-full"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="category">Category *</label>
+                <p-select id="category" [options]="categories" formControlName="category_fk" optionLabel="name"
+                    class="w-full"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="department">Department *</label>
+                <p-select id="department" [options]="departments" formControlName="Departement_Emp"
+                    optionLabel="department" optionValue="department" class="w-full"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="hiredate">Hire Date *</label>
+                <p-datepicker id="hiredate" formControlName="DateEmbauche_Emp" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="status">Status *</label>
+                <p-select id="status" [options]="statusOptions" formControlName="EmpStatus" optionLabel="label"
+                    optionValue="value" class="w-full"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="team">Team</label>
+                <p-select id="team" [options]="teams" formControlName="team" optionLabel="name" [showClear]="true"
+                    placeholder="Select team" class="w-full"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="trajet">Trajet</label>
+                <p-select id="trajet" [options]="trajets" formControlName="trajet" optionLabel="name" [showClear]="true"
+                    placeholder="Select trajet" class="w-full"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="badge">Badge Number</label>
+                <input pInputText id="badge" formControlName="BadgeNumber" class="w-full" />
+            </div>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showEmployeeDialog = false"></p-button>
+        <p-button label="Save" icon="pi pi-check" (click)="saveEmployee()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Formation Dialog -->
+<p-dialog [(visible)]="showFormationDialog" [header]="isEditMode ? 'Edit Formation' : 'New Formation'" [modal]="true"
+    [style]="{width: '500px'}">
+    <form [formGroup]="formationForm" class="formation-form">
+        <div class="form-field">
+            <label for="formationName">Formation Name *</label>
+            <input pInputText id="formationName" formControlName="name_formation" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="formationType">Type *</label>
+            <p-select id="formationType"
+                [options]="[{label: 'Safety', value: 'Safety'}, {label: 'Technical', value: 'Technical'}, {label: 'Quality', value: 'Quality'}]"
+                formControlName="type_formation" optionLabel="label" optionValue="value" class="w-full"></p-select>
+        </div>
+
+        <div class="form-field">
+            <label for="process">Process *</label>
+            <p-select id="process" [options]="processes" formControlName="id_process" optionLabel="desc_process"
+                optionValue="id_process" class="w-full"></p-select>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showFormationDialog = false"></p-button>
+        <p-button label="Save" icon="pi pi-check" (click)="saveFormation()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Qualification Dialog -->
+<p-dialog [(visible)]="showQualificationDialog" header="New Qualification" [modal]="true" [style]="{width: '550px'}">
+    <form [formGroup]="qualificationForm" class="qualification-form">
+        <div class="form-field">
+            <label for="qEmployee">Employee *</label>
+            <p-select id="qEmployee" [options]="employees" formControlName="Id_Emp" optionLabel="Nom_Emp"
+                optionValue="Id_Emp" [filter]="true" class="w-full">
+                <ng-template let-emp pTemplate="item">
+                    {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                </ng-template>
+            </p-select>
+        </div>
+
+        <div class="form-field">
+            <label for="qFormation">Formation *</label>
+            <p-select id="qFormation" [options]="formations" formControlName="id_formation" optionLabel="name_formation"
+                optionValue="id_formation" class="w-full"></p-select>
+        </div>
+
+        <div class="form-field">
+            <label for="qTrainer">Trainer *</label>
+            <p-select id="qTrainer" [options]="formateurs" formControlName="Trainer" optionLabel="Name"
+                optionValue="TrainerID" class="w-full"></p-select>
+        </div>
+
+        <div class="form-field">
+            <label for="qStartDate">Start Date *</label>
+            <p-datepicker id="qStartDate" formControlName="start_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
+                class="w-full"></p-datepicker>
+        </div>
+
+        <div class="form-field">
+            <label for="qComment">Comment</label>
+            <textarea pInputTextarea id="qComment" formControlName="comment_qualif" rows="3" class="w-full"></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showQualificationDialog = false"></p-button>
+        <p-button label="Create" icon="pi pi-check" (click)="saveQualification()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Team Dialog -->
+<p-dialog [(visible)]="showTeamDialog" header="New Team" [modal]="true" [style]="{width: '400px'}">
+    <form [formGroup]="teamForm">
+        <div class="form-field">
+            <label for="teamName">Team Name *</label>
+            <input pInputText id="teamName" formControlName="teamName" class="w-full" />
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showTeamDialog = false"></p-button>
+        <p-button label="Create" icon="pi pi-check" (click)="saveTeam()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Formateur Dialog -->
+<p-dialog [(visible)]="showFormateurDialog" header="New Trainer" [modal]="true" [style]="{width: '450px'}">
+    <form [formGroup]="formateurForm">
+        <div class="form-field">
+            <label for="trainerName">Name *</label>
+            <input pInputText id="trainerName" formControlName="Name" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerEmail">Email</label>
+            <input pInputText id="trainerEmail" formControlName="Email" type="email" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerLogin">Login *</label>
+            <input pInputText id="trainerLogin" formControlName="login" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerStatus">Status *</label>
+            <p-select id="trainerStatus" [options]="statusOptions" formControlName="Status" optionLabel="label"
+                optionValue="value" class="w-full"></p-select>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showFormateurDialog = false"></p-button>
+        <p-button label="Create" icon="pi pi-check" (click)="saveFormateur()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Import Dialog -->
+<p-dialog [(visible)]="showImportDialog" header="Import Employees from Excel" [modal]="true" [style]="{width: '500px'}">
+    <div class="import-container">
+        <p class="mb-3">Upload an Excel file (.xlsx) containing employee data.</p>
+        <p-fileUpload mode="advanced" name="file" accept=".xlsx,.xls" [maxFileSize]="10000000"
+            (onUpload)="onFileUpload($event)" chooseLabel="Choose File" uploadLabel="Import" cancelLabel="Cancel">
+            <ng-template pTemplate="empty">
+                <div class="upload-placeholder">
+                    <i class="pi pi-cloud-upload text-4xl text-color-secondary"></i>
+                    <p>Drag and drop file here or click to browse</p>
+                </div>
+            </ng-template>
+        </p-fileUpload>
+    </div>
+</p-dialog>
+
+<!-- Confirm Dialog -->
+<p-confirmDialog></p-confirmDialog>
+
+<!-- Toast -->
 <p-toast position="top-right"></p-toast>

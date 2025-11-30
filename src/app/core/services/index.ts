@@ -7,6 +7,7 @@ export * from './notification.service';
 export * from './dashboard.service';
 export * from './production.service';
 export * from './employee.service';
+export * from './hr.service';
 export * from './quality.service';
 export * from './inventory.service';
 export * from './maintenance.service';

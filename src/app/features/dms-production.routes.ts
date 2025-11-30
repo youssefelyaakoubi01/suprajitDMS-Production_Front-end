@@ -25,5 +25,9 @@ export default [
     {
         path: 'settings/shifts',
         loadComponent: () => import('./settings/shifts.component').then(m => m.ShiftsComponent)
+    },
+    {
+        path: 'downtime-declaration',
+        loadComponent: () => import('./downtime-declaration/downtime-declaration.component').then(m => m.DowntimeDeclarationComponent)
     }
 ] as Routes;

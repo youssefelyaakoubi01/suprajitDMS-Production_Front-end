@@ -5,6 +5,7 @@ import {
     Project,
     ProductionLine,
     Workstation,
+    Machine,
     Part,
     Shift,
     HourlyProduction,
@@ -52,6 +53,40 @@ export class ProductionService {
     getWorkstations(lineId?: number): Observable<Workstation[]> {
         const params = lineId ? { production_line: lineId } : undefined;
         return this.api.get<Workstation[]>(`${this.endpoint}/workstations`, params);
+    }
+
+    getWorkstation(id: number): Observable<Workstation> {
+        return this.api.get<Workstation>(`${this.endpoint}/workstations/${id}`);
+    }
+
+    // Machines
+    getMachines(workstationId?: number): Observable<Machine[]> {
+        const params = workstationId ? { workstation: workstationId } : undefined;
+        return this.api.get<Machine[]>(`${this.endpoint}/machines`, params);
+    }
+
+    getMachinesByProductionLine(lineId: number): Observable<Machine[]> {
+        return this.api.get<Machine[]>(`${this.endpoint}/machines/by_production_line`, { line_id: lineId });
+    }
+
+    getMachine(id: number): Observable<Machine> {
+        return this.api.get<Machine>(`${this.endpoint}/machines/${id}`);
+    }
+
+    createMachine(machine: Partial<Machine>): Observable<Machine> {
+        return this.api.post<Machine>(`${this.endpoint}/machines`, machine);
+    }
+
+    updateMachine(id: number, machine: Partial<Machine>): Observable<Machine> {
+        return this.api.put<Machine>(`${this.endpoint}/machines/${id}`, machine);
+    }
+
+    deleteMachine(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/machines/${id}`);
+    }
+
+    updateMachineStatus(id: number, status: Machine['status']): Observable<Machine> {
+        return this.api.post<Machine>(`${this.endpoint}/machines/${id}/update_status`, { status });
     }
 
     // Parts

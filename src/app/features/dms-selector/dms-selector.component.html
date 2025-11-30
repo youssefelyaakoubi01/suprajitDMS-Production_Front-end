@@ -1,0 +1,112 @@
+<div class="dms-selector-container">
+    <!-- Background Pattern -->
+    <div class="background-pattern"></div>
+
+    <!-- Main Content -->
+    <div class="content-wrapper">
+        <!-- Header Section -->
+        <header class="header-section">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <i class="pi pi-cog"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>Suprajit DMS</h1>
+                    <span class="tagline">Digital Manufacturing System</span>
+                </div>
+            </div>
+            <p class="welcome-text">Select a module to get started</p>
+        </header>
+
+        <!-- Modules Grid -->
+        <div class="modules-grid">
+            <div
+                *ngFor="let module of dmsModules"
+                class="module-card"
+                [class.inactive]="!module.isActive"
+                [style.--module-color]="module.color"
+                [style.--module-gradient]="module.gradient"
+                (click)="navigateToModule(module)"
+                pRipple>
+
+                <!-- Card Header with Icon -->
+                <div class="module-header">
+                    <div class="module-icon-wrapper">
+                        <i [class]="module.icon"></i>
+                    </div>
+                    <span class="module-status" [class.active]="module.isActive">
+                        {{ getModuleStatus(module) }}
+                    </span>
+                </div>
+
+                <!-- Card Content -->
+                <div class="module-content">
+                    <h3 class="module-title">{{ module.title }}</h3>
+                    <span class="module-subtitle">{{ module.subtitle }}</span>
+                    <p class="module-description">{{ module.description }}</p>
+                </div>
+
+                <!-- Features List -->
+                <div class="module-features">
+                    <span *ngFor="let feature of module.features" class="feature-tag">
+                        <i class="pi pi-check-circle"></i>
+                        {{ feature }}
+                    </span>
+                </div>
+
+                <!-- Action Button -->
+                <div class="module-action">
+                    <button
+                        pButton
+                        pRipple
+                        [label]="module.isActive ? 'Launch Module' : 'Coming Soon'"
+                        [icon]="module.isActive ? 'pi pi-arrow-right' : 'pi pi-clock'"
+                        [disabled]="!module.isActive"
+                        class="action-button"
+                        iconPos="right">
+                    </button>
+                </div>
+
+                <!-- Decorative Corner -->
+                <div class="corner-decoration"></div>
+            </div>
+        </div>
+
+        <!-- Quick Access Section -->
+        <div class="quick-access-section">
+            <h4>Quick Access</h4>
+            <div class="quick-links">
+                <a routerLink="/dms-production/production" class="quick-link" pRipple>
+                    <i class="pi pi-play"></i>
+                    <span>Start Production</span>
+                </a>
+                <a routerLink="/dms-hr/employees" class="quick-link" pRipple>
+                    <i class="pi pi-users"></i>
+                    <span>View Employees</span>
+                </a>
+                <a routerLink="/dms-production/downtime-list" class="quick-link" pRipple>
+                    <i class="pi pi-clock"></i>
+                    <span>Downtime List</span>
+                </a>
+                <a routerLink="/analytics/kpi" class="quick-link" pRipple>
+                    <i class="pi pi-chart-line"></i>
+                    <span>View KPIs</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer-section">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <img src="assets/layout/images/logo.svg" alt="Suprajit" height="30" onerror="this.style.display='none'">
+                    <span>Suprajit Automotive</span>
+                </div>
+                <div class="footer-info">
+                    <p>Digital Manufacturing System - Enterprise Edition</p>
+                    <p class="copyright">&copy; {{ currentYear }} Suprajit. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</div>

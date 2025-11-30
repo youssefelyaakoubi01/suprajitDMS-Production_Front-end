@@ -60,6 +60,43 @@ export interface MaintenanceLog {
     Cost?: number;
 }
 
+export interface DowntimeDeclaration {
+    id: number;
+    ticket_number: string;
+    workstation: number;
+    workstation_name?: string;
+    workstation_code?: string;
+    machine?: number;
+    machine_name?: string;
+    machine_code?: string;
+    production_line: number;
+    production_line_name?: string;
+    production_line_code?: string;
+    declaration_type: 'planned' | 'unplanned' | 'emergency';
+    impact_level: 'low' | 'medium' | 'high' | 'critical';
+    reason: string;
+    description?: string;
+    declared_at: string;
+    expected_start?: string;
+    expected_end?: string;
+    actual_start?: string;
+    actual_end?: string;
+    declared_by?: number;
+    declared_by_name?: string;
+    acknowledged_by?: number;
+    acknowledged_by_name?: string;
+    assigned_technician?: number;
+    assigned_technician_name?: string;
+    status: 'declared' | 'acknowledged' | 'in_progress' | 'resolved' | 'cancelled';
+    acknowledged_at?: string;
+    resolution_notes?: string;
+    maintenance_downtime?: number;
+    downtime_duration?: number;
+    waiting_time?: number;
+    created_at: string;
+    updated_at: string;
+}
+
 @Injectable({
     providedIn: 'root'
 })
@@ -166,5 +203,106 @@ export class MaintenanceService {
         by_status: { status: string; count: number }[];
     }> {
         return this.api.get(`${this.endpoint}/downtimes/statistics`, { days });
+    }
+
+    // ============================================
+    // Downtime Declarations (Notifications to Technicians)
+    // ============================================
+
+    getDeclarations(params?: {
+        workstation?: number;
+        production_line?: number;
+        status?: string;
+        declaration_type?: string;
+        impact_level?: string;
+        assigned_technician?: number;
+    }): Observable<DowntimeDeclaration[]> {
+        return this.api.get<DowntimeDeclaration[]>(`${this.endpoint}/declarations`, params);
+    }
+
+    getDeclaration(id: number): Observable<DowntimeDeclaration> {
+        return this.api.get<DowntimeDeclaration>(`${this.endpoint}/declarations/${id}`);
+    }
+
+    createDeclaration(declaration: {
+        workstation: number;
+        machine?: number;
+        production_line: number;
+        declaration_type: string;
+        impact_level: string;
+        reason: string;
+        description?: string;
+        expected_start?: string;
+        expected_end?: string;
+        declared_by?: number;
+    }): Observable<DowntimeDeclaration> {
+        return this.api.post<DowntimeDeclaration>(`${this.endpoint}/declarations`, declaration);
+    }
+
+    updateDeclaration(id: number, declaration: Partial<DowntimeDeclaration>): Observable<DowntimeDeclaration> {
+        return this.api.put<DowntimeDeclaration>(`${this.endpoint}/declarations/${id}`, declaration);
+    }
+
+    deleteDeclaration(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/declarations/${id}`);
+    }
+
+    // Get pending declarations (not yet acknowledged)
+    getPendingDeclarations(): Observable<DowntimeDeclaration[]> {
+        return this.api.get<DowntimeDeclaration[]>(`${this.endpoint}/declarations/pending`);
+    }
+
+    // Get active declarations (declared, acknowledged, or in progress)
+    getActiveDeclarations(): Observable<DowntimeDeclaration[]> {
+        return this.api.get<DowntimeDeclaration[]>(`${this.endpoint}/declarations/active`);
+    }
+
+    // Get declarations assigned to a specific technician
+    getDeclarationsForTechnician(technicianId: number): Observable<DowntimeDeclaration[]> {
+        return this.api.get<DowntimeDeclaration[]>(`${this.endpoint}/declarations/for_technician`, {
+            technician_id: technicianId
+        });
+    }
+
+    // Acknowledge a declaration
+    acknowledgeDeclaration(id: number, data: {
+        acknowledged_by: number;
+        assigned_technician?: number;
+    }): Observable<DowntimeDeclaration> {
+        return this.api.post<DowntimeDeclaration>(`${this.endpoint}/declarations/${id}/acknowledge`, data);
+    }
+
+    // Start working on a declaration
+    startWorkOnDeclaration(id: number, assignedTechnician: number): Observable<DowntimeDeclaration> {
+        return this.api.post<DowntimeDeclaration>(`${this.endpoint}/declarations/${id}/start_work`, {
+            assigned_technician: assignedTechnician
+        });
+    }
+
+    // Resolve a declaration
+    resolveDeclaration(id: number, resolutionNotes: string): Observable<DowntimeDeclaration> {
+        return this.api.post<DowntimeDeclaration>(`${this.endpoint}/declarations/${id}/resolve`, {
+            resolution_notes: resolutionNotes
+        });
+    }
+
+    // Cancel a declaration
+    cancelDeclaration(id: number, reason: string): Observable<DowntimeDeclaration> {
+        return this.api.post<DowntimeDeclaration>(`${this.endpoint}/declarations/${id}/cancel`, {
+            reason: reason
+        });
+    }
+
+    // Get declaration statistics
+    getDeclarationStatistics(days: number = 30): Observable<{
+        total: number;
+        by_status: { status: string; count: number }[];
+        by_type: { declaration_type: string; count: number }[];
+        by_impact: { impact_level: string; count: number }[];
+        by_production_line: { production_line__name: string; count: number }[];
+        avg_waiting_time_minutes: number;
+        avg_downtime_minutes: number;
+    }> {
+        return this.api.get(`${this.endpoint}/declarations/statistics`, { days });
     }
 }

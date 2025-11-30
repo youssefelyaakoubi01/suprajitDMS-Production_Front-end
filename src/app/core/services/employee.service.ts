@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import {
     Employee,
-    Process,
+    HRProcess,
     Formation,
     Qualification,
     Attendance
@@ -49,8 +49,8 @@ export class EmployeeService {
     }
 
     // Processes
-    getProcesses(): Observable<Process[]> {
-        return this.api.get<Process[]>(`${this.endpoint}/processes`);
+    getProcesses(): Observable<HRProcess[]> {
+        return this.api.get<HRProcess[]>(`${this.endpoint}/processes`);
     }
 
     // Formations

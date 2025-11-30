@@ -20,6 +20,20 @@ export class AppMenu {
 
     ngOnInit() {
         this.model = [
+            // ==================== DMS HOME ====================
+            {
+                label: 'Navigation',
+                items: [
+                    {
+                        label: 'DMS Home',
+                        icon: 'pi pi-fw pi-th-large',
+                        routerLink: ['/dms-home'],
+                        styleClass: 'dms-home-link'
+                    }
+                ]
+            },
+            { separator: true },
+            // ==================== DMS PRODUCTION ====================
             {
                 label: 'DMS Production',
                 items: [
@@ -37,49 +51,85 @@ export class AppMenu {
                         label: 'Downtime List',
                         icon: 'pi pi-fw pi-clock',
                         routerLink: ['/dms-production/downtime-list']
-                    }
-                ]
-            },
-            {
-                label: 'Operations',
-                items: [
-                    {
-                        label: 'Inventory',
-                        icon: 'pi pi-fw pi-box',
-                        routerLink: ['/inventory']
                     },
                     {
                         label: 'Quality',
                         icon: 'pi pi-fw pi-exclamation-triangle',
-                        routerLink: ['/quality']
+                        routerLink: ['/dms-production/quality']
                     },
                     {
                         label: 'Maintenance',
                         icon: 'pi pi-fw pi-wrench',
-                        routerLink: ['/maintenance']
+                        routerLink: ['/dms-production/maintenance']
+                    },
+                    {
+                        label: 'Inventory',
+                        icon: 'pi pi-fw pi-box',
+                        routerLink: ['/dms-production/inventory']
                     }
                 ]
             },
+            { separator: true },
+            // ==================== DMS HR ====================
             {
-                label: 'Resources',
+                label: 'DMS HR',
                 items: [
                     {
-                        label: 'HR & Employees',
-                        icon: 'pi pi-fw pi-users',
-                        routerLink: ['/hr']
+                        label: 'HR Dashboard',
+                        icon: 'pi pi-fw pi-chart-pie',
+                        routerLink: ['/dms-hr/dashboard']
                     },
+                    {
+                        label: 'Employees',
+                        icon: 'pi pi-fw pi-users',
+                        routerLink: ['/dms-hr/employees']
+                    },
+                    {
+                        label: 'Formations',
+                        icon: 'pi pi-fw pi-book',
+                        routerLink: ['/dms-hr/formations']
+                    },
+                    {
+                        label: 'Qualifications',
+                        icon: 'pi pi-fw pi-verified',
+                        routerLink: ['/dms-hr/qualifications']
+                    },
+                    {
+                        label: 'Versatility Matrix',
+                        icon: 'pi pi-fw pi-th-large',
+                        routerLink: ['/dms-hr/versatility']
+                    },
+                    {
+                        label: 'Recyclage',
+                        icon: 'pi pi-fw pi-refresh',
+                        routerLink: ['/dms-hr/recyclage']
+                    },
+                    {
+                        label: 'Teams & Trainers',
+                        icon: 'pi pi-fw pi-sitemap',
+                        routerLink: ['/dms-hr/teams']
+                    }
+                ]
+            },
+            { separator: true },
+            // ==================== ANALYTICS ====================
+            {
+                label: 'Analytics',
+                items: [
                     {
                         label: 'KPI & Indicators',
                         icon: 'pi pi-fw pi-chart-bar',
-                        routerLink: ['/kpi']
+                        routerLink: ['/analytics/kpi']
                     },
                     {
                         label: 'Lessons Learned',
-                        icon: 'pi pi-fw pi-book',
-                        routerLink: ['/lessons']
+                        icon: 'pi pi-fw pi-lightbulb',
+                        routerLink: ['/analytics/lessons']
                     }
                 ]
             },
+            { separator: true },
+            // ==================== SYSTEM ====================
             {
                 label: 'System',
                 items: [

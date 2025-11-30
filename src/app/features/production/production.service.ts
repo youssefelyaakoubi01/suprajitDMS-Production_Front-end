@@ -6,6 +6,7 @@ import {
     ProductionLine,
     Part,
     Workstation,
+    Machine,
     Shift,
     DowntimeProblem,
     HourlyProduction,
@@ -112,8 +113,27 @@ export class ProductionService {
                     Id_Workstation: w.id,
                     Name_Workstation: w.name,
                     Code_Workstation: w.code,
-                    Id_ProdLine: w.production_line
+                    Id_ProdLine: w.production_line,
+                    machines_count: w.machines_count || 0
                 }));
+            })
+        );
+    }
+
+    getMachines(workstationId?: number): Observable<Machine[]> {
+        return this.coreService.getMachines(workstationId).pipe(
+            map((response: any) => {
+                const machines = response.results || response;
+                return machines;
+            })
+        );
+    }
+
+    getMachinesByProductionLine(lineId: number): Observable<Machine[]> {
+        return this.coreService.getMachinesByProductionLine(lineId).pipe(
+            map((response: any) => {
+                const machines = response.results || response;
+                return machines;
             })
         );
     }

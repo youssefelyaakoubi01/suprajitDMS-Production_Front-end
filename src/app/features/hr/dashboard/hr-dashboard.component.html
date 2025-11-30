@@ -1,0 +1,243 @@
+<div class="hr-dashboard">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="pi pi-chart-pie"></i>
+            </div>
+            <div class="header-text">
+                <h1>HR Dashboard</h1>
+                <p>Human Resources Overview & Analytics</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <p-button label="Export Report" icon="pi pi-download" severity="secondary" [outlined]="true"></p-button>
+            <p-button label="Add Employee" icon="pi pi-plus" routerLink="/dms-hr/employees"></p-button>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div *ngFor="let kpi of kpiCards" class="kpi-card" [style.--kpi-color]="kpi.color">
+            <div class="kpi-header">
+                <div class="kpi-icon" [style.background]="kpi.color + '15'" [style.color]="kpi.color">
+                    <i [class]="kpi.icon"></i>
+                </div>
+                <div class="kpi-trend" *ngIf="kpi.trend" [class.positive]="kpi.trend > 0" [class.negative]="kpi.trend < 0">
+                    <i [class]="kpi.trend > 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"></i>
+                    {{ kpi.trend > 0 ? '+' : '' }}{{ kpi.trend }}%
+                </div>
+            </div>
+            <div class="kpi-body">
+                <span class="kpi-value">{{ kpi.value }}</span>
+                <span class="kpi-title">{{ kpi.title }}</span>
+                <span class="kpi-subtitle" *ngIf="kpi.subtitle">{{ kpi.subtitle }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+        <!-- Employees by Department -->
+        <p-card styleClass="chart-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-building"></i> Employees by Department</h3>
+                    <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" size="small"></p-button>
+                </div>
+            </ng-template>
+            <div class="chart-container">
+                <p-chart type="doughnut" [data]="employeesByDeptChart" [options]="pieChartOptions" height="280px"></p-chart>
+            </div>
+        </p-card>
+
+        <!-- Formations Progress -->
+        <p-card styleClass="chart-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-book"></i> Formations Overview</h3>
+                    <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" size="small"></p-button>
+                </div>
+            </ng-template>
+            <div class="chart-container">
+                <p-chart type="bar" [data]="formationsChart" [options]="chartOptions" height="280px"></p-chart>
+            </div>
+        </p-card>
+
+        <!-- Qualifications Distribution -->
+        <p-card styleClass="chart-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-verified"></i> Qualification Levels</h3>
+                    <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" size="small"></p-button>
+                </div>
+            </ng-template>
+            <div class="chart-container">
+                <p-chart type="bar" [data]="qualificationsChart" [options]="chartOptions" height="280px"></p-chart>
+            </div>
+        </p-card>
+    </div>
+
+    <!-- Content Row -->
+    <div class="content-row">
+        <!-- Recent Activities -->
+        <p-card styleClass="activities-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-clock"></i> Recent Activities</h3>
+                    <p-button label="View All" [text]="true" size="small"></p-button>
+                </div>
+            </ng-template>
+            <div class="activities-list">
+                <div *ngFor="let activity of recentActivities" class="activity-item">
+                    <div class="activity-icon" [style.background]="activity.color + '15'" [style.color]="activity.color">
+                        <i [class]="activity.icon"></i>
+                    </div>
+                    <div class="activity-content">
+                        <span class="activity-title">{{ activity.title }}</span>
+                        <span class="activity-desc">{{ activity.description }}</span>
+                        <span class="activity-date">
+                            <i class="pi pi-calendar"></i>
+                            {{ activity.date | date:'MMM d, yyyy' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </p-card>
+
+        <!-- Upcoming Formations -->
+        <p-card styleClass="formations-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-calendar"></i> Upcoming Formations</h3>
+                    <p-button label="Plan New" icon="pi pi-plus" [text]="true" size="small" routerLink="/dms-hr/formations"></p-button>
+                </div>
+            </ng-template>
+            <div class="formations-list">
+                <div *ngFor="let formation of upcomingFormations" class="formation-item">
+                    <div class="formation-date">
+                        <span class="date-day">{{ formation.date | date:'d' }}</span>
+                        <span class="date-month">{{ formation.date | date:'MMM' }}</span>
+                    </div>
+                    <div class="formation-content">
+                        <span class="formation-name">{{ formation.name }}</span>
+                        <div class="formation-meta">
+                            <span><i class="pi pi-users"></i> {{ formation.participants }} participants</span>
+                            <span><i class="pi pi-user"></i> {{ formation.trainer }}</span>
+                        </div>
+                    </div>
+                    <p-tag [value]="formation.status" [severity]="getStatusSeverity(formation.status)"></p-tag>
+                </div>
+            </div>
+        </p-card>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row">
+        <!-- Recyclage Alerts -->
+        <p-card styleClass="recyclage-card">
+            <ng-template pTemplate="header">
+                <div class="card-header warning">
+                    <h3><i class="pi pi-exclamation-triangle"></i> Recyclage Required</h3>
+                    <p-tag [value]="employeesNeedingRecyclage.length + ' employees'" severity="warn"></p-tag>
+                </div>
+            </ng-template>
+            <p-table [value]="employeesNeedingRecyclage" [rows]="5" styleClass="p-datatable-sm">
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Hire Date</th>
+                        <th>Action</th>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-emp>
+                    <tr>
+                        <td>
+                            <div class="employee-cell">
+                                <p-avatar [label]="getInitials(emp.Prenom_Emp + ' ' + emp.Nom_Emp)" shape="circle" size="normal"></p-avatar>
+                                <span>{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
+                            </div>
+                        </td>
+                        <td>{{ emp.Departement_Emp }}</td>
+                        <td>{{ emp.DateEmbauche_Emp | date:'MMM d, yyyy' }}</td>
+                        <td>
+                            <p-button icon="pi pi-calendar-plus" [rounded]="true" [text]="true" pTooltip="Schedule Recyclage"></p-button>
+                        </td>
+                    </tr>
+                </ng-template>
+            </p-table>
+            <div class="card-footer">
+                <p-button label="View All" [text]="true" icon="pi pi-arrow-right" iconPos="right" routerLink="/dms-hr/recyclage"></p-button>
+            </div>
+        </p-card>
+
+        <!-- Top Performers -->
+        <p-card styleClass="performers-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-star"></i> Top Performers</h3>
+                    <p-button icon="pi pi-ellipsis-v" [rounded]="true" [text]="true" size="small"></p-button>
+                </div>
+            </ng-template>
+            <div class="performers-list">
+                <div *ngFor="let performer of topPerformers; let i = index" class="performer-item">
+                    <div class="performer-rank" [class.gold]="i === 0" [class.silver]="i === 1" [class.bronze]="i === 2">
+                        {{ i + 1 }}
+                    </div>
+                    <p-avatar [label]="getInitials(performer.name)" shape="circle" size="large"
+                              [style]="{'background-color': i === 0 ? '#F59E0B' : i === 1 ? '#9CA3AF' : i === 2 ? '#B45309' : '#3B82F6', 'color': 'white'}"></p-avatar>
+                    <div class="performer-info">
+                        <span class="performer-name">{{ performer.name }}</span>
+                        <span class="performer-dept">{{ performer.department }}</span>
+                    </div>
+                    <div class="performer-stats">
+                        <div class="stat">
+                            <span class="stat-value">{{ performer.score }}%</span>
+                            <span class="stat-label">Score</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">{{ performer.qualifications }}</span>
+                            <span class="stat-label">Qualifs</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </p-card>
+
+        <!-- Quick Actions -->
+        <p-card styleClass="quick-actions-card">
+            <ng-template pTemplate="header">
+                <div class="card-header">
+                    <h3><i class="pi pi-bolt"></i> Quick Actions</h3>
+                </div>
+            </ng-template>
+            <div class="quick-actions-grid">
+                <a routerLink="/dms-hr/employees" class="quick-action">
+                    <i class="pi pi-user-plus"></i>
+                    <span>Add Employee</span>
+                </a>
+                <a routerLink="/dms-hr/formations" class="quick-action">
+                    <i class="pi pi-calendar-plus"></i>
+                    <span>Plan Formation</span>
+                </a>
+                <a routerLink="/dms-hr/versatility" class="quick-action">
+                    <i class="pi pi-th-large"></i>
+                    <span>Versatility Matrix</span>
+                </a>
+                <a routerLink="/dms-hr/qualifications" class="quick-action">
+                    <i class="pi pi-verified"></i>
+                    <span>Add Qualification</span>
+                </a>
+                <a routerLink="/dms-hr/teams" class="quick-action">
+                    <i class="pi pi-users"></i>
+                    <span>Manage Teams</span>
+                </a>
+                <a routerLink="/dms-hr/recyclage" class="quick-action">
+                    <i class="pi pi-refresh"></i>
+                    <span>Recyclage List</span>
+                </a>
+            </div>
+        </p-card>
+    </div>
+</div>
