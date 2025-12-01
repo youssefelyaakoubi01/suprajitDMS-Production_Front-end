@@ -1,4 +1,4 @@
-import { Shift, Project, ProductionLine, Part, DowntimeProblem } from './production.model';
+import { Shift, Project, ProductionLine, Part, DowntimeProblem, Machine } from './production.model';
 import { EmployeeWithAssignment } from './employee.model';
 
 // Use existing Downtime interface from production.model.ts
@@ -10,6 +10,8 @@ export interface DowntimeExtended {
     Id_DowntimeProblems: number;
     Id_HourlyProd?: number;
     problemName?: string;
+    machine?: number;
+    machine_name?: string;
 }
 
 export type HourStatus = 'not_started' | 'in_progress' | 'completed';
@@ -56,6 +58,7 @@ export interface ShiftProductionSession {
     project: Project | null;
     productionLine: ProductionLine | null;
     part: Part | null;
+    machine: Machine | null;
 
     // Order Number
     orderNo: string;
@@ -80,6 +83,7 @@ export interface HourProductionInput {
     downtime?: {
         duration: number;
         problemId: number;
+        machineId?: number;
         comment: string;
     };
 }

@@ -46,6 +46,8 @@ export interface Downtime {
     Comment_Downtime: string;
     Id_HourlyProd: number;
     Id_DowntimeProblems: number;
+    machine?: number;
+    machine_name?: string;
 }
 
 export interface DowntimeProblem {

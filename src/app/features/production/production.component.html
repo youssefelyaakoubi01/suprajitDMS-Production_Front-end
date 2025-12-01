@@ -151,6 +151,19 @@
                     </div>
 
                     <div class="form-field">
+                        <label for="machine">Machine</label>
+                        <p-select
+                            id="machine"
+                            formControlName="machine"
+                            [options]="machines"
+                            optionLabel="name"
+                            placeholder="Select Machine"
+                            [showClear]="true"
+                            [style]="{ width: '100%' }">
+                        </p-select>
+                    </div>
+
+                    <div class="form-field">
                         <label for="orderNo">Order NO</label>
                         <input
                             id="orderNo"
@@ -195,6 +208,10 @@
             <div class="summary-item">
                 <span class="summary-label">Part:</span>
                 <span class="summary-value">{{ session.part?.PN_Part }}</span>
+            </div>
+            <div class="summary-item" *ngIf="session.machine">
+                <span class="summary-label">Machine:</span>
+                <span class="summary-value">{{ session.machine?.name }}</span>
             </div>
             <div class="summary-item" *ngIf="session.orderNo">
                 <span class="summary-label">Order NO:</span>
@@ -247,6 +264,21 @@
                             [options]="workstations"
                             optionLabel="Name_Workstation"
                             placeholder="Select Workstation"
+                            (onChange)="onWorkstationChange()"
+                            [style]="{ width: '200px' }">
+                        </p-select>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="machineAssignment"><i class="pi pi-cog"></i> Machine</label>
+                        <p-select
+                            id="machineAssignment"
+                            [(ngModel)]="selectedMachineForAssignment"
+                            [options]="filteredMachinesForAssignment"
+                            optionLabel="name"
+                            placeholder="Select Machine (Optional)"
+                            [showClear]="true"
+                            [disabled]="!selectedWorkstation"
                             [style]="{ width: '200px' }">
                         </p-select>
                     </div>
@@ -264,13 +296,14 @@
 
             <p-divider></p-divider>
 
-            <p-table [value]="session.team" [tableStyle]="{ 'min-width': '50rem' }">
+            <p-table [value]="session.team" [tableStyle]="{ 'min-width': '60rem' }">
                 <ng-template pTemplate="header">
                     <tr>
                         <th>Photo</th>
                         <th>Name</th>
                         <th>Employee ID</th>
                         <th>Workstation</th>
+                        <th>Machine</th>
                         <th>Qualification</th>
                         <th>Actions</th>
                     </tr>
@@ -284,6 +317,10 @@
                         <td><span class="employee-id">{{ emp.Id_Emp }}</span></td>
                         <td>{{ emp.workstation }}</td>
                         <td>
+                            <span *ngIf="emp.machine">{{ emp.machine }}</span>
+                            <span *ngIf="!emp.machine" class="text-gray-400">-</span>
+                        </td>
+                        <td>
                             <p-tag [value]="emp.qualification" [severity]="getQualificationSeverity(emp.qualificationLevel)"></p-tag>
                         </td>
                         <td>
@@ -293,11 +330,11 @@
                 </ng-template>
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="6" class="text-center">
+                        <td colspan="7" class="text-center">
                             <div class="empty-state">
                                 <i class="pi pi-users empty-icon"></i>
                                 <p class="empty-title">No employees assigned yet</p>
-                                <p class="empty-subtitle">Scan employee badges to assign them to workstations</p>
+                                <p class="empty-subtitle">Scan employee badges to assign them to workstations and machines</p>
                             </div>
                         </td>
                     </tr>

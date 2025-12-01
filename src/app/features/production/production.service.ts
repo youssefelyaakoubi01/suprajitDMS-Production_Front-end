@@ -249,6 +249,7 @@ export class ProductionService {
             hour_type: data.hour_type || 'normal',
             part: data.part || data.Id_Part,
             production_line: data.production_line || data.Id_ProdLine,
+            machine: data.machine || null,
             result: data.result ?? data.Result_HourlyProdPN ?? 0,
             target: data.target ?? data.Target_HourlyProdPN ?? 0,
             headcount: data.headcount ?? data.HC_HourlyProdPN ?? 0,
@@ -284,6 +285,7 @@ export class ProductionService {
             hour_type: data.hour_type || 'normal',
             part: data.part || data.Id_Part,
             production_line: data.production_line || data.Id_ProdLine,
+            machine: data.machine || null,
             result: data.result ?? data.Result_HourlyProdPN ?? 0,
             target: data.target ?? data.Target_HourlyProdPN ?? 0,
             headcount: data.headcount ?? data.HC_HourlyProdPN ?? 0,
@@ -327,7 +329,8 @@ export class ProductionService {
             duration: data.Total_Downtime,
             comment: data.Comment_Downtime,
             problem: data.Id_DowntimeProblems,
-            hourly_production: hourlyProductionValue
+            hourly_production: hourlyProductionValue,
+            machine: (data as any).machine || null
         };
 
         console.log('Downtime API data being sent:', apiData);
@@ -397,7 +400,7 @@ export class ProductionService {
         return this.coreService.deleteHourlyProduction(id);
     }
 
-    createTeamAssignment(assignment: { hourly_production: number; employee: number; workstation: number }): Observable<any> {
+    createTeamAssignment(assignment: { hourly_production: number; employee: number; workstation: number; machine?: number }): Observable<any> {
         // The core service expects TeamAssignment interface, but we're sending API format
         // Cast to any to bypass type checking since we're sending directly to API
         return this.coreService.createTeamAssignment(assignment as any);

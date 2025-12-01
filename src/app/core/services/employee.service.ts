@@ -23,29 +23,29 @@ export class EmployeeService {
         category?: string;
         status?: string
     }): Observable<Employee[]> {
-        return this.api.get<Employee[]>(`${this.endpoint}/employees`, params);
+        return this.api.get<Employee[]>(this.endpoint, params);
     }
 
     getEmployee(id: number): Observable<Employee> {
-        return this.api.get<Employee>(`${this.endpoint}/employees/${id}`);
+        return this.api.get<Employee>(`${this.endpoint}/${id}`);
     }
 
     getEmployeeByBadge(badgeId: string): Observable<Employee> {
         // Trim whitespace from badge ID (common issue with barcode scanners)
         const cleanBadgeId = badgeId?.trim() || '';
-        return this.api.get<Employee>(`${this.endpoint}/employees/by_badge`, { badge: cleanBadgeId });
+        return this.api.get<Employee>(`${this.endpoint}/by_badge`, { badge: cleanBadgeId });
     }
 
     createEmployee(employee: Partial<Employee>): Observable<Employee> {
-        return this.api.post<Employee>(`${this.endpoint}/employees`, employee);
+        return this.api.post<Employee>(this.endpoint, employee);
     }
 
     updateEmployee(id: number, employee: Partial<Employee>): Observable<Employee> {
-        return this.api.put<Employee>(`${this.endpoint}/employees/${id}`, employee);
+        return this.api.put<Employee>(`${this.endpoint}/${id}`, employee);
     }
 
     deleteEmployee(id: number): Observable<void> {
-        return this.api.delete<void>(`${this.endpoint}/employees/${id}`);
+        return this.api.delete<void>(`${this.endpoint}/${id}`);
     }
 
     // Processes

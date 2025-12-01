@@ -27,6 +27,7 @@ import {
     ProductionLine,
     Part,
     Workstation,
+    Machine,
     Shift,
     DowntimeProblem,
     Downtime
@@ -78,6 +79,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         project: null,
         productionLine: null,
         part: null,
+        machine: null,
         orderNo: '',
         team: [],
         actors: {
@@ -102,6 +104,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
     productionLines: ProductionLine[] = [];
     parts: Part[] = [];
     workstations: Workstation[] = [];
+    machines: Machine[] = [];
     downtimeProblems: DowntimeProblem[] = [];
 
     // Hour Type Options
@@ -115,6 +118,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
     // Team Assignment
     employeeIdScan = '';
     selectedWorkstation: Workstation | null = null;
+    selectedMachineForAssignment: Machine | null = null;
+    filteredMachinesForAssignment: Machine[] = [];
 
     // Hour Production Dialog
     showHourDialog = false;
@@ -548,11 +553,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         return;
                     }
 
-                    const assignmentData = {
+                    const assignmentData: any = {
                         hourly_production: hourlyProductionId,
                         employee: member.Id_Emp,
                         workstation: workstationId
                     };
+
+                    // Add machine if assigned
+                    if (member.machineId) {
+                        assignmentData.machine = member.machineId;
+                    }
 
                     this.productionService.createTeamAssignment(assignmentData).subscribe({
                         next: (response) => {
@@ -584,11 +594,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
             if (!workstationId) return;
 
-            this.productionService.createTeamAssignment({
+            const assignmentData: any = {
                 hourly_production: hourlyProductionId,
                 employee: member.Id_Emp,
                 workstation: workstationId
-            }).subscribe({
+            };
+
+            // Add machine if assigned
+            if (member.machineId) {
+                assignmentData.machine = member.machineId;
+            }
+
+            this.productionService.createTeamAssignment(assignmentData).subscribe({
                 next: (response) => console.log('Team assignment saved:', response),
                 error: () => {} // Silently ignore duplicates
             });
@@ -630,7 +647,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             date: [new Date(), Validators.required],
             project: [null, Validators.required],
             productionLine: [null, Validators.required],
-            partNumber: [null, Validators.required]
+            partNumber: [null, Validators.required],
+            machine: [null]
         });
 
         // Watch for project changes
@@ -645,6 +663,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.shiftSetupForm.get('productionLine')?.valueChanges.subscribe((line: ProductionLine) => {
             if (line) {
                 this.loadWorkstations(line.id);
+                this.loadMachines(line.id);
                 this.loadShiftsForProductionLine(line.id);
             }
         });
@@ -681,6 +700,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
     loadWorkstations(lineId: number): void {
         this.productionService.getWorkstations(lineId).subscribe(workstations => {
             this.workstations = workstations;
+        });
+    }
+
+    loadMachines(lineId: number): void {
+        this.productionService.getMachinesByProductionLine(lineId).subscribe(machines => {
+            this.machines = machines;
+            this.shiftSetupForm.patchValue({ machine: null });
         });
     }
 
@@ -737,6 +763,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.session.project = formValue.project;
         this.session.productionLine = formValue.productionLine;
         this.session.part = formValue.partNumber;
+        this.session.machine = formValue.machine;
         this.session.isSetupComplete = true;
 
         // Generate hours for the shift
@@ -854,6 +881,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Picture: employee.picture || 'assets/images/avatar-default.png',
                     EmpStatus: employee.status,
                     workstation: this.selectedWorkstation!.Name_Workstation,
+                    workstationId: this.selectedWorkstation!.Id_Workstation,
+                    machine: this.selectedMachineForAssignment?.name,
+                    machineId: this.selectedMachineForAssignment?.id,
                     qualification: this.getCategoryQualification(employee.category),
                     qualificationLevel: this.getCategoryLevel(employee.category)
                 };
@@ -863,13 +893,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Success',
-                    detail: `${employee.first_name} ${employee.last_name} assigned`
+                    detail: `${employee.first_name} ${employee.last_name} assigned to ${this.selectedWorkstation!.Name_Workstation}${this.selectedMachineForAssignment ? ' - ' + this.selectedMachineForAssignment.name : ''}`
                 });
 
                 // Save session to localStorage
                 this.saveSessionToStorage();
 
                 this.employeeIdScan = '';
+                this.selectedMachineForAssignment = null;
             },
             error: (error) => {
                 this.messageService.add({
@@ -891,6 +922,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Save session to localStorage
         this.saveSessionToStorage();
+    }
+
+    onWorkstationChange(): void {
+        // Filter machines based on selected workstation
+        if (this.selectedWorkstation) {
+            this.filteredMachinesForAssignment = this.machines.filter(
+                m => m.workstation === this.selectedWorkstation!.Id_Workstation
+            );
+        } else {
+            this.filteredMachinesForAssignment = [];
+        }
+        this.selectedMachineForAssignment = null;
     }
 
     getCategoryQualification(category: string): string {
@@ -1077,7 +1120,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Mark hour as in progress
         hour.status = 'in_progress';
 
-        const productionData = {
+        const productionData: any = {
             date: this.session.date,
             shift: this.session.shift.id,
             hour: hour.hour,
@@ -1087,6 +1130,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             target: hour.target,
             headcount: this.session.team.length || 0,
             production_line: this.session.productionLine.id,
+            // Machine
+            machine: this.session.machine?.id || null,
             // Order Number
             order_no: this.session.orderNo || '',
             // Production Supervisors & Key Personnel
@@ -1171,7 +1216,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         });
     }
 
-    saveDowntimeForHour(hourIndex: number, downtime: { duration: number; problemId: number; comment: string }): void {
+    saveDowntimeForHour(hourIndex: number, downtime: { duration: number; problemId: number; machineId?: number; comment: string }): void {
         const hour = this.session.hours[hourIndex];
 
         if (!hour.hourlyProductionId) {
@@ -1194,7 +1239,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             Total_Downtime: downtime.duration,
             Comment_Downtime: downtime.comment,
             Id_DowntimeProblems: downtime.problemId,
-            Id_HourlyProd: hour.hourlyProductionId
+            Id_HourlyProd: hour.hourlyProductionId,
+            machine: downtime.machineId || this.session.machine?.id || undefined
         }).subscribe({
             next: () => {
                 const newDowntime: DowntimeExtended = {
@@ -1202,6 +1248,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Comment_Downtime: downtime.comment,
                     Id_DowntimeProblems: downtime.problemId,
                     Id_HourlyProd: hour.hourlyProductionId!,
+                    machine: downtime.machineId || this.session.machine?.id,
+                    machine_name: this.session.machine?.name,
                     problemName: this.downtimeProblems.find(p => p.Id_DowntimeProblems === downtime.problemId)?.Name_DowntimeProblems
                 };
                 hour.downtimes.push(newDowntime);
@@ -1447,6 +1495,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             project: null,
             productionLine: null,
             part: null,
+            machine: null,
             orderNo: '',
             team: [],
             actors: {
@@ -1464,6 +1513,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.shiftSetupForm.reset({ date: new Date() });
         this.employeeIdScan = '';
         this.selectedWorkstation = null;
+        this.selectedMachineForAssignment = null;
+        this.filteredMachinesForAssignment = [];
 
         this.messageService.add({
             severity: 'info',

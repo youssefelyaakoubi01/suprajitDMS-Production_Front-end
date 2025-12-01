@@ -245,6 +245,9 @@ export interface FormationStats {
 // ==================== EXTENDED INTERFACES ====================
 export interface EmployeeWithAssignment extends Employee {
     workstation?: string;
+    workstationId?: number;
+    machine?: string;
+    machineId?: number;
     qualification?: string;
     qualificationLevel?: number;
     team?: Team;
