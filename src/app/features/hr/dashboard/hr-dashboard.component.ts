@@ -145,57 +145,81 @@ export class HrDashboardComponent implements OnInit {
 
     private loadDashboardData(): void {
         this.loading = true;
+        this.loadingStats = true;
 
-        // Simulate API call with mock data
-        setTimeout(() => {
-            this.loadStats();
-            this.loadCharts();
-            this.loadRecentActivities();
-            this.loadUpcomingFormations();
-            this.loadEmployeesNeedingRecyclage();
-            this.loadTopPerformers();
-            this.loading = false;
-        }, 800);
+        // Load real stats from backend
+        this.hrService.getDashboardStats().subscribe({
+            next: (stats: any) => {
+                this.dashboardStats = {
+                    totalEmployees: stats.total_employees,
+                    activeEmployees: stats.active_employees,
+                    inactiveEmployees: stats.inactive_employees,
+                    employeesByDepartment: stats.employees_by_department?.map((d: any) => ({
+                        department: d.department,
+                        count: d.count
+                    })) || [],
+                    employeesByCategory: stats.employees_by_category?.map((c: any) => ({
+                        category: c.category,
+                        count: c.count
+                    })) || [],
+                    recentHires: [],
+                    employeesRequiringRecyclage: stats.employees_requiring_recyclage,
+                    qualificationCompletionRate: stats.qualification_rate,
+                    averageVersatility: 2.4
+                };
+
+                this.formationStats = {
+                    totalFormations: stats.total_formations,
+                    plannedFormations: stats.pending_qualifications,
+                    completedFormations: stats.passed_qualifications,
+                    formationsByType: [],
+                    upcomingFormations: []
+                };
+
+                this.buildKpiCards();
+                this.loadCharts();
+                this.loadingStats = false;
+            },
+            error: (err) => {
+                console.error('Error loading dashboard stats:', err);
+                // Fallback to mock data
+                this.loadStatsFallback();
+            }
+        });
+
+        // Load recyclage employees
+        this.hrService.getEmployeesRequiringRecyclage().subscribe({
+            next: (employees: any[]) => {
+                this.employeesNeedingRecyclage = employees.map(e => ({
+                    Id_Emp: e.id,
+                    Nom_Emp: e.full_name?.split(' ')[1] || '',
+                    Prenom_Emp: e.full_name?.split(' ')[0] || '',
+                    DateNaissance_Emp: new Date(),
+                    Genre_Emp: '',
+                    Categorie_Emp: e.category,
+                    DateEmbauche_Emp: new Date(e.hire_date),
+                    Departement_Emp: e.department,
+                    Picture: e.picture || '',
+                    EmpStatus: 'Active',
+                    daysUntilRecyclage: e.days_until_recyclage,
+                    isOverdue: e.is_overdue
+                } as any));
+            },
+            error: (err) => {
+                console.error('Error loading recyclage employees:', err);
+                this.loadEmployeesNeedingRecyclageFallback();
+            }
+        });
+
+        this.loadRecentActivities();
+        this.loadUpcomingFormations();
+        this.loadTopPerformers();
+        this.loading = false;
     }
 
-    private loadStats(): void {
-        this.dashboardStats = {
-            totalEmployees: 156,
-            activeEmployees: 142,
-            inactiveEmployees: 14,
-            employeesByDepartment: [
-                { department: 'Production', count: 85 },
-                { department: 'Quality', count: 25 },
-                { department: 'Maintenance', count: 20 },
-                { department: 'Logistics', count: 15 },
-                { department: 'HR', count: 11 }
-            ],
-            employeesByCategory: [
-                { category: 'Operator', count: 95 },
-                { category: 'Team Leader', count: 20 },
-                { category: 'Technician', count: 25 },
-                { category: 'Engineer', count: 10 },
-                { category: 'Manager', count: 6 }
-            ],
-            recentHires: [],
-            employeesRequiringRecyclage: 12,
-            qualificationCompletionRate: 78,
-            averageVersatility: 2.4
-        };
+    private buildKpiCards(): void {
+        if (!this.dashboardStats || !this.formationStats) return;
 
-        this.formationStats = {
-            totalFormations: 45,
-            plannedFormations: 8,
-            completedFormations: 37,
-            formationsByType: [
-                { type: 'Safety', count: 15 },
-                { type: 'Technical', count: 18 },
-                { type: 'Quality', count: 12 }
-            ],
-            upcomingFormations: []
-        };
-
-        // Build KPI Cards
         this.kpiCards = [
             {
                 title: 'Total Employees',
@@ -206,17 +230,17 @@ export class HrDashboardComponent implements OnInit {
                 subtitle: `${this.dashboardStats.activeEmployees} active`
             },
             {
-                title: 'Formations Completed',
+                title: 'Qualifications Passed',
                 value: this.formationStats.completedFormations,
-                icon: 'pi pi-book',
+                icon: 'pi pi-verified',
                 color: '#10B981',
                 trend: 12.5,
-                subtitle: `${this.formationStats.plannedFormations} planned`
+                subtitle: `${this.formationStats.plannedFormations} pending`
             },
             {
                 title: 'Qualification Rate',
                 value: `${this.dashboardStats.qualificationCompletionRate}%`,
-                icon: 'pi pi-verified',
+                icon: 'pi pi-chart-line',
                 color: '#8B5CF6',
                 trend: 3.1,
                 subtitle: 'Overall completion'
@@ -230,8 +254,36 @@ export class HrDashboardComponent implements OnInit {
                 subtitle: 'Employees to retrain'
             }
         ];
+    }
 
+    private loadStatsFallback(): void {
+        this.dashboardStats = {
+            totalEmployees: 0,
+            activeEmployees: 0,
+            inactiveEmployees: 0,
+            employeesByDepartment: [],
+            employeesByCategory: [],
+            recentHires: [],
+            employeesRequiringRecyclage: 0,
+            qualificationCompletionRate: 0,
+            averageVersatility: 0
+        };
+
+        this.formationStats = {
+            totalFormations: 0,
+            plannedFormations: 0,
+            completedFormations: 0,
+            formationsByType: [],
+            upcomingFormations: []
+        };
+
+        this.buildKpiCards();
+        this.loadCharts();
         this.loadingStats = false;
+    }
+
+    private loadEmployeesNeedingRecyclageFallback(): void {
+        this.employeesNeedingRecyclage = [];
     }
 
     private loadCharts(): void {

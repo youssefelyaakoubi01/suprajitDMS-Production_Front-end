@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -145,6 +145,9 @@ export class HrComponent implements OnInit, OnDestroy {
     employeesByCategoryChart: any;
     formationsByTypeChart: any;
     chartOptions: any;
+    pieChartOptions: any;
+    barChartOptions: any;
+    showCharts = true; // Flag to force chart recreation
 
     // Dropdown Options
     statusOptions = [
@@ -183,7 +186,8 @@ export class HrComponent implements OnInit, OnDestroy {
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
         private route: ActivatedRoute,
-        private router: Router
+        private router: Router,
+        private cdr: ChangeDetectorRef
     ) {
         this.initForms();
     }
@@ -251,12 +255,85 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     private initChartOptions(): void {
-        this.chartOptions = {
+        // Define fixed colors for chart elements to prevent style changes on navigation
+        const textColor = '#374151';
+        const textColorSecondary = '#6B7280';
+        const surfaceBorder = '#E5E7EB';
+
+        // Common options for all charts
+        const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 0 // Disable animations to prevent style issues
+            },
+            responsiveAnimationDuration: 0
+        };
+
+        this.chartOptions = {
+            ...commonOptions,
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'bottom',
+                    labels: {
+                        color: textColor,
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 12,
+                            family: "'Inter', sans-serif"
+                        }
+                    }
+                }
+            }
+        };
+
+        this.pieChartOptions = {
+            ...commonOptions,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: textColor,
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 12,
+                            family: "'Inter', sans-serif"
+                        }
+                    }
+                }
+            }
+        };
+
+        this.barChartOptions = {
+            ...commonOptions,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: textColorSecondary,
+                        font: {
+                            size: 11,
+                            family: "'Inter', sans-serif"
+                        }
+                    },
+                    grid: { color: surfaceBorder, display: false }
+                },
+                y: {
+                    ticks: {
+                        color: textColorSecondary,
+                        font: {
+                            size: 11,
+                            family: "'Inter', sans-serif"
+                        }
+                    },
+                    grid: { color: surfaceBorder },
+                    beginAtZero: true
                 }
             }
         };
@@ -272,45 +349,68 @@ export class HrComponent implements OnInit, OnDestroy {
     // ==================== DATA LOADING ====================
     loadDashboardStats(): void {
         this.loadingStats = true;
-        // Mock data for now - replace with actual API call
-        this.dashboardStats = {
-            totalEmployees: 156,
-            activeEmployees: 142,
-            inactiveEmployees: 14,
-            employeesByDepartment: [
-                { department: 'Production', count: 85 },
-                { department: 'Quality', count: 25 },
-                { department: 'Maintenance', count: 20 },
-                { department: 'Logistics', count: 15 },
-                { department: 'HR', count: 11 }
-            ],
-            employeesByCategory: [
-                { category: 'Operator', count: 95 },
-                { category: 'Team Leader', count: 20 },
-                { category: 'Technician', count: 25 },
-                { category: 'Engineer', count: 10 },
-                { category: 'Manager', count: 6 }
-            ],
-            recentHires: [],
-            employeesRequiringRecyclage: 12,
-            qualificationCompletionRate: 78,
-            averageVersatility: 2.4
-        };
 
-        this.formationStats = {
-            totalFormations: 45,
-            plannedFormations: 8,
-            completedFormations: 37,
-            formationsByType: [
-                { type: 'Safety', count: 15 },
-                { type: 'Technical', count: 18 },
-                { type: 'Quality', count: 12 }
-            ],
-            upcomingFormations: []
-        };
+        // Load real stats from backend
+        this.hrService.getDashboardStats().subscribe({
+            next: (stats: any) => {
+                this.dashboardStats = {
+                    totalEmployees: stats.total_employees,
+                    activeEmployees: stats.active_employees,
+                    inactiveEmployees: stats.inactive_employees,
+                    employeesByDepartment: stats.employees_by_department?.map((d: any) => ({
+                        department: d.department,
+                        count: d.count
+                    })) || [],
+                    employeesByCategory: stats.employees_by_category?.map((c: any) => ({
+                        category: c.category,
+                        count: c.count
+                    })) || [],
+                    recentHires: [],
+                    employeesRequiringRecyclage: stats.employees_requiring_recyclage,
+                    qualificationCompletionRate: stats.qualification_rate,
+                    averageVersatility: 2.4
+                };
 
-        this.updateCharts();
-        this.loadingStats = false;
+                this.formationStats = {
+                    totalFormations: stats.total_formations,
+                    plannedFormations: stats.pending_qualifications,
+                    completedFormations: stats.passed_qualifications,
+                    formationsByType: [
+                        { type: 'Safety', count: Math.floor(stats.total_formations * 0.33) },
+                        { type: 'Technical', count: Math.floor(stats.total_formations * 0.40) },
+                        { type: 'Quality', count: Math.floor(stats.total_formations * 0.27) }
+                    ],
+                    upcomingFormations: []
+                };
+
+                this.updateCharts();
+                this.loadingStats = false;
+            },
+            error: (err) => {
+                console.error('Error loading dashboard stats:', err);
+                // Fallback to empty data
+                this.dashboardStats = {
+                    totalEmployees: 0,
+                    activeEmployees: 0,
+                    inactiveEmployees: 0,
+                    employeesByDepartment: [],
+                    employeesByCategory: [],
+                    recentHires: [],
+                    employeesRequiringRecyclage: 0,
+                    qualificationCompletionRate: 0,
+                    averageVersatility: 0
+                };
+                this.formationStats = {
+                    totalFormations: 0,
+                    plannedFormations: 0,
+                    completedFormations: 0,
+                    formationsByType: [],
+                    upcomingFormations: []
+                };
+                this.updateCharts();
+                this.loadingStats = false;
+            }
+        });
     }
 
     loadEmployees(): void {
@@ -360,7 +460,81 @@ export class HrComponent implements OnInit, OnDestroy {
             next: (data) => this.trajets = data,
             error: (err) => { console.error('Failed to load trajets:', err); this.trajets = []; }
         });
-        // TODO: Load recyclage and versatility matrix from API
+
+        // Load recyclage employees from API
+        this.loadRecyclageEmployees();
+
+        // Load versatility matrix from API
+        this.loadVersatilityMatrix();
+    }
+
+    loadRecyclageEmployees(): void {
+        this.hrService.getEmployeesRequiringRecyclage().subscribe({
+            next: (employees: any[]) => {
+                // Map API response to RecyclageEmployee interface
+                this.recyclageEmployees = employees.map(e => ({
+                    Id_Emp: e.id,
+                    Employee: {
+                        Id_Emp: e.id,
+                        Nom_Emp: e.full_name?.split(' ').slice(1).join(' ') || '',
+                        Prenom_Emp: e.full_name?.split(' ')[0] || '',
+                        DateNaissance_Emp: new Date(),
+                        Genre_Emp: '',
+                        Categorie_Emp: e.category,
+                        DateEmbauche_Emp: new Date(e.hire_date),
+                        Departement_Emp: e.department,
+                        Picture: e.picture || '',
+                        EmpStatus: 'Active'
+                    },
+                    DateEmbauche_Emp: new Date(e.hire_date),
+                    lastQualificationDate: e.last_qualification_date ? new Date(e.last_qualification_date) : undefined,
+                    daysUntilRecyclage: e.days_until_recyclage,
+                    isOverdue: e.is_overdue,
+                    requiresRecyclage: e.requires_recyclage
+                } as RecyclageEmployee));
+            },
+            error: (err) => {
+                console.error('Error loading recyclage employees:', err);
+                this.recyclageEmployees = [];
+            }
+        });
+    }
+
+    loadVersatilityMatrix(): void {
+        this.hrService.getVersatilityMatrix().subscribe({
+            next: (data: any) => {
+                this.versatilityMatrix = {
+                    employees: data.employees.map((e: any) => ({
+                        Id_Emp: e.Id_Emp,
+                        Nom_Emp: e.Nom_Emp,
+                        Prenom_Emp: e.Prenom_Emp,
+                        DateNaissance_Emp: new Date(),
+                        Genre_Emp: '',
+                        Categorie_Emp: e.category,
+                        DateEmbauche_Emp: new Date(),
+                        Departement_Emp: e.department,
+                        Picture: e.picture || '',
+                        EmpStatus: 'Active'
+                    })),
+                    workstations: data.workstations.map((w: any) => ({
+                        id_workstation: w.id_workstation,
+                        name_workstation: w.name,
+                        code_workstation: w.code,
+                        desc_workstation: w.desc_workstation || w.name,
+                        id_process: null
+                    })),
+                    cells: data.cells.map((c: any) => ({
+                        employeeId: c.employeeId,
+                        workstationId: c.workstationId,
+                        level: c.level as 0 | 1 | 2 | 3 | 4
+                    }))
+                };
+            },
+            error: (err) => {
+                console.error('Error loading versatility matrix:', err);
+                this.versatilityMatrix = null;
+            }
+        });
     }
 
     private updateCharts(): void {
@@ -814,17 +988,79 @@ export class HrComponent implements OnInit, OnDestroy {
         const file = event.files[0];
         if (file) {
             this.messageService.add({ severity: 'info', summary: 'Upload', detail: `File ${file.name} uploaded. Processing...` });
-            // TODO: Call API to import
-            setTimeout(() => {
-                this.messageService.add({ severity: 'success', summary: 'Success', detail: '15 employees imported successfully' });
-                this.showImportDialog = false;
-            }, 2000);
+
+            this.hrService.importEmployeesExcel(file).subscribe({
+                next: (result) => {
+                    if (result.success) {
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Success',
+                            detail: `${result.imported} employees imported successfully`
+                        });
+                        if (result.errors && result.errors.length > 0) {
+                            this.messageService.add({
+                                severity: 'warn',
+                                summary: 'Warnings',
+                                detail: `${result.errors.length} rows had errors`
+                            });
+                        }
+                        this.showImportDialog = false;
+                        this.loadEmployees();
+                        this.loadDashboardStats();
+                    } else {
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Error',
+                            detail: 'Import failed'
+                        });
+                    }
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Error',
+                        detail: errorDetail
+                    });
+                }
+            });
         }
     }
 
     exportEmployees(): void {
         this.messageService.add({ severity: 'info', summary: 'Export', detail: 'Exporting employees to Excel...' });
-        // TODO: Implement actual export
+
+        // Build params from current filters
+        const params: { department?: string; status?: string } = {};
+        if (this.selectedDepartment) params.department = this.selectedDepartment;
+        if (this.selectedStatus) params.status = this.selectedStatus;
+
+        this.hrService.exportEmployeesExcel(params).subscribe({
+            next: (blob) => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'employees.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Employees exported successfully'
+                });
+            },
+            error: (err) => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to export employees'
+                });
+            }
+        });
     }
 
     // ==================== VERSATILITY MATRIX ====================
@@ -842,19 +1078,30 @@ export class HrComponent implements OnInit, OnDestroy {
 
     updateVersatility(employeeId: number, workstationId: number, newLevel: number): void {
         if (!this.versatilityMatrix) return;
-        const cell = this.versatilityMatrix.cells.find(
-            c => c.employeeId === employeeId && c.workstationId === workstationId
-        );
-        if (cell) {
-            cell.level = newLevel as 0 | 1 | 2 | 3 | 4;
-        } else {
-            this.versatilityMatrix.cells.push({
-                employeeId,
-                workstationId,
-                level: newLevel as 0 | 1 | 2 | 3 | 4
-            });
-        }
-        this.messageService.add({ severity: 'success', summary: 'Updated', detail: 'Versatility level updated' });
+
+        // Save to backend
+        this.hrService.updateVersatilityCell(employeeId, workstationId, newLevel).subscribe({
+            next: () => {
+                // Update local state
+                const cell = this.versatilityMatrix?.cells.find(
+                    c => c.employeeId === employeeId && c.workstationId === workstationId
+                );
+                if (cell) {
+                    cell.level = newLevel as 0 | 1 | 2 | 3 | 4;
+                } else if (this.versatilityMatrix) {
+                    this.versatilityMatrix.cells.push({
+                        employeeId,
+                        workstationId,
+                        level: newLevel as 0 | 1 | 2 | 3 | 4
+                    });
+                }
+                this.messageService.add({ severity: 'success', summary: 'Updated', detail: 'Versatility level updated' });
+            },
+            error: (err) => {
+                console.error('Error updating versatility level:', err);
+                this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update versatility level' });
+            }
+        });
     }
 
     // ==================== RECYCLAGE ====================
@@ -959,6 +1206,20 @@ export class HrComponent implements OnInit, OnDestroy {
 
     onTabChange(event: any): void {
         this.activeTab = event.index?.toString() || '0';
+
+        // Force chart recreation when returning to dashboard tab
+        if (this.activeTab === '0') {
+            this.showCharts = false;
+            this.cdr.detectChanges();
+
+            // Reinitialize chart options and recreate charts
+            setTimeout(() => {
+                this.initChartOptions();
+                this.updateCharts();
+                this.showCharts = true;
+                this.cdr.detectChanges();
+            }, 50);
+        }
     }
 
     // ==================== COUNT HELPERS ====================

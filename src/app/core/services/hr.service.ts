@@ -40,13 +40,11 @@ export class HRService {
 
     // ==================== DASHBOARD ====================
     getDashboardStats(): Observable<HRDashboardStats> {
-        // TODO: Implement backend endpoint for this
-        return this.api.get<HRDashboardStats>(`${this.endpoint}/dashboard/stats`);
+        return this.api.get<HRDashboardStats>(`${this.endpoint}/dashboard-stats`);
     }
 
     getFormationStats(): Observable<FormationStats> {
-        // TODO: Implement backend endpoint for this
-        return this.api.get<FormationStats>(`${this.endpoint}/dashboard/formation-stats`);
+        return this.api.get<FormationStats>(`formations`);
     }
 
     // ==================== EMPLOYEES ====================
@@ -92,14 +90,20 @@ export class HRService {
         return this.api.delete<void>(`${this.endpoint}/${id}`);
     }
 
-    importEmployeesExcel(file: File): Observable<{ imported: number; errors: string[] }> {
+    importEmployeesExcel(file: File): Observable<{ imported: number; errors: string[]; success: boolean }> {
         const formData = new FormData();
         formData.append('file', file);
-        return this.api.post<{ imported: number; errors: string[] }>(`${this.endpoint}/import`, formData);
+        return this.api.post<{ imported: number; errors: string[]; success: boolean }>(`${this.endpoint}/import`, formData);
     }
 
     exportEmployeesExcel(params?: { department?: string; status?: string }): Observable<Blob> {
-        return this.api.get<Blob>(`${this.endpoint}/export`, { ...params, responseType: 'blob' });
+        // Build the URL with query params for download
+        let url = `${this.endpoint}/export`;
+        const queryParams: string[] = [];
+        if (params?.department) queryParams.push(`department=${encodeURIComponent(params.department)}`);
+        if (params?.status) queryParams.push(`status=${encodeURIComponent(params.status)}`);
+        if (queryParams.length) url += '?' + queryParams.join('&');
+        return this.api.get<Blob>(url, { responseType: 'blob' });
     }
 
     syncEmployees(): Observable<{ synced: number; errors: string[] }> {
@@ -254,16 +258,18 @@ export class HRService {
     // ==================== VERSATILITY MATRIX ====================
     getVersatilityMatrix(params?: {
         prodLineId?: number;
-        processId?: number;
-        teamId?: number;
+        department?: string;
     }): Observable<VersatilityMatrix> {
-        return this.api.get<VersatilityMatrix>(`${this.endpoint}/versatility-matrix`, params);
+        const apiParams: any = {};
+        if (params?.prodLineId) apiParams.production_line = params.prodLineId;
+        if (params?.department) apiParams.department = params.department;
+        return this.api.get<VersatilityMatrix>(`${this.endpoint}/versatility/matrix`, apiParams);
     }
 
-    updateVersatilityCell(employeeId: number, workstationId: number, level: number): Observable<void> {
-        return this.api.put<void>(`${this.endpoint}/versatility-matrix`, {
-            employeeId,
-            workstationId,
+    updateVersatilityCell(employeeId: number, workstationId: number, level: number): Observable<any> {
+        return this.api.post<any>(`${this.endpoint}/versatility/update-cell`, {
+            employee_id: employeeId,
+            workstation_id: workstationId,
             level
         });
     }
@@ -313,7 +319,7 @@ export class HRService {
 
     // ==================== RECYCLAGE (RETRAINING) ====================
     getEmployeesRequiringRecyclage(): Observable<RecyclageEmployee[]> {
-        return this.api.get<RecyclageEmployee[]>(`${this.endpoint}/recyclage/employees`);
+        return this.api.get<RecyclageEmployee[]>(`${this.endpoint}/recyclage`);
     }
 
     getRecyclageNotifications(params?: { isRead?: boolean }): Observable<RecyclageNotification[]> {
