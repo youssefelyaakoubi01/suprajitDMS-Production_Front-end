@@ -35,6 +35,7 @@ import {
     HourStatus
 } from '../../core/models';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
+import { environment } from '../../../environments/environment';
 
 @Component({
     selector: 'app-production',
@@ -365,7 +366,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Categorie_Emp: employee.category,
                     DateEmbauche_Emp: new Date(employee.hire_date),
                     Departement_Emp: employee.department,
-                    Picture: employee.picture || 'assets/images/avatar-default.png',
+                    Picture: employee.picture ? `${environment.mediaUrl}${employee.picture}` : 'assets/images/avatar-default.png',
                     EmpStatus: employee.status,
                     workstation: this.selectedWorkstation!.Name_Workstation,
                     qualification: this.getCategoryQualification(employee.category),

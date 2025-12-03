@@ -22,6 +22,7 @@
             <p-tab value="3"><i class="pi pi-th-large mr-2"></i>Versatility Matrix</p-tab>
             <p-tab value="4"><i class="pi pi-refresh mr-2"></i>Recyclage</p-tab>
             <p-tab value="5"><i class="pi pi-sitemap mr-2"></i>Teams & Trainers</p-tab>
+            <p-tab value="6"><i class="pi pi-user-edit mr-2"></i>Users & Access</p-tab>
         </p-tablist>
 
         <p-tabpanels>
@@ -139,8 +140,8 @@
                         <input type="text" pInputText [(ngModel)]="searchTerm"
                             placeholder="Search by name, ID or badge..." class="w-full" />
                     </span>
-                    <p-select [options]="departments" [(ngModel)]="selectedDepartment" optionLabel="department"
-                        optionValue="department" placeholder="Department" [showClear]="true"
+                    <p-select [options]="departmentEntities" [(ngModel)]="selectedDepartment" optionLabel="name"
+                        optionValue="name" placeholder="Department" [showClear]="true"
                         class="filter-dropdown"></p-select>
                     <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="categoryDescription"
                         optionValue="categoryDescription" placeholder="Category" [showClear]="true"
@@ -153,20 +154,20 @@
 
                 <!-- Employee Table -->
                 <p-table #employeeTable [value]="filteredEmployees" [paginator]="true" [rows]="10" [rowHover]="true"
-                    [loading]="loading" [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'Departement_Emp']">
+                    [loading]="loading" [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'BadgeNumber', 'Departement_Emp']">
                     <ng-template pTemplate="header">
                         <tr>
                             <th style="width: 60px">Photo</th>
                             <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
-                            <th style="width: 80px">ID</th>
+                            <th pSortableColumn="BadgeNumber">Badge <p-sortIcon field="BadgeNumber"></p-sortIcon></th>
                             <th pSortableColumn="Categorie_Emp">Category <p-sortIcon field="Categorie_Emp"></p-sortIcon>
                             </th>
                             <th pSortableColumn="team.name">Team <p-sortIcon field="team.name"></p-sortIcon></th>
-                            <th pSortableColumn="trajet.name">Trajet <p-sortIcon field="trajet.name"></p-sortIcon></th>
                             <th pSortableColumn="Departement_Emp">Department <p-sortIcon
                                     field="Departement_Emp"></p-sortIcon></th>
                             <th pSortableColumn="DateEmbauche_Emp">Hire Date <p-sortIcon
                                     field="DateEmbauche_Emp"></p-sortIcon></th>
+                            <th>Last Qualification</th>
                             <th style="width: 100px">Status</th>
                             <th style="width: 150px">Actions</th>
                         </tr>
@@ -174,7 +175,7 @@
                     <ng-template pTemplate="body" let-emp>
                         <tr>
                             <td>
-                                <p-avatar *ngIf="emp.Picture" [image]="emp.Picture" shape="circle"
+                                <p-avatar *ngIf="emp.Picture" [image]="getEmployeePictureUrl(emp.Picture)" shape="circle"
                                     size="large"></p-avatar>
                                 <p-avatar *ngIf="!emp.Picture" [label]="getInitials(emp)" shape="circle" size="large"
                                     styleClass="bg-primary text-white"></p-avatar>
@@ -184,12 +185,15 @@
                                 <br><small class="text-color-secondary">{{ emp.Genre_Emp === 'M' ? 'Male' : 'Female'
                                     }}</small>
                             </td>
-                            <td><span class="font-mono">{{ emp.Id_Emp }}</span></td>
+                            <td><span class="font-mono font-semibold text-primary">{{ emp.BadgeNumber || emp.employee_id || '-' }}</span></td>
                             <td>{{ emp.category_fk?.name || emp.Categorie_Emp }}</td>
                             <td>{{ getTeamName(emp.team) }}</td>
-                            <td>{{ getTrajetName(emp.trajet) }}</td>
                             <td>{{ emp.Departement_Emp }}</td>
                             <td>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
+                            <td>
+                                <span *ngIf="emp.last_qualification_date">{{ emp.last_qualification_date | date:'dd/MM/yyyy' }}</span>
+                                <span *ngIf="!emp.last_qualification_date" class="text-color-secondary">-</span>
+                            </td>
                             <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag>
                             </td>
                             <td>
@@ -204,7 +208,7 @@
                     </ng-template>
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="8" class="text-center p-4">
+                            <td colspan="10" class="text-center p-4">
                                 <i class="pi pi-inbox text-4xl text-color-secondary mb-3"></i>
                                 <p>No employees found</p>
                             </td>
@@ -416,13 +420,129 @@
                     <!-- Departments -->
                     <p-card header="Departments">
                         <div class="department-list">
-                            <div class="department-item" *ngFor="let dept of departments">
-                                <span class="department-name">{{ dept.department }}</span>
-                                <p-badge [value]="getEmployeeCountByDepartment(dept.department)"
+                            <div class="department-item" *ngFor="let dept of departmentEntities">
+                                <span class="department-name">{{ dept.name }}</span>
+                                <p-badge [value]="getEmployeeCountByDepartment(dept.name)"
                                     severity="info"></p-badge>
                             </div>
+                            <p *ngIf="departmentEntities.length === 0" class="text-color-secondary text-center p-3">
+                                No departments. Go to "Users & Access" tab to create departments.
+                            </p>
                         </div>
                     </p-card>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 6: Users & Access -->
+            <p-tabpanel value="6">
+                <div class="users-access-container">
+                    <!-- Users Section -->
+                    <div class="tab-header">
+                        <h3>System Users</h3>
+                        <div class="tab-actions">
+                            <p-button label="New Department" icon="pi pi-building" severity="secondary"
+                                (click)="openNewDepartmentDialog()"></p-button>
+                            <p-button label="New User" icon="pi pi-plus" (click)="openNewUserDialog()"></p-button>
+                        </div>
+                    </div>
+
+                    <div class="users-grid">
+                        <!-- Users Table -->
+                        <p-card header="Users" styleClass="users-card">
+                            <p-table [value]="users" [rows]="10" [paginator]="true" [rowHover]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Login</th>
+                                        <th>Position</th>
+                                        <th>Department</th>
+                                        <th>Status</th>
+                                        <th>Permissions</th>
+                                        <th>Last Login</th>
+                                        <th style="width: 120px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-user>
+                                    <tr>
+                                        <td>
+                                            <div class="user-name-cell">
+                                                <p-avatar [label]="user.name?.charAt(0)" shape="circle"
+                                                    styleClass="bg-primary text-white"></p-avatar>
+                                                <span class="font-semibold">{{ user.name }}</span>
+                                            </div>
+                                        </td>
+                                        <td><code>{{ user.login }}</code></td>
+                                        <td>{{ user.position_display || user.position }}</td>
+                                        <td>{{ user.department_name || '-' }}</td>
+                                        <td>
+                                            <p-tag [value]="user.status" [severity]="getUserStatusSeverity(user.status)"></p-tag>
+                                        </td>
+                                        <td>
+                                            <div class="permissions-badges">
+                                                <p-badge *ngIf="user.dms_hr" value="HR" severity="info" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_production" value="Prod" severity="success" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_quality" value="QC" severity="warn" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_maintenance" value="Maint" severity="secondary" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_kpi" value="KPI" severity="contrast" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_ll" value="LL" styleClass="mr-1"></p-badge>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span *ngIf="user.last_login">{{ user.last_login | date:'dd/MM/yyyy HH:mm' }}</span>
+                                            <span *ngIf="!user.last_login" class="text-color-secondary">Never</span>
+                                        </td>
+                                        <td>
+                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"
+                                                (click)="editUser(user)" pTooltip="Edit"></p-button>
+                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                                (click)="deleteUser(user)" pTooltip="Delete"></p-button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="8" class="text-center p-4">
+                                            <i class="pi pi-users text-4xl text-color-secondary mb-3"></i>
+                                            <p>No users found. Click "New User" to create one.</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+
+                        <!-- Departments Management -->
+                        <p-card header="Departments Management" styleClass="departments-card">
+                            <p-table [value]="departmentEntities" [rows]="5" [paginator]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th style="width: 100px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-dept>
+                                    <tr>
+                                        <td class="font-semibold">{{ dept.name }}</td>
+                                        <td>{{ dept.description || '-' }}</td>
+                                        <td>
+                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"
+                                                (click)="editDepartmentEntity(dept)" pTooltip="Edit"></p-button>
+                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                                (click)="deleteDepartmentEntity(dept)" pTooltip="Delete"></p-button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="3" class="text-center p-4">
+                                            <i class="pi pi-building text-4xl text-color-secondary mb-3"></i>
+                                            <p>No departments found</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+                    </div>
                 </div>
             </p-tabpanel>
         </p-tabpanels>
@@ -477,7 +597,7 @@
             <div class="form-field">
                 <label for="genre">Gender *</label>
                 <p-select id="genre" [options]="genderOptions" formControlName="Genre_Emp" optionLabel="label"
-                    optionValue="value" class="w-full"></p-select>
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
             </div>
         </div>
 
@@ -485,12 +605,12 @@
             <div class="form-field">
                 <label for="category">Category *</label>
                 <p-select id="category" [options]="categories" formControlName="category_fk" optionLabel="name"
-                    class="w-full"></p-select>
+                    class="w-full" appendTo="body"></p-select>
             </div>
             <div class="form-field">
                 <label for="department">Department *</label>
-                <p-select id="department" [options]="departments" formControlName="Departement_Emp"
-                    optionLabel="department" optionValue="department" class="w-full"></p-select>
+                <p-select id="department" [options]="departmentEntities" formControlName="Departement_Emp"
+                    optionLabel="name" optionValue="name" class="w-full" appendTo="body"></p-select>
             </div>
         </div>
 
@@ -498,12 +618,12 @@
             <div class="form-field">
                 <label for="hiredate">Hire Date *</label>
                 <p-datepicker id="hiredate" formControlName="DateEmbauche_Emp" dateFormat="dd/mm/yy" [showIcon]="true"
-                    class="w-full"></p-datepicker>
+                    class="w-full" appendTo="body"></p-datepicker>
             </div>
             <div class="form-field">
                 <label for="status">Status *</label>
                 <p-select id="status" [options]="statusOptions" formControlName="EmpStatus" optionLabel="label"
-                    optionValue="value" class="w-full"></p-select>
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
             </div>
         </div>
 
@@ -511,12 +631,12 @@
             <div class="form-field">
                 <label for="team">Team</label>
                 <p-select id="team" [options]="teams" formControlName="team" optionLabel="name" [showClear]="true"
-                    placeholder="Select team" class="w-full"></p-select>
+                    placeholder="Select team" class="w-full" appendTo="body"></p-select>
             </div>
             <div class="form-field">
                 <label for="trajet">Trajet</label>
                 <p-select id="trajet" [options]="trajets" formControlName="trajet" optionLabel="name" [showClear]="true"
-                    placeholder="Select trajet" class="w-full"></p-select>
+                    placeholder="Select trajet" class="w-full" appendTo="body"></p-select>
             </div>
             <div class="form-field">
                 <label for="badge">Badge Number</label>
@@ -544,13 +664,14 @@
             <label for="formationType">Type *</label>
             <p-select id="formationType"
                 [options]="[{label: 'Safety', value: 'Safety'}, {label: 'Technical', value: 'Technical'}, {label: 'Quality', value: 'Quality'}]"
-                formControlName="type_formation" optionLabel="label" optionValue="value" class="w-full"></p-select>
+                formControlName="type_formation" optionLabel="label" optionValue="value" class="w-full"
+                appendTo="body"></p-select>
         </div>
 
         <div class="form-field">
             <label for="process">Process *</label>
             <p-select id="process" [options]="processes" formControlName="id_process" optionLabel="desc_process"
-                optionValue="id_process" class="w-full"></p-select>
+                optionValue="id_process" class="w-full" appendTo="body"></p-select>
         </div>
     </form>
 
@@ -566,7 +687,7 @@
         <div class="form-field">
             <label for="qEmployee">Employee *</label>
             <p-select id="qEmployee" [options]="employees" formControlName="Id_Emp" optionLabel="Nom_Emp"
-                optionValue="Id_Emp" [filter]="true" class="w-full">
+                optionValue="Id_Emp" [filter]="true" class="w-full" appendTo="body">
                 <ng-template let-emp pTemplate="item">
                     {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
                 </ng-template>
@@ -576,19 +697,19 @@
         <div class="form-field">
             <label for="qFormation">Formation *</label>
             <p-select id="qFormation" [options]="formations" formControlName="id_formation" optionLabel="name_formation"
-                optionValue="id_formation" class="w-full"></p-select>
+                optionValue="id_formation" class="w-full" appendTo="body"></p-select>
         </div>
 
         <div class="form-field">
             <label for="qTrainer">Trainer *</label>
             <p-select id="qTrainer" [options]="formateurs" formControlName="Trainer" optionLabel="Name"
-                optionValue="TrainerID" class="w-full"></p-select>
+                optionValue="TrainerID" class="w-full" appendTo="body"></p-select>
         </div>
 
         <div class="form-field">
             <label for="qStartDate">Start Date *</label>
             <p-datepicker id="qStartDate" formControlName="start_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
-                class="w-full"></p-datepicker>
+                class="w-full" appendTo="body"></p-datepicker>
         </div>
 
         <div class="form-field">
@@ -639,13 +760,135 @@
         <div class="form-field">
             <label for="trainerStatus">Status *</label>
             <p-select id="trainerStatus" [options]="statusOptions" formControlName="Status" optionLabel="label"
-                optionValue="value" class="w-full"></p-select>
+                optionValue="value" class="w-full" appendTo="body"></p-select>
         </div>
     </form>
 
     <ng-template pTemplate="footer">
         <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showFormateurDialog = false"></p-button>
         <p-button label="Create" icon="pi pi-check" (click)="saveFormateur()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- User Dialog -->
+<p-dialog [(visible)]="showUserDialog" [header]="isEditMode ? 'Edit User' : 'New User'" [modal]="true"
+    [style]="{width: '700px'}" [closable]="true">
+    <form [formGroup]="userForm" class="user-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userName">Name *</label>
+                <input pInputText id="userName" formControlName="name" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="userLogin">Login *</label>
+                <input pInputText id="userLogin" formControlName="login" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userPassword">Password {{ isEditMode ? '(leave empty to keep current)' : '*' }}</label>
+                <input pInputText id="userPassword" formControlName="password" type="password" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="userPosition">Position *</label>
+                <p-select id="userPosition" [options]="positionOptions" formControlName="position" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userEmployee">Linked Employee</label>
+                <p-select id="userEmployee" [options]="employees" formControlName="employee" optionLabel="Prenom_Emp"
+                    optionValue="Id_Emp" [filter]="true" [showClear]="true" placeholder="Select employee" class="w-full" appendTo="body">
+                    <ng-template let-emp pTemplate="item">
+                        {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="userDepartment">Department</label>
+                <p-select id="userDepartment" [options]="departmentEntities" formControlName="department" optionLabel="name"
+                    optionValue="id" [showClear]="true" placeholder="Select department" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userStatus">Status *</label>
+                <p-select id="userStatus" [options]="userStatusOptions" formControlName="status" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <h4 class="mb-3">DMS Module Permissions</h4>
+        <div class="permissions-grid">
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_hr" [binary]="true" inputId="dms_hr"></p-checkbox>
+                <label for="dms_hr" class="ml-2">
+                    <i class="pi pi-users mr-1"></i> HR Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_production" [binary]="true" inputId="dms_production"></p-checkbox>
+                <label for="dms_production" class="ml-2">
+                    <i class="pi pi-bolt mr-1"></i> Production Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_quality" [binary]="true" inputId="dms_quality"></p-checkbox>
+                <label for="dms_quality" class="ml-2">
+                    <i class="pi pi-check-circle mr-1"></i> Quality Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_maintenance" [binary]="true" inputId="dms_maintenance"></p-checkbox>
+                <label for="dms_maintenance" class="ml-2">
+                    <i class="pi pi-wrench mr-1"></i> Maintenance Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_kpi" [binary]="true" inputId="dms_kpi"></p-checkbox>
+                <label for="dms_kpi" class="ml-2">
+                    <i class="pi pi-chart-bar mr-1"></i> KPI Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_ll" [binary]="true" inputId="dms_ll"></p-checkbox>
+                <label for="dms_ll" class="ml-2">
+                    <i class="pi pi-book mr-1"></i> Lessons Learned
+                </label>
+            </div>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showUserDialog = false"></p-button>
+        <p-button [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveUser()"></p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Department Dialog -->
+<p-dialog [(visible)]="showDepartmentDialog" [header]="isEditMode ? 'Edit Department' : 'New Department'" [modal]="true"
+    [style]="{width: '450px'}" [closable]="true">
+    <form [formGroup]="departmentForm" class="department-form">
+        <div class="form-field">
+            <label for="deptName">Department Name *</label>
+            <input pInputText id="deptName" formControlName="name" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="deptDescription">Description</label>
+            <textarea pInputTextarea id="deptDescription" formControlName="description" rows="3" class="w-full"></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showDepartmentDialog = false"></p-button>
+        <p-button [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveDepartment()"></p-button>
     </ng-template>
 </p-dialog>
 

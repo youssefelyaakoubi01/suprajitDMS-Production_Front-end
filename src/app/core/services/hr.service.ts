@@ -10,6 +10,9 @@ import {
     TransportPlanning,
     Department,
     DMSUser,
+    DMSUserCreate,
+    LoginResponse,
+    PasswordChangeRequest,
     Qualification,
     VersatilityMatrix,
     Formation,
@@ -163,6 +166,51 @@ export class HRService {
         return this.api.get<Department[]>(`${this.endpoint}/departments`).pipe(
             tap(depts => this.departmentsCache$.next(depts))
         );
+    }
+
+    getDepartmentEntities(): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/department-mgmt`);
+    }
+
+    createDepartment(department: { name: string; description?: string }): Observable<any> {
+        return this.api.post<any>(`${this.endpoint}/department-mgmt`, department);
+    }
+
+    updateDepartment(id: number, department: { name?: string; description?: string }): Observable<any> {
+        return this.api.put<any>(`${this.endpoint}/department-mgmt/${id}`, department);
+    }
+
+    deleteDepartment(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/department-mgmt/${id}`);
+    }
+
+    // ==================== DMS USERS ====================
+    getUsers(params?: { status?: string; position?: string; department?: number }): Observable<DMSUser[]> {
+        return this.api.get<DMSUser[]>(`${this.endpoint}/users`, params);
+    }
+
+    getUser(id: number): Observable<DMSUser> {
+        return this.api.get<DMSUser>(`${this.endpoint}/users/${id}`);
+    }
+
+    createUser(user: DMSUserCreate): Observable<DMSUser> {
+        return this.api.post<DMSUser>(`${this.endpoint}/users`, user);
+    }
+
+    updateUser(id: number, user: Partial<DMSUser>): Observable<DMSUser> {
+        return this.api.put<DMSUser>(`${this.endpoint}/users/${id}`, user);
+    }
+
+    deleteUser(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/users/${id}`);
+    }
+
+    authenticateUser(login: string, password: string): Observable<LoginResponse> {
+        return this.api.post<LoginResponse>(`${this.endpoint}/users/authenticate`, { login, password });
+    }
+
+    changeUserPassword(userId: number, passwords: PasswordChangeRequest): Observable<{ success: boolean; message: string }> {
+        return this.api.post<{ success: boolean; message: string }>(`${this.endpoint}/users/${userId}/change-password`, passwords);
     }
 
     // ==================== FORMATIONS ====================

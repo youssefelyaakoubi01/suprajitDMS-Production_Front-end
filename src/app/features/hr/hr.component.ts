@@ -26,10 +26,12 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { DividerModule } from 'primeng/divider';
+import { CheckboxModule } from 'primeng/checkbox';
 import { MessageService, ConfirmationService } from 'primeng/api';
 
 // Services & Models
 import { HRService } from '../../core/services/hr.service';
+import { environment } from '../../../environments/environment';
 import {
     Employee,
     Team,
@@ -45,7 +47,9 @@ import {
     HRWorkstation,
     HRProcess,
     Trajet,
-    TransportPlanning
+    TransportPlanning,
+    DMSUser,
+    DMSUserCreate
 } from '../../core/models/employee.model';
 
 @Component({
@@ -74,7 +78,8 @@ import {
         ProgressBarModule,
         TextareaModule,
         InputNumberModule,
-        DividerModule
+        DividerModule,
+        CheckboxModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './hr.component.html',
@@ -96,6 +101,7 @@ export class HrComponent implements OnInit, OnDestroy {
     employees: Employee[] = [];
     teams: Team[] = [];
     departments: Department[] = [];
+    departmentEntities: any[] = [];
     categories: EmployeeCategory[] = [];
     formations: Formation[] = [];
     formateurs: Formateur[] = [];
@@ -105,6 +111,7 @@ export class HrComponent implements OnInit, OnDestroy {
     workstations: HRWorkstation[] = [];
     processes: HRProcess[] = [];
     trajets: Trajet[] = [];
+    users: DMSUser[] = [];
 
     // Dashboard Stats
     dashboardStats: HRDashboardStats | null = null;
@@ -123,6 +130,8 @@ export class HrComponent implements OnInit, OnDestroy {
     showTeamDialog = false;
     showFormateurDialog = false;
     showImportDialog = false;
+    showUserDialog = false;
+    showDepartmentDialog = false;
 
     // Forms
     employeeForm!: FormGroup;
@@ -130,10 +139,14 @@ export class HrComponent implements OnInit, OnDestroy {
     qualificationForm!: FormGroup;
     teamForm!: FormGroup;
     formateurForm!: FormGroup;
+    userForm!: FormGroup;
+    departmentForm!: FormGroup;
 
     // Edit Mode
     isEditMode = false;
     selectedEmployee: Employee | null = null;
+    selectedUser: DMSUser | null = null;
+    selectedDepartmentEntity: any | null = null;
 
     // Photo upload
     employeePhotoPreview: string | null = null;
@@ -169,6 +182,23 @@ export class HrComponent implements OnInit, OnDestroy {
         { label: 'Level 4 - Expert/Trainer', value: 4, color: '#8B5CF6' }
     ];
 
+    // User position options
+    positionOptions = [
+        { label: 'Administrator', value: 'admin' },
+        { label: 'HR Manager', value: 'rh_manager' },
+        { label: 'Team Leader', value: 'team_leader' },
+        { label: 'Supervisor', value: 'supervisor' },
+        { label: 'Operator', value: 'operator' },
+        { label: 'Trainer', value: 'formateur' }
+    ];
+
+    // User status options
+    userStatusOptions = [
+        { label: 'Active', value: 'active' },
+        { label: 'Inactive', value: 'inactive' },
+        { label: 'Suspended', value: 'suspended' }
+    ];
+
     // Tab mapping from route data
     private tabMapping: { [key: string]: string } = {
         'dashboard': '0',
@@ -177,7 +207,8 @@ export class HrComponent implements OnInit, OnDestroy {
         'qualifications': '2',
         'versatility': '3',
         'recyclage': '4',
-        'teams': '5'
+        'teams': '5',
+        'users': '6'
     };
 
     constructor(
@@ -207,6 +238,19 @@ export class HrComponent implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         this.destroy$.next();
         this.destroy$.complete();
+    }
+
+    // Helper to build full image URL for employee pictures
+    getEmployeePictureUrl(picture: string | null | undefined): string | undefined {
+        if (!picture) {
+            return undefined;
+        }
+        // If already a full URL or local asset, return as is
+        if (picture.startsWith('http') || picture.startsWith('assets/')) {
+            return picture;
+        }
+        // Otherwise, prepend the media URL
+        return `${environment.mediaUrl}${picture}`;
     }
 
     // ==================== INITIALIZATION ====================
@@ -251,6 +295,27 @@ export class HrComponent implements OnInit, OnDestroy {
             login: ['', Validators.required],
             Status: ['Active', Validators.required],
             IsAdmin: [false]
+        });
+
+        this.userForm = this.fb.group({
+            name: ['', Validators.required],
+            login: ['', Validators.required],
+            password: ['', Validators.required],
+            position: ['operator', Validators.required],
+            employee: [null],
+            department: [null],
+            status: ['active', Validators.required],
+            dms_ll: [false],
+            dms_kpi: [false],
+            dms_hr: [false],
+            dms_production: [false],
+            dms_quality: [false],
+            dms_maintenance: [false]
+        });
+
+        this.departmentForm = this.fb.group({
+            name: ['', Validators.required],
+            description: ['']
         });
     }
 
@@ -466,6 +531,26 @@ export class HrComponent implements OnInit, OnDestroy {
 
         // Load versatility matrix from API
         this.loadVersatilityMatrix();
+
+        // Load users
+        this.loadUsers();
+
+        // Load department entities
+        this.loadDepartmentEntities();
+    }
+
+    loadUsers(): void {
+        this.hrService.getUsers().subscribe({
+            next: (data) => this.users = data,
+            error: (err) => { console.error('Failed to load users:', err); this.users = []; }
+        });
+    }
+
+    loadDepartmentEntities(): void {
+        this.hrService.getDepartmentEntities().subscribe({
+            next: (data) => this.departmentEntities = data,
+            error: (err) => { console.error('Failed to load department entities:', err); this.departmentEntities = []; }
+        });
     }
 
     loadRecyclageEmployees(): void {
@@ -625,7 +710,7 @@ export class HrComponent implements OnInit, OnDestroy {
 
         // Handle photo preview - support both legacy and new field names
         const pictureUrl = employee.Picture || (employee as any).picture || null;
-        this.employeePhotoPreview = pictureUrl;
+        this.employeePhotoPreview = this.getEmployeePictureUrl(pictureUrl) || null;
         this.employeePhotoFile = null;
 
         // Map backend field names to form field names
@@ -669,15 +754,43 @@ export class HrComponent implements OnInit, OnDestroy {
         };
         const category = emp.Categorie_Emp || emp.category || '';
 
-        // Find team and trajet objects from the loaded lists by ID
+        // Find team, trajet and category objects from the loaded lists
         // The dropdowns use objects with optionLabel="name", not just IDs
+        // Handle both ID (number) and object formats from backend
+        // Use _detail fields from backend (nested serializers) or fall back to ID fields
+        const teamDetail = emp.team_detail;
+        const trajetDetail = emp.trajet_detail;
+        const categoryFkDetail = emp.category_fk_detail;
         const teamId = emp.team;
         const trajetId = emp.trajet;
         const categoryFkId = emp.category_fk;
 
-        const selectedTeam = teamId ? this.teams.find(t => t.id === teamId) : null;
-        const selectedTrajet = trajetId ? this.trajets.find(t => t.id === trajetId) : null;
-        const selectedCategoryFk = categoryFkId ? this.categories.find(c => c.id === categoryFkId) : null;
+        // Get team - prefer _detail object, fall back to ID lookup
+        let selectedTeam = null;
+        if (teamDetail && teamDetail.id) {
+            selectedTeam = this.teams.find(t => t.id === teamDetail.id);
+        } else if (teamId) {
+            const id = typeof teamId === 'object' ? teamId.id : teamId;
+            selectedTeam = this.teams.find(t => t.id === id);
+        }
+
+        // Get trajet - prefer _detail object, fall back to ID lookup
+        let selectedTrajet = null;
+        if (trajetDetail && trajetDetail.id) {
+            selectedTrajet = this.trajets.find(t => t.id === trajetDetail.id);
+        } else if (trajetId) {
+            const id = typeof trajetId === 'object' ? trajetId.id : trajetId;
+            selectedTrajet = this.trajets.find(t => t.id === id);
+        }
+
+        // Get category - prefer _detail object, fall back to ID lookup
+        let selectedCategoryFk = null;
+        if (categoryFkDetail && categoryFkDetail.id) {
+            selectedCategoryFk = this.categories.find(c => c.id === categoryFkDetail.id);
+        } else if (categoryFkId) {
+            const id = typeof categoryFkId === 'object' ? categoryFkId.id : categoryFkId;
+            selectedCategoryFk = this.categories.find(c => c.id === id);
+        }
 
         this.employeeForm.patchValue({
             Nom_Emp: emp.Nom_Emp || emp.last_name || '',
@@ -854,8 +967,16 @@ export class HrComponent implements OnInit, OnDestroy {
             header: 'Delete Confirmation',
             icon: 'pi pi-exclamation-triangle',
             accept: () => {
-                this.employees = this.employees.filter(e => e.Id_Emp !== employee.Id_Emp);
-                this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Employee deleted successfully' });
+                this.hrService.deleteEmployee(employee.Id_Emp).subscribe({
+                    next: () => {
+                        this.employees = this.employees.filter(e => e.Id_Emp !== employee.Id_Emp);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Employee deleted successfully' });
+                    },
+                    error: (err) => {
+                        console.error('Error deleting employee:', err);
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete employee' });
+                    }
+                });
             }
         });
     }
@@ -1118,6 +1239,204 @@ export class HrComponent implements OnInit, OnDestroy {
             detail: `Planning recyclage for ${employee.Employee.Prenom_Emp} ${employee.Employee.Nom_Emp}`
         });
         // TODO: Open dialog to plan recyclage
+    }
+
+    // ==================== USER MANAGEMENT ====================
+    openNewUserDialog(): void {
+        this.isEditMode = false;
+        this.selectedUser = null;
+        this.userForm.reset({
+            position: 'operator',
+            status: 'active',
+            dms_ll: false,
+            dms_kpi: false,
+            dms_hr: false,
+            dms_production: false,
+            dms_quality: false,
+            dms_maintenance: false
+        });
+        this.userForm.get('password')?.setValidators([Validators.required]);
+        this.userForm.get('password')?.updateValueAndValidity();
+        this.showUserDialog = true;
+    }
+
+    editUser(user: DMSUser): void {
+        this.isEditMode = true;
+        this.selectedUser = user;
+        this.userForm.patchValue({
+            name: user.name,
+            login: user.login,
+            password: '',
+            position: user.position,
+            employee: user.employee,
+            department: user.department,
+            status: user.status,
+            dms_ll: user.dms_ll,
+            dms_kpi: user.dms_kpi,
+            dms_hr: user.dms_hr,
+            dms_production: user.dms_production,
+            dms_quality: user.dms_quality,
+            dms_maintenance: user.dms_maintenance
+        });
+        // Password not required for edit
+        this.userForm.get('password')?.clearValidators();
+        this.userForm.get('password')?.updateValueAndValidity();
+        this.showUserDialog = true;
+    }
+
+    saveUser(): void {
+        if (this.userForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const userData = this.userForm.value;
+
+        // Extract department ID if it's an object
+        if (userData.department && typeof userData.department === 'object') {
+            userData.department = userData.department.id;
+        }
+
+        // Extract employee ID if it's an object
+        if (userData.employee && typeof userData.employee === 'object') {
+            userData.employee = userData.employee.Id_Emp || userData.employee.id;
+        }
+
+        if (this.isEditMode && this.selectedUser) {
+            // Remove password if empty on edit
+            if (!userData.password) {
+                delete userData.password;
+            }
+            this.hrService.updateUser(this.selectedUser.id, userData).subscribe({
+                next: (updated) => {
+                    const index = this.users.findIndex(u => u.id === updated.id);
+                    if (index > -1) this.users[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'User updated successfully' });
+                    this.showUserDialog = false;
+                    this.loadUsers();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createUser(userData).subscribe({
+                next: (newUser) => {
+                    this.users.push(newUser);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'User created successfully' });
+                    this.showUserDialog = false;
+                    this.loadUsers();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteUser(user: DMSUser): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete user "${user.name}"?`,
+            header: 'Delete Confirmation',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteUser(user.id).subscribe({
+                    next: () => {
+                        this.users = this.users.filter(u => u.id !== user.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'User deleted successfully' });
+                    },
+                    error: (err) => {
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete user' });
+                    }
+                });
+            }
+        });
+    }
+
+    getUserStatusSeverity(status: string): 'success' | 'danger' | 'warn' | 'info' {
+        const map: { [key: string]: 'success' | 'danger' | 'warn' | 'info' } = {
+            'active': 'success',
+            'inactive': 'danger',
+            'suspended': 'warn'
+        };
+        return map[status] || 'info';
+    }
+
+    // ==================== DEPARTMENT MANAGEMENT ====================
+    openNewDepartmentDialog(): void {
+        this.isEditMode = false;
+        this.selectedDepartmentEntity = null;
+        this.departmentForm.reset();
+        this.showDepartmentDialog = true;
+    }
+
+    editDepartmentEntity(dept: any): void {
+        this.isEditMode = true;
+        this.selectedDepartmentEntity = dept;
+        this.departmentForm.patchValue({
+            name: dept.name,
+            description: dept.description || ''
+        });
+        this.showDepartmentDialog = true;
+    }
+
+    saveDepartment(): void {
+        if (this.departmentForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please enter department name' });
+            return;
+        }
+
+        const deptData = this.departmentForm.value;
+
+        if (this.isEditMode && this.selectedDepartmentEntity) {
+            this.hrService.updateDepartment(this.selectedDepartmentEntity.id, deptData).subscribe({
+                next: (updated) => {
+                    const index = this.departmentEntities.findIndex(d => d.id === updated.id);
+                    if (index > -1) this.departmentEntities[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Department updated successfully' });
+                    this.showDepartmentDialog = false;
+                    this.loadDepartmentEntities();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createDepartment(deptData).subscribe({
+                next: (newDept) => {
+                    this.departmentEntities.push(newDept);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Department created successfully' });
+                    this.showDepartmentDialog = false;
+                    this.loadDepartmentEntities();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteDepartmentEntity(dept: any): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete department "${dept.name}"?`,
+            header: 'Delete Confirmation',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteDepartment(dept.id).subscribe({
+                    next: () => {
+                        this.departmentEntities = this.departmentEntities.filter(d => d.id !== dept.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Department deleted successfully' });
+                    },
+                    error: (err) => {
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete department' });
+                    }
+                });
+            }
+        });
     }
 
     // ==================== HELPERS ====================

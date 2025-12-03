@@ -42,6 +42,7 @@ import {
     HOUR_TYPE_TARGET_PERCENTAGE
 } from '../../core/models/production-session.model';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
+import { environment } from '../../../environments/environment';
 
 @Component({
     selector: 'app-production',
@@ -180,6 +181,19 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     get completedHours(): number {
         return this.session.hours.filter(h => h.status === 'completed').length;
+    }
+
+    // Helper to build full image URL for employee pictures
+    getEmployeePictureUrl(picture: string | null | undefined): string {
+        if (!picture) {
+            return 'assets/images/avatar-default.png';
+        }
+        // If already a full URL or local asset, return as is
+        if (picture.startsWith('http') || picture.startsWith('assets/')) {
+            return picture;
+        }
+        // Otherwise, prepend the media URL
+        return `${environment.mediaUrl}${picture}`;
     }
 
     constructor(
@@ -424,7 +438,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                     Categorie_Emp: employee.category || employee.Categorie_Emp || 'operator',
                                     DateEmbauche_Emp: employee.hire_date || employee.DateEmbauche_Emp || new Date(),
                                     Departement_Emp: employee.department || employee.Departement_Emp || 'Production',
-                                    Picture: employee.picture || employee.Picture || 'assets/images/avatar-default.png',
+                                    Picture: this.getEmployeePictureUrl(employee.picture || employee.Picture),
                                     EmpStatus: employee.status || employee.EmpStatus || 'active',
                                     workstation: workstation?.Name_Workstation || 'Unknown',
                                     qualification: this.getCategoryQualification(employee.category || employee.Categorie_Emp || ''),
@@ -490,7 +504,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                         Categorie_Emp: employee.category || employee.Categorie_Emp || 'operator',
                                         DateEmbauche_Emp: employee.hire_date || employee.DateEmbauche_Emp || new Date(),
                                         Departement_Emp: employee.department || employee.Departement_Emp || 'Production',
-                                        Picture: employee.picture || employee.Picture || 'assets/images/avatar-default.png',
+                                        Picture: this.getEmployeePictureUrl(employee.picture || employee.Picture),
                                         EmpStatus: employee.status || employee.EmpStatus || 'active',
                                         workstation: workstation?.Name_Workstation || 'Unknown',
                                         qualification: this.getCategoryQualification(employee.category || employee.Categorie_Emp || ''),
@@ -878,7 +892,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Categorie_Emp: employee.category,
                     DateEmbauche_Emp: new Date(employee.hire_date),
                     Departement_Emp: employee.department,
-                    Picture: employee.picture || 'assets/images/avatar-default.png',
+                    Picture: this.getEmployeePictureUrl(employee.picture),
                     EmpStatus: employee.status,
                     workstation: this.selectedWorkstation!.Name_Workstation,
                     workstationId: this.selectedWorkstation!.Id_Workstation,

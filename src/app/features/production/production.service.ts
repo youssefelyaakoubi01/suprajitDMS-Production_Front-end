@@ -14,6 +14,7 @@ import {
 } from '../../core/models';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
 import { ProductionService as CoreProductionService } from '../../core/services/production.service';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
     providedIn: 'root'
@@ -197,7 +198,7 @@ export class ProductionService {
                     Categorie_Emp: a.employee?.category || 'Operator',
                     DateEmbauche_Emp: a.employee?.hire_date ? new Date(a.employee.hire_date) : new Date(),
                     Departement_Emp: a.employee?.department || 'Production',
-                    Picture: a.employee?.picture || 'assets/images/avatar-default.png',
+                    Picture: a.employee?.picture ? `${environment.mediaUrl}${a.employee.picture}` : 'assets/images/avatar-default.png',
                     EmpStatus: a.employee?.status || 'active',
                     workstation: a.workstation?.name || '',
                     qualification: '', // TODO: Get from qualifications
