@@ -57,6 +57,16 @@ export class AppDmsHrMenu {
                         label: 'Teams',
                         icon: 'pi pi-fw pi-sitemap',
                         routerLink: ['/dms-hr/teams']
+                    },
+                    {
+                        label: 'Licenses Manager',
+                        icon: 'pi pi-fw pi-id-card',
+                        routerLink: ['/dms-hr/licenses']
+                    },
+                    {
+                        label: 'Workstations',
+                        icon: 'pi pi-fw pi-desktop',
+                        routerLink: ['/dms-hr/workstations']
                     }
                 ]
             },

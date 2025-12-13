@@ -1,17 +1,30 @@
 <div class="hr-container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">DMS - Human Resources</h1>
-            <p class="page-subtitle">Manage employees, formations, qualifications and teams</p>
-        </div>
-        <div class="header-actions">
-            <p-button label="Import Excel" icon="pi pi-upload" severity="secondary"
-                (click)="openImportDialog()"></p-button>
-            <p-button label="Export" icon="pi pi-download" severity="secondary" (click)="exportEmployees()"></p-button>
-            <p-button label="Add Employee" icon="pi pi-plus" (click)="openNewEmployeeDialog()"></p-button>
-        </div>
-    </div>
+    <!-- Modern Header Toolbar - Responsive -->
+    <p-toolbar styleClass="mb-4 surface-ground border-round hr-header-toolbar">
+        <ng-template #start>
+            <div class="flex flex-column">
+                <h1 class="header-title m-0 text-color">DMS - Human Resources</h1>
+                <span class="header-subtitle text-color-secondary">Manage employees, formations, qualifications and teams</span>
+            </div>
+        </ng-template>
+        <ng-template #end>
+            <div class="header-actions">
+                <button pButton icon="pi pi-upload" class="p-button-secondary p-button-text action-btn"
+                    (click)="openImportDialog()" pTooltip="Import Excel">
+                    <span class="btn-label">Import</span>
+                </button>
+                <button pButton icon="pi pi-download" class="p-button-secondary p-button-text action-btn"
+                    (click)="exportEmployees()" pTooltip="Export Data">
+                    <span class="btn-label">Export</span>
+                </button>
+                <span class="header-divider"></span>
+                <button pButton icon="pi pi-plus" class="add-employee-btn"
+                    (click)="openNewEmployeeDialog()" pTooltip="Add Employee">
+                    <span class="btn-label">Add Employee</span>
+                </button>
+            </div>
+        </ng-template>
+    </p-toolbar>
 
     <!-- Main Tabs -->
     <p-tabs [value]="activeTab" (onChange)="onTabChange($event)">
@@ -23,53 +36,44 @@
             <p-tab value="4"><i class="pi pi-refresh mr-2"></i>Recyclage</p-tab>
             <p-tab value="5"><i class="pi pi-sitemap mr-2"></i>Teams & Trainers</p-tab>
             <p-tab value="6"><i class="pi pi-user-edit mr-2"></i>Users & Access</p-tab>
+            <p-tab value="7"><i class="pi pi-id-card mr-2"></i>Licenses Manager</p-tab>
+            <p-tab value="8"><i class="pi pi-desktop mr-2"></i>Workstations</p-tab>
         </p-tablist>
 
         <p-tabpanels>
             <!-- TAB 0: Dashboard -->
             <p-tabpanel value="0">
-                <div class="dashboard-grid" *ngIf="dashboardStats">
-                    <!-- KPI Cards -->
+                <!-- Loading Skeleton for KPI Cards -->
+                <div class="kpi-row" *ngIf="loadingStats">
+                    <div class="modern-kpi-card" *ngFor="let i of [1,2,3,4]">
+                        <div class="flex justify-content-between mb-3">
+                            <p-skeleton width="60%" height="1rem"></p-skeleton>
+                            <p-skeleton shape="circle" size="3rem"></p-skeleton>
+                        </div>
+                        <p-skeleton width="40%" height="2rem" styleClass="mb-2"></p-skeleton>
+                        <p-skeleton width="80%" height="0.5rem"></p-skeleton>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid" *ngIf="dashboardStats && !loadingStats">
+                    <!-- Modern KPI Cards with Trends -->
                     <div class="kpi-row">
-                        <p-card styleClass="kpi-card kpi-primary">
-                            <div class="kpi-content">
-                                <div class="kpi-icon"><i class="pi pi-users"></i></div>
-                                <div class="kpi-info">
-                                    <span class="kpi-value">{{ dashboardStats.totalEmployees }}</span>
-                                    <span class="kpi-label">Total Employees</span>
+                        <div class="modern-kpi-card" *ngFor="let kpi of kpiData">
+                            <div class="kpi-header">
+                                <span class="kpi-label">{{ kpi.label }}</span>
+                                <div class="kpi-icon-wrapper" [ngClass]="'bg-' + kpi.color + '-100'">
+                                    <i [ngClass]="kpi.icon + ' text-' + kpi.color + '-500'"></i>
                                 </div>
                             </div>
-                        </p-card>
-
-                        <p-card styleClass="kpi-card kpi-success">
-                            <div class="kpi-content">
-                                <div class="kpi-icon"><i class="pi pi-check-circle"></i></div>
-                                <div class="kpi-info">
-                                    <span class="kpi-value">{{ dashboardStats.activeEmployees }}</span>
-                                    <span class="kpi-label">Active Employees</span>
+                            <div class="kpi-body">
+                                <span class="kpi-value">{{ kpi.value }}</span>
+                                <div class="kpi-trend" [class.positive]="kpi.trend > 0" [class.negative]="kpi.trend < 0">
+                                    <i [ngClass]="kpi.trend >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"></i>
+                                    <span>{{ kpi.trend >= 0 ? '+' : '' }}{{ kpi.trend }}% vs last month</span>
                                 </div>
                             </div>
-                        </p-card>
-
-                        <p-card styleClass="kpi-card kpi-warning">
-                            <div class="kpi-content">
-                                <div class="kpi-icon"><i class="pi pi-exclamation-triangle"></i></div>
-                                <div class="kpi-info">
-                                    <span class="kpi-value">{{ dashboardStats.employeesRequiringRecyclage }}</span>
-                                    <span class="kpi-label">Require Recyclage</span>
-                                </div>
-                            </div>
-                        </p-card>
-
-                        <p-card styleClass="kpi-card kpi-info">
-                            <div class="kpi-content">
-                                <div class="kpi-icon"><i class="pi pi-percentage"></i></div>
-                                <div class="kpi-info">
-                                    <span class="kpi-value">{{ dashboardStats.qualificationCompletionRate }}%</span>
-                                    <span class="kpi-label">Qualification Rate</span>
-                                </div>
-                            </div>
-                        </p-card>
+                            <p-progressBar [value]="kpi.progress" [showValue]="false" styleClass="h-1 mt-3"></p-progressBar>
+                        </div>
                     </div>
 
                     <!-- Charts Row -->
@@ -133,47 +137,93 @@
 
             <!-- TAB 1: Employee Directory -->
             <p-tabpanel value="1">
-                <!-- Filters -->
-                <div class="filters-bar">
-                    <span class="p-input-icon-left flex-grow-1">
-                        <i class="pi pi-search"></i>
-                        <input type="text" pInputText [(ngModel)]="searchTerm"
-                            placeholder="Search by name, ID or badge..." class="w-full" />
-                    </span>
-                    <p-select [options]="departmentEntities" [(ngModel)]="selectedDepartment" optionLabel="name"
-                        optionValue="name" placeholder="Department" [showClear]="true"
-                        class="filter-dropdown"></p-select>
-                    <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="categoryDescription"
-                        optionValue="categoryDescription" placeholder="Category" [showClear]="true"
-                        class="filter-dropdown"></p-select>
-                    <p-select [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label"
-                        optionValue="value" placeholder="Status" [showClear]="true" class="filter-dropdown"></p-select>
-                    <p-button icon="pi pi-filter-slash" severity="secondary" [text]="true" (click)="clearFilters()"
-                        pTooltip="Clear filters"></p-button>
+                <!-- Modern Filter Toolbar -->
+                <p-toolbar styleClass="mb-3 surface-ground border-round">
+                    <ng-template #start>
+                        <p-iconfield iconPosition="left" class="toolbar-search">
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input pInputText [(ngModel)]="searchTerm" placeholder="Search employees..."
+                                   style="width: 280px" />
+                        </p-iconfield>
+                    </ng-template>
+
+                    <ng-template #center>
+                        <!-- Quick Filters -->
+                        <p-selectbutton [options]="quickFilterOptions" [(ngModel)]="selectedQuickFilter"
+                            optionLabel="label" optionValue="value" (onChange)="applyQuickFilter()">
+                        </p-selectbutton>
+                    </ng-template>
+
+                    <ng-template #end>
+                        <p-button icon="pi pi-sliders-h" [text]="true" [rounded]="true"
+                            (onClick)="showAdvancedFilters = !showAdvancedFilters"
+                            [badge]="activeFilterCount > 0 ? activeFilterCount.toString() : undefined"
+                            pTooltip="Advanced Filters">
+                        </p-button>
+                        <button pButton icon="pi pi-plus" label="Add Employee" class="ml-2"
+                            (click)="openNewEmployeeDialog()"></button>
+                    </ng-template>
+                </p-toolbar>
+
+                <!-- Advanced Filters Panel (collapsible) -->
+                <div class="advanced-filters" *ngIf="showAdvancedFilters" @slideDown>
+                    <div class="filter-grid">
+                        <p-select [options]="departmentEntities" [(ngModel)]="selectedDepartment" optionLabel="name"
+                            optionValue="name" placeholder="Department" [showClear]="true"
+                            (onChange)="applyFilters()"></p-select>
+                        <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="categoryDescription"
+                            optionValue="categoryDescription" placeholder="Category" [showClear]="true"
+                            (onChange)="applyFilters()"></p-select>
+                        <p-select [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label"
+                            optionValue="value" placeholder="Status" [showClear]="true"
+                            (onChange)="applyFilters()"></p-select>
+                    </div>
+
+                    <!-- Active Filter Chips -->
+                    <div class="active-filters mt-3" *ngIf="hasActiveFilters()">
+                        <span class="text-sm text-color-secondary mr-2">Active filters:</span>
+                        <p-chip *ngFor="let filter of activeFilters" [label]="filter.label"
+                            [removable]="true" (onRemove)="removeFilter(filter)"></p-chip>
+                        <button pButton label="Clear all" class="p-button-text p-button-sm"
+                            icon="pi pi-times" (click)="clearAllFilters()"></button>
+                    </div>
                 </div>
 
-                <!-- Employee Table -->
+                <!-- Employee Table with Row Expansion -->
                 <p-table #employeeTable [value]="filteredEmployees" [paginator]="true" [rows]="10" [rowHover]="true"
-                    [loading]="loading" [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'BadgeNumber', 'Departement_Emp']">
+                    [loading]="loading" [expandedRowKeys]="expandedRows" dataKey="Id_Emp"
+                    [rowsPerPageOptions]="[10, 25, 50]"
+                    [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'BadgeNumber', 'Departement_Emp']">
+
+                    <!-- Table Caption with Counter -->
+                    <ng-template pTemplate="caption">
+                        <div class="flex justify-content-between align-items-center">
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-users mr-2"></i>Employees ({{ filteredEmployees.length }})
+                            </span>
+                        </div>
+                    </ng-template>
+
                     <ng-template pTemplate="header">
                         <tr>
+                            <th style="width: 3rem"></th>
                             <th style="width: 60px">Photo</th>
                             <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
                             <th pSortableColumn="BadgeNumber">Badge <p-sortIcon field="BadgeNumber"></p-sortIcon></th>
-                            <th pSortableColumn="Categorie_Emp">Category <p-sortIcon field="Categorie_Emp"></p-sortIcon>
-                            </th>
-                            <th pSortableColumn="team.name">Team <p-sortIcon field="team.name"></p-sortIcon></th>
                             <th pSortableColumn="Departement_Emp">Department <p-sortIcon
                                     field="Departement_Emp"></p-sortIcon></th>
-                            <th pSortableColumn="DateEmbauche_Emp">Hire Date <p-sortIcon
-                                    field="DateEmbauche_Emp"></p-sortIcon></th>
-                            <th>Last Qualification</th>
                             <th style="width: 100px">Status</th>
-                            <th style="width: 150px">Actions</th>
+                            <th style="width: 120px">Actions</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-emp>
+
+                    <ng-template pTemplate="body" let-emp let-expanded="expanded">
                         <tr>
+                            <td>
+                                <button pButton type="button" [pRowToggler]="emp" class="p-button-text p-button-rounded"
+                                    [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'">
+                                </button>
+                            </td>
                             <td>
                                 <p-avatar *ngIf="emp.Picture" [image]="getEmployeePictureUrl(emp.Picture)" shape="circle"
                                     size="large"></p-avatar>
@@ -181,36 +231,84 @@
                                     styleClass="bg-primary text-white"></p-avatar>
                             </td>
                             <td>
-                                <span class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
-                                <br><small class="text-color-secondary">{{ emp.Genre_Emp === 'M' ? 'Male' : 'Female'
-                                    }}</small>
+                                <div class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</div>
+                                <div class="text-sm text-color-secondary">{{ emp.category_fk?.name || emp.Categorie_Emp }}</div>
                             </td>
-                            <td><span class="font-mono font-semibold text-primary">{{ emp.BadgeNumber || emp.employee_id || '-' }}</span></td>
-                            <td>{{ emp.category_fk?.name || emp.Categorie_Emp }}</td>
-                            <td>{{ getTeamName(emp.team) }}</td>
+                            <td><code>{{ emp.BadgeNumber || emp.employee_id || '-' }}</code></td>
                             <td>{{ emp.Departement_Emp }}</td>
-                            <td>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
+                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag></td>
                             <td>
-                                <span *ngIf="emp.last_qualification_date">{{ emp.last_qualification_date | date:'dd/MM/yyyy' }}</span>
-                                <span *ngIf="!emp.last_qualification_date" class="text-color-secondary">-</span>
-                            </td>
-                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag>
-                            </td>
-                            <td>
-                                <p-button icon="pi pi-eye" [rounded]="true" [text]="true" severity="info"
-                                    (click)="viewEmployee(emp)" pTooltip="View"></p-button>
-                                <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" (click)="editEmployee(emp)"
-                                    pTooltip="Edit"></p-button>
-                                <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
-                                    (click)="deleteEmployee(emp)" pTooltip="Delete"></p-button>
+                                <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text" (click)="editEmployee(emp)"
+                                    pTooltip="Edit"></button>
+                                <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                    (click)="deleteEmployee(emp)" pTooltip="Delete"></button>
                             </td>
                         </tr>
                     </ng-template>
+
+                    <!-- Row Expansion - Inline Details -->
+                    <ng-template pTemplate="rowexpansion" let-emp>
+                        <tr>
+                            <td colspan="7">
+                                <div class="expanded-row-content">
+                                    <div class="grid">
+                                        <div class="col-12 md:col-4">
+                                            <h4><i class="pi pi-user mr-2"></i>Personal Information</h4>
+                                            <div class="field">
+                                                <label>Date of Birth</label>
+                                                <p>{{ emp.DateNaissance_Emp | date:'dd/MM/yyyy' }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Gender</label>
+                                                <p>{{ emp.Genre_Emp === 'M' ? 'Male' : 'Female' }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Category</label>
+                                                <p>{{ emp.category_fk?.name || emp.Categorie_Emp }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 md:col-4">
+                                            <h4><i class="pi pi-briefcase mr-2"></i>Employment Details</h4>
+                                            <div class="field">
+                                                <label>Hire Date</label>
+                                                <p>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Team</label>
+                                                <p>{{ getTeamName(emp.team) }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Route (Trajet)</label>
+                                                <p>{{ getTrajetName(emp.trajet) }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 md:col-4">
+                                            <h4><i class="pi pi-bolt mr-2"></i>Quick Actions</h4>
+                                            <div class="flex flex-column gap-2">
+                                                <button pButton label="View Qualifications" icon="pi pi-list"
+                                                    class="p-button-outlined p-button-sm" (click)="viewEmployee(emp)"></button>
+                                                <button pButton label="Assign to Training" icon="pi pi-book"
+                                                    class="p-button-outlined p-button-sm" (click)="openNewQualificationDialog(); selectedEmployee = emp"></button>
+                                                <button pButton label="Edit Full Profile" icon="pi pi-user-edit"
+                                                    class="p-button-sm" (click)="editEmployee(emp)"></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+
+                    <!-- Improved Empty State -->
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="10" class="text-center p-4">
-                                <i class="pi pi-inbox text-4xl text-color-secondary mb-3"></i>
-                                <p>No employees found</p>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="pi pi-users"></i>
+                                    <span class="empty-title">No employees found</span>
+                                    <span class="empty-subtitle">Try adjusting your filters or add a new employee</span>
+                                    <button pButton label="Add Employee" icon="pi pi-plus" (click)="openNewEmployeeDialog()"></button>
+                                </div>
                             </td>
                         </tr>
                     </ng-template>
@@ -219,59 +317,300 @@
 
             <!-- TAB 2: Formations -->
             <p-tabpanel value="2">
-                <div class="tab-header">
-                    <h3>Training & Formations</h3>
-                    <div class="tab-actions">
-                        <p-button label="New Qualification" icon="pi pi-plus-circle" severity="secondary"
-                            (click)="openNewQualificationDialog()"></p-button>
-                        <p-button label="New Formation" icon="pi pi-plus" (click)="openNewFormationDialog()"></p-button>
+                <div class="formations-tab">
+                    <!-- Stats Mini Cards Row -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                        <!-- Total Formations -->
+                        <div style="background: var(--surface-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--surface-border);">
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); display: flex; align-items: center; justify-content: center;">
+                                    <i class="pi pi-book" style="color: white; font-size: 1.25rem;"></i>
+                                </div>
+                            </div>
+                            <div style="font-size: 2rem; font-weight: 700; color: var(--text-color);">{{ formations.length }}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-color-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Total Formations</div>
+                        </div>
+                        <!-- Active Trainers -->
+                        <div style="background: var(--surface-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--surface-border);">
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%); display: flex; align-items: center; justify-content: center;">
+                                    <i class="pi pi-user" style="color: white; font-size: 1.25rem;"></i>
+                                </div>
+                            </div>
+                            <div style="font-size: 2rem; font-weight: 700; color: var(--text-color);">{{ activeTrainersCount }}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-color-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Active Trainers</div>
+                        </div>
+                        <!-- Processes -->
+                        <div style="background: var(--surface-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--surface-border);">
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%); display: flex; align-items: center; justify-content: center;">
+                                    <i class="pi pi-cog" style="color: white; font-size: 1.25rem;"></i>
+                                </div>
+                            </div>
+                            <div style="font-size: 2rem; font-weight: 700; color: var(--text-color);">{{ processes.length }}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-color-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Processes</div>
+                        </div>
+                        <!-- Planned Sessions -->
+                        <div style="background: var(--surface-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--surface-border);">
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); display: flex; align-items: center; justify-content: center;">
+                                    <i class="pi pi-calendar" style="color: white; font-size: 1.25rem;"></i>
+                                </div>
+                            </div>
+                            <div style="font-size: 2rem; font-weight: 700; color: var(--text-color);">{{ ongoingSessions }}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-color-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Planned Sessions</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Content: Two Column Layout -->
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                        <!-- Left Column: Available Formations (70%) -->
+                        <div style="flex: 2; min-width: 300px;">
+                            <p-card>
+                                <ng-template pTemplate="header">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem; border-bottom: 1px solid var(--surface-border);">
+                                        <div style="display: flex; align-items: center; gap: 1rem;">
+                                            <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); display: flex; align-items: center; justify-content: center;">
+                                                <i class="pi pi-book" style="color: white; font-size: 1.2rem;"></i>
+                                            </div>
+                                            <div>
+                                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Available Formations</h3>
+                                                <span style="font-size: 0.8rem; color: var(--text-color-secondary);">Grouped by process</span>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; gap: 0.5rem;">
+                                            <button pButton label="New Qualification" icon="pi pi-plus-circle"
+                                                class="p-button-secondary p-button-outlined p-button-sm" (click)="openNewQualificationDialog()"></button>
+                                            <button pButton label="New Formation" icon="pi pi-plus" class="p-button-sm"
+                                                (click)="openNewFormationDialog()"></button>
+                                        </div>
+                                    </div>
+                                </ng-template>
+
+                                <!-- Accordion grouped by Process -->
+                                <div style="padding: 1rem;" *ngIf="formations.length > 0">
+                                    <p-accordion [multiple]="true">
+                                        <p-accordionpanel *ngFor="let item of groupedFormations | keyvalue"
+                                            style="margin-bottom: 0.75rem; border: 1px solid var(--surface-border); border-radius: 10px; overflow: hidden;">
+                                            <p-accordionheader>
+                                                <div style="display: flex; align-items: center; gap: 0.75rem; width: 100%;">
+                                                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%); display: flex; align-items: center; justify-content: center;">
+                                                        <i class="pi pi-cog" style="color: white; font-size: 1rem;"></i>
+                                                    </div>
+                                                    <span style="flex: 1; font-weight: 600;">{{ item.key }}</span>
+                                                    <p-badge [value]="item.value.length.toString()" severity="secondary"></p-badge>
+                                                </div>
+                                            </p-accordionheader>
+                                            <p-accordioncontent>
+                                                <div *ngFor="let formation of item.value"
+                                                    style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--surface-border); transition: background 0.2s;"
+                                                    class="formation-row">
+                                                    <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                                        <i class="pi pi-bookmark" style="color: white; font-size: 1rem;"></i>
+                                                    </div>
+                                                    <div style="flex: 1; min-width: 0;">
+                                                        <div style="font-weight: 600; margin-bottom: 0.25rem;">{{ formation.name }}</div>
+                                                        <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; color: var(--text-color-secondary);">
+                                                            <span style="display: flex; align-items: center; gap: 0.25rem;">
+                                                                <i class="pi pi-clock" style="font-size: 0.75rem;"></i>
+                                                                {{ formation.duration_hours || 0 }}h
+                                                            </span>
+                                                            <p-tag [value]="formation.type" size="small" [rounded]="true"></p-tag>
+                                                        </div>
+                                                    </div>
+                                                    <div style="display: flex; gap: 0.25rem;" (click)="$event.stopPropagation()">
+                                                        <button pButton icon="pi pi-pencil" class="p-button-text p-button-rounded p-button-sm"
+                                                            (click)="editFormation(formation)" pTooltip="Edit"></button>
+                                                        <button pButton icon="pi pi-trash" class="p-button-text p-button-rounded p-button-sm p-button-danger"
+                                                            (click)="deleteFormation(formation)" pTooltip="Delete"></button>
+                                                    </div>
+                                                </div>
+                                            </p-accordioncontent>
+                                        </p-accordionpanel>
+                                    </p-accordion>
+                                </div>
+
+                                <!-- Empty state if no formations -->
+                                <div *ngIf="formations.length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; text-align: center;">
+                                    <i class="pi pi-book" style="font-size: 3rem; color: var(--text-color-secondary); margin-bottom: 1rem;"></i>
+                                    <span style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">No formations available</span>
+                                    <span style="color: var(--text-color-secondary); margin-bottom: 1.5rem;">Create your first formation to get started</span>
+                                    <button pButton label="New Formation" icon="pi pi-plus" (click)="openNewFormationDialog()"></button>
+                                </div>
+                            </p-card>
+                        </div>
+
+                        <!-- Right Column: Trainers & Quick Actions (30%) -->
+                        <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 1rem;">
+                            <!-- Trainers Card -->
+                            <p-card>
+                                <ng-template pTemplate="header">
+                                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem; border-bottom: 1px solid var(--surface-border);">
+                                        <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%); display: flex; align-items: center; justify-content: center;">
+                                            <i class="pi pi-users" style="color: white; font-size: 1.2rem;"></i>
+                                        </div>
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Trainers</h3>
+                                            <span style="font-size: 0.8rem; color: var(--text-color-secondary);">{{ formateurs.length }} formateurs</span>
+                                        </div>
+                                    </div>
+                                </ng-template>
+
+                                <div style="padding: 1rem;">
+                                    <div *ngFor="let trainer of formateurs"
+                                        style="display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem; background: var(--surface-hover); border-radius: 10px; margin-bottom: 0.5rem; transition: all 0.2s;"
+                                        class="trainer-row">
+                                        <p-avatar [label]="(trainer.name || trainer.Name || '?').charAt(0)" shape="circle"
+                                            styleClass="bg-purple-500 text-white"></p-avatar>
+                                        <div style="flex: 1; min-width: 0;">
+                                            <div style="font-weight: 600; font-size: 0.9rem;">{{ trainer.name || trainer.Name }}</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ trainer.email || trainer.login || '-' }}</div>
+                                        </div>
+                                        <p-tag [value]="(trainer.is_active || trainer.Status === 'Active') ? 'Active' : 'Inactive'"
+                                            [severity]="(trainer.is_active || trainer.Status === 'Active') ? 'success' : 'danger'"
+                                            size="small" [rounded]="true"></p-tag>
+                                        <div style="display: flex; gap: 0.25rem;">
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text p-button-sm"
+                                                (click)="editFormateur(trainer)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-sm p-button-danger"
+                                                (click)="deleteFormateur(trainer)" pTooltip="Delete"></button>
+                                        </div>
+                                    </div>
+
+                                    <div *ngIf="formateurs.length === 0" style="text-align: center; padding: 2rem; color: var(--text-color-secondary);">
+                                        <i class="pi pi-users" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
+                                        <span>No trainers yet</span>
+                                    </div>
+
+                                    <!-- Add Trainer Button -->
+                                    <div (click)="openNewFormateurDialog()"
+                                        style="margin-top: 1rem; border: 2px dashed var(--surface-border); border-radius: 10px; padding: 0.875rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: var(--text-color-secondary); cursor: pointer; transition: all 0.2s;"
+                                        class="add-trainer-btn">
+                                        <i class="pi pi-plus"></i>
+                                        <span>Add New Trainer</span>
+                                    </div>
+                                </div>
+                            </p-card>
+
+                            <!-- Quick Actions Card -->
+                            <p-card>
+                                <ng-template pTemplate="header">
+                                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem; border-bottom: 1px solid var(--surface-border);">
+                                        <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #10b981 0%, #34d399 100%); display: flex; align-items: center; justify-content: center;">
+                                            <i class="pi pi-bolt" style="color: white; font-size: 1.2rem;"></i>
+                                        </div>
+                                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Quick Actions</h3>
+                                    </div>
+                                </ng-template>
+                                <div style="padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <button pButton label="Schedule Training Session" icon="pi pi-calendar-plus"
+                                        class="p-button-outlined w-full justify-content-start" (click)="openNewQualificationDialog()"></button>
+                                    <button pButton label="View Training Reports" icon="pi pi-chart-bar"
+                                        class="p-button-outlined p-button-secondary w-full justify-content-start"></button>
+                                    <button pButton label="Manage Processes" icon="pi pi-cog"
+                                        class="p-button-outlined p-button-secondary w-full justify-content-start"></button>
+                                </div>
+                            </p-card>
+                        </div>
                     </div>
                 </div>
 
-                <div class="formations-grid">
-                    <!-- Formations List -->
-                    <p-card header="Available Formations">
-                        <p-table [value]="formations" [rows]="5" [paginator]="true">
+                <!-- Process & Specialization Management - Side by Side Layout -->
+                <div style="margin-top: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <!-- Process Management Section (50%) -->
+                    <div style="flex: 1; min-width: 400px;">
+                        <p-card>
                             <ng-template pTemplate="header">
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Process</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </ng-template>
-                            <ng-template pTemplate="body" let-formation>
-                                <tr>
-                                    <td class="font-semibold">{{ formation.name_formation }}</td>
-                                    <td><p-tag [value]="formation.type_formation"></p-tag></td>
-                                    <td>{{ processes | json }}</td>
-                                    <td>
-                                        <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"
-                                            (click)="editFormation(formation)"></p-button>
-                                    </td>
-                                </tr>
-                            </ng-template>
-                        </p-table>
-                    </p-card>
-
-                    <!-- Trainers List -->
-                    <p-card header="Trainers (Formateurs)">
-                        <div class="trainers-list">
-                            <div class="trainer-card" *ngFor="let trainer of formateurs">
-                                <p-avatar [label]="trainer.name.charAt(0)" shape="circle" size="large"
-                                    styleClass="bg-purple-500 text-white"></p-avatar>
-                                <div class="trainer-info">
-                                    <span class="trainer-name">{{ trainer.name }}</span>
-                                    <span class="trainer-email">{{ trainer.email || trainer.login }}</span>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--surface-border);">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); display: flex; align-items: center; justify-content: center;">
+                                            <i class="pi pi-cog" style="color: white; font-size: 1rem;"></i>
+                                        </div>
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Process Management</h3>
+                                            <span style="font-size: 0.75rem; color: var(--text-color-secondary);">{{ processes.length }} processes</span>
+                                        </div>
+                                    </div>
+                                    <button pButton icon="pi pi-plus" class="p-button-rounded" (click)="openNewProcessDialog()" pTooltip="Add Process"></button>
                                 </div>
-                                <p-tag [value]="trainer.is_active ? 'Active' : 'Inactive'"
-                                    [severity]="trainer.is_active ? 'success' : 'danger'"></p-tag>
-                                <p-badge *ngIf="trainer.IsAdmin" value="Admin" severity="info"></p-badge>
+                            </ng-template>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                <div *ngFor="let process of processes"
+                                    style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--surface-border); transition: background 0.2s;"
+                                    class="process-row">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <code style="font-size: 0.75rem; background: var(--surface-100); padding: 0.125rem 0.375rem; border-radius: 4px;">{{ process.code }}</code>
+                                            <span style="font-weight: 600; font-size: 0.9rem;">{{ process.name }}</span>
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-color-secondary); margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            {{ process.description || 'No description' }}
+                                        </div>
+                                    </div>
+                                    <p-tag [value]="process.is_active ? 'Active' : 'Inactive'"
+                                        [severity]="process.is_active ? 'success' : 'danger'" size="small"></p-tag>
+                                    <div style="display: flex; gap: 0.125rem;">
+                                        <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text p-button-sm"
+                                            (click)="editProcess(process)" pTooltip="Edit"></button>
+                                        <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-sm p-button-danger"
+                                            (click)="deleteProcess(process)" pTooltip="Delete"></button>
+                                    </div>
+                                </div>
+                                <div *ngIf="processes.length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center;">
+                                    <i class="pi pi-cog" style="font-size: 2rem; color: var(--text-color-secondary); margin-bottom: 0.5rem;"></i>
+                                    <span style="color: var(--text-color-secondary); font-size: 0.875rem;">No processes found</span>
+                                    <button pButton label="Add Process" icon="pi pi-plus" class="p-button-text p-button-sm mt-2"
+                                        (click)="openNewProcessDialog()"></button>
+                                </div>
                             </div>
-                        </div>
-                        <p-button label="Add Trainer" icon="pi pi-plus" [text]="true" class="mt-3"
-                            (click)="openNewFormateurDialog()"></p-button>
-                    </p-card>
+                        </p-card>
+                    </div>
+
+                    <!-- Specialization Management Section (50%) -->
+                    <div style="flex: 1; min-width: 400px;">
+                        <p-card>
+                            <ng-template pTemplate="header">
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--surface-border);">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); display: flex; align-items: center; justify-content: center;">
+                                            <i class="pi pi-star" style="color: white; font-size: 1rem;"></i>
+                                        </div>
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Specialization Management</h3>
+                                            <span style="font-size: 0.75rem; color: var(--text-color-secondary);">{{ specializations.length }} specializations</span>
+                                        </div>
+                                    </div>
+                                    <button pButton icon="pi pi-plus" class="p-button-rounded" (click)="openNewSpecializationDialog()" pTooltip="Add Specialization"></button>
+                                </div>
+                            </ng-template>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                <div *ngFor="let spec of specializations"
+                                    style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--surface-border); transition: background 0.2s;"
+                                    class="spec-row">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-weight: 600; font-size: 0.9rem;">{{ spec.name }}</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-color-secondary); margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            {{ spec.description || 'No description' }}
+                                        </div>
+                                    </div>
+                                    <p-tag [value]="spec.is_active !== false ? 'Active' : 'Inactive'"
+                                        [severity]="spec.is_active !== false ? 'success' : 'danger'" size="small"></p-tag>
+                                    <div style="display: flex; gap: 0.125rem;">
+                                        <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text p-button-sm"
+                                            (click)="editSpecialization(spec)" pTooltip="Edit"></button>
+                                        <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-sm p-button-danger"
+                                            (click)="deleteSpecialization(spec)" pTooltip="Delete"></button>
+                                    </div>
+                                </div>
+                                <div *ngIf="specializations.length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center;">
+                                    <i class="pi pi-star" style="font-size: 2rem; color: var(--text-color-secondary); margin-bottom: 0.5rem;"></i>
+                                    <span style="color: var(--text-color-secondary); font-size: 0.875rem;">No specializations found</span>
+                                    <button pButton label="Add Specialization" icon="pi pi-plus" class="p-button-text p-button-sm mt-2"
+                                        (click)="openNewSpecializationDialog()"></button>
+                                </div>
+                            </div>
+                        </p-card>
+                    </div>
                 </div>
             </p-tabpanel>
 
@@ -371,8 +710,8 @@
                                         [value]="rec.isOverdue ? 'OVERDUE' : (rec.daysUntilRecyclage <= 30 ? 'DUE SOON' : 'OK')"></p-tag>
                                 </td>
                                 <td>
-                                    <p-button label="Plan Recyclage" icon="pi pi-calendar" size="small"
-                                        (click)="planRecyclage(rec)"></p-button>
+                                    <button pButton label="Plan Recyclage" icon="pi pi-calendar" class="p-button-sm"
+                                        (click)="planRecyclage(rec)"></button>
                                 </td>
                             </tr>
                         </ng-template>
@@ -400,11 +739,11 @@
                                     <span class="team-name">{{ team.name }}</span>
                                     <span class="team-members">{{ getEmployeeCountByTeam(team.id) }} members</span>
                                 </div>
-                                <p-button icon="pi pi-eye" [rounded]="true" [text]="true"></p-button>
+                                <button pButton icon="pi pi-eye" class="p-button-rounded p-button-text"></button>
                             </div>
                         </div>
-                        <p-button label="New Team" icon="pi pi-plus" [text]="true" class="mt-3"
-                            (click)="openNewTeamDialog()"></p-button>
+                        <button pButton label="New Team" icon="pi pi-plus" class="p-button-text mt-3"
+                            (click)="openNewTeamDialog()"></button>
                     </p-card>
 
                     <!-- Categories -->
@@ -440,9 +779,9 @@
                     <div class="tab-header">
                         <h3>System Users</h3>
                         <div class="tab-actions">
-                            <p-button label="New Department" icon="pi pi-building" severity="secondary"
-                                (click)="openNewDepartmentDialog()"></p-button>
-                            <p-button label="New User" icon="pi pi-plus" (click)="openNewUserDialog()"></p-button>
+                            <button pButton label="New Department" icon="pi pi-building" class="p-button-secondary"
+                                (click)="openNewDepartmentDialog()"></button>
+                            <button pButton label="New User" icon="pi pi-plus" (click)="openNewUserDialog()"></button>
                         </div>
                     </div>
 
@@ -492,10 +831,10 @@
                                             <span *ngIf="!user.last_login" class="text-color-secondary">Never</span>
                                         </td>
                                         <td>
-                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"
-                                                (click)="editUser(user)" pTooltip="Edit"></p-button>
-                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
-                                                (click)="deleteUser(user)" pTooltip="Delete"></p-button>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editUser(user)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteUser(user)" pTooltip="Delete"></button>
                                         </td>
                                     </tr>
                                 </ng-template>
@@ -525,10 +864,10 @@
                                         <td class="font-semibold">{{ dept.name }}</td>
                                         <td>{{ dept.description || '-' }}</td>
                                         <td>
-                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true"
-                                                (click)="editDepartmentEntity(dept)" pTooltip="Edit"></p-button>
-                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
-                                                (click)="deleteDepartmentEntity(dept)" pTooltip="Delete"></p-button>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editDepartmentEntity(dept)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteDepartmentEntity(dept)" pTooltip="Delete"></button>
                                         </td>
                                     </tr>
                                 </ng-template>
@@ -543,6 +882,214 @@
                             </p-table>
                         </p-card>
                     </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 7: Licenses Manager -->
+            <p-tabpanel value="7">
+                <div class="licenses-container">
+                    <div class="tab-header">
+                        <h3>Licenses Manager</h3>
+                        <div class="tab-actions">
+                            <button pButton label="New License Type" icon="pi pi-plus-circle" class="p-button-secondary"
+                                (click)="openNewLicenseTypeDialog()"></button>
+                            <button pButton label="New License" icon="pi pi-plus" (click)="openNewLicenseDialog()"></button>
+                        </div>
+                    </div>
+
+                    <!-- License Stats Cards -->
+                    <div class="license-stats-row" *ngIf="licenseStats">
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-id-card stat-icon text-primary"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value">{{ licenseStats.total }}</span>
+                                    <span class="stat-label">Total Licenses</span>
+                                </div>
+                            </div>
+                        </p-card>
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-check-circle stat-icon text-success"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value text-success">{{ licenseStats.active }}</span>
+                                    <span class="stat-label">Active</span>
+                                </div>
+                            </div>
+                        </p-card>
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-exclamation-triangle stat-icon text-warning"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value text-warning">{{ licenseStats.expiring_soon }}</span>
+                                    <span class="stat-label">Expiring Soon</span>
+                                </div>
+                            </div>
+                        </p-card>
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-times-circle stat-icon text-danger"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value text-danger">{{ licenseStats.expired }}</span>
+                                    <span class="stat-label">Expired</span>
+                                </div>
+                            </div>
+                        </p-card>
+                    </div>
+
+                    <div class="licenses-grid">
+                        <!-- Licenses Table -->
+                        <p-card header="Employee Licenses" styleClass="licenses-card">
+                            <p-table [value]="licenses" [rows]="10" [paginator]="true" [rowHover]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>License Type</th>
+                                        <th>License Number</th>
+                                        <th>Issue Date</th>
+                                        <th>Expiry Date</th>
+                                        <th>Days Until Expiry</th>
+                                        <th>Status</th>
+                                        <th style="width: 120px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-license>
+                                    <tr>
+                                        <td>
+                                            <span class="font-semibold">{{ license.employee_name || 'Employee #' + license.employee }}</span>
+                                        </td>
+                                        <td>{{ license.license_type_name || 'Type #' + license.license_type }}</td>
+                                        <td><code class="font-semibold">{{ license.license_number }}</code></td>
+                                        <td>{{ license.issue_date | date:'dd/MM/yyyy' }}</td>
+                                        <td>{{ license.expiry_date | date:'dd/MM/yyyy' }}</td>
+                                        <td>
+                                            <span [class]="license.days_until_expiry < 0 ? 'text-danger font-bold' : (license.days_until_expiry <= 30 ? 'text-warning font-bold' : '')">
+                                                {{ license.days_until_expiry < 0 ? 'Expired ' + (-license.days_until_expiry) + ' days ago' : license.days_until_expiry + ' days' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <p-tag [value]="license.status" [severity]="getLicenseStatusSeverity(license.status)"></p-tag>
+                                        </td>
+                                        <td>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editLicense(license)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteLicense(license)" pTooltip="Delete"></button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="8" class="text-center p-4">
+                                            <i class="pi pi-id-card text-4xl text-color-secondary mb-3"></i>
+                                            <p>No licenses found. Click "New License" to create one.</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+
+                        <!-- License Types -->
+                        <p-card header="License Types" styleClass="license-types-card">
+                            <p-table [value]="licenseTypes" [rows]="5" [paginator]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Validity (Months)</th>
+                                        <th>Mandatory</th>
+                                        <th style="width: 100px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-lt>
+                                    <tr>
+                                        <td class="font-semibold">{{ lt.name }}</td>
+                                        <td>{{ lt.validity_months }} months</td>
+                                        <td>
+                                            <p-tag [value]="lt.is_mandatory ? 'Required' : 'Optional'"
+                                                [severity]="lt.is_mandatory ? 'danger' : 'info'"></p-tag>
+                                        </td>
+                                        <td>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editLicenseType(lt)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteLicenseType(lt)" pTooltip="Delete"></button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="4" class="text-center p-4">
+                                            <i class="pi pi-list text-4xl text-color-secondary mb-3"></i>
+                                            <p>No license types defined</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+                    </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 8: Workstations -->
+            <p-tabpanel value="8">
+                <div class="workstations-container">
+                    <div class="tab-header">
+                        <h3>Workstation Management</h3>
+                        <div class="tab-actions">
+                            <button pButton label="New Workstation" icon="pi pi-plus" (click)="openNewWorkstationDialog()"></button>
+                        </div>
+                    </div>
+
+                    <p-card>
+                        <p-table [value]="workstations" [rows]="10" [paginator]="true" [rowHover]="true">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th pSortableColumn="id">ID <p-sortIcon field="id"></p-sortIcon></th>
+                                    <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
+                                    <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
+                                    <th>Production Line</th>
+                                    <th>Process Mode</th>
+                                    <th>Typ Order</th>
+                                    <th>Cycle Time (s)</th>
+                                    <th>Max Operators</th>
+                                    <th>Critical</th>
+                                    <th style="width: 120px">Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-ws>
+                                <tr>
+                                    <td><span class="font-mono font-semibold">{{ ws.id }}</span></td>
+                                    <td><code>{{ ws.code }}</code></td>
+                                    <td class="font-semibold">{{ ws.name }}</td>
+                                    <td>{{ ws.production_line_name || '-' }}</td>
+                                    <td>
+                                        <p-tag [value]="ws.process_mode || 'manual'" [severity]="getProcessModeSeverity(ws.process_mode || 'manual')"></p-tag>
+                                    </td>
+                                    <td>{{ ws.typ_order || '-' }}</td>
+                                    <td>{{ ws.cycle_time_seconds || 0 }}</td>
+                                    <td>{{ ws.max_operators || 1 }}</td>
+                                    <td>
+                                        <i *ngIf="ws.is_critical" class="pi pi-exclamation-triangle text-danger" pTooltip="Critical Workstation"></i>
+                                        <span *ngIf="!ws.is_critical" class="text-color-secondary">-</span>
+                                    </td>
+                                    <td>
+                                        <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                            (click)="editWorkstation(ws)" pTooltip="Edit"></button>
+                                        <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                            (click)="deleteWorkstation(ws)" pTooltip="Delete"></button>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td colspan="10" class="text-center p-4">
+                                        <i class="pi pi-desktop text-4xl text-color-secondary mb-3"></i>
+                                        <p>No workstations found. Click "New Workstation" to create one.</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </p-card>
                 </div>
             </p-tabpanel>
         </p-tabpanels>
@@ -566,10 +1113,10 @@
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <input type="file" id="photoUpload" accept="image/*" (change)="onPhotoSelect($event)"
                         style="display: none;" #photoInput />
-                    <p-button label="Choose Photo" icon="pi pi-upload" [outlined]="true" size="small"
-                        (click)="photoInput.click()"></p-button>
-                    <p-button *ngIf="employeePhotoPreview" icon="pi pi-trash" [outlined]="true" severity="danger"
-                        size="small" (click)="removePhoto()"></p-button>
+                    <button pButton label="Choose Photo" icon="pi pi-upload" class="p-button-outlined p-button-sm"
+                        (click)="photoInput.click()"></button>
+                    <button pButton *ngIf="employeePhotoPreview" icon="pi pi-trash" class="p-button-outlined p-button-danger p-button-sm"
+                        (click)="removePhoto()"></button>
                 </div>
                 <small style="color: var(--text-color-secondary); margin-top: 0.25rem; display: block;">
                     JPG, PNG or GIF. Max 2MB.
@@ -638,89 +1185,149 @@
                 <p-select id="trajet" [options]="trajets" formControlName="trajet" optionLabel="name" [showClear]="true"
                     placeholder="Select trajet" class="w-full" appendTo="body"></p-select>
             </div>
+        </div>
+
+        <div class="form-row">
             <div class="form-field">
                 <label for="badge">Badge Number</label>
                 <input pInputText id="badge" formControlName="BadgeNumber" class="w-full" />
             </div>
+            <div class="form-field">
+                <label for="email">Email</label>
+                <input pInputText id="email" formControlName="email" type="email" class="w-full" placeholder="employee@company.com" />
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="phone">Phone</label>
+            <input pInputText id="phone" formControlName="phone" class="w-full" placeholder="+212 6XX XXX XXX" />
         </div>
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showEmployeeDialog = false"></p-button>
-        <p-button label="Save" icon="pi pi-check" (click)="saveEmployee()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showEmployeeDialog = false"></button>
+        <button pButton label="Save" icon="pi pi-check" (click)="saveEmployee()"></button>
     </ng-template>
 </p-dialog>
 
 <!-- Formation Dialog -->
-<p-dialog [(visible)]="showFormationDialog" [header]="isEditMode ? 'Edit Formation' : 'New Formation'" [modal]="true"
-    [style]="{width: '500px'}">
+<p-dialog [(visible)]="showFormationDialog" [header]="isEditModeFormation ? 'Edit Formation' : 'New Formation'" [modal]="true"
+    [style]="{width: '550px'}">
     <form [formGroup]="formationForm" class="formation-form">
         <div class="form-field">
             <label for="formationName">Formation Name *</label>
-            <input pInputText id="formationName" formControlName="name_formation" class="w-full" />
+            <input pInputText id="formationName" formControlName="name" class="w-full" />
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="formationType">Type *</label>
+                <p-select id="formationType"
+                    [options]="[{label: 'Initial Training', value: 'initial'}, {label: 'Refresher', value: 'refresher'}, {label: 'Certification', value: 'certification'}, {label: 'Safety', value: 'safety'}]"
+                    formControlName="type" optionLabel="label" optionValue="value" class="w-full"
+                    appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="process">Process *</label>
+                <p-select id="process" [options]="processes" formControlName="process" optionLabel="name"
+                    optionValue="id" class="w-full" appendTo="body" placeholder="Select a process"></p-select>
+            </div>
         </div>
 
         <div class="form-field">
-            <label for="formationType">Type *</label>
-            <p-select id="formationType"
-                [options]="[{label: 'Safety', value: 'Safety'}, {label: 'Technical', value: 'Technical'}, {label: 'Quality', value: 'Quality'}]"
-                formControlName="type_formation" optionLabel="label" optionValue="value" class="w-full"
-                appendTo="body"></p-select>
+            <label for="duration">Duration (hours)</label>
+            <p-inputNumber id="duration" formControlName="duration_hours" [min]="0" [maxFractionDigits]="2"
+                [showButtons]="true" class="w-full" suffix=" hrs"></p-inputNumber>
         </div>
 
         <div class="form-field">
-            <label for="process">Process *</label>
-            <p-select id="process" [options]="processes" formControlName="id_process" optionLabel="desc_process"
-                optionValue="id_process" class="w-full" appendTo="body"></p-select>
+            <label for="formationDesc">Description</label>
+            <textarea pInputTextarea id="formationDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe the formation content, objectives..."></textarea>
         </div>
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showFormationDialog = false"></p-button>
-        <p-button label="Save" icon="pi pi-check" (click)="saveFormation()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showFormationDialog = false"></button>
+        <button pButton label="Save" icon="pi pi-check" (click)="saveFormation()"></button>
     </ng-template>
 </p-dialog>
 
 <!-- Qualification Dialog -->
-<p-dialog [(visible)]="showQualificationDialog" header="New Qualification" [modal]="true" [style]="{width: '550px'}">
+<p-dialog [(visible)]="showQualificationDialog" [header]="isEditMode ? 'Edit Qualification' : 'New Qualification'" [modal]="true" [style]="{width: '650px'}">
     <form [formGroup]="qualificationForm" class="qualification-form">
-        <div class="form-field">
-            <label for="qEmployee">Employee *</label>
-            <p-select id="qEmployee" [options]="employees" formControlName="Id_Emp" optionLabel="Nom_Emp"
-                optionValue="Id_Emp" [filter]="true" class="w-full" appendTo="body">
-                <ng-template let-emp pTemplate="item">
-                    {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
-                </ng-template>
-            </p-select>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qEmployee">Employee *</label>
+                <p-select id="qEmployee" [options]="employees" formControlName="Id_Emp" optionLabel="Nom_Emp"
+                    optionValue="Id_Emp" [filter]="true" class="w-full" appendTo="body">
+                    <ng-template let-emp pTemplate="item">
+                        {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="qFormation">Formation *</label>
+                <p-select id="qFormation" [options]="formations" formControlName="id_formation" optionLabel="name"
+                    optionValue="id" class="w-full" appendTo="body" placeholder="Select a formation"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qTrainer">Trainer *</label>
+                <p-select id="qTrainer" [options]="formateurs" formControlName="Trainer" optionLabel="Name"
+                    optionValue="TrainerID" class="w-full" appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="qProdLine">Production Line</label>
+                <p-select id="qProdLine" [options]="productionLines" formControlName="prod_line" optionLabel="name"
+                    optionValue="name" [showClear]="true" placeholder="Select line" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qStartDate">Start Date *</label>
+                <p-datepicker id="qStartDate" formControlName="start_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="qEndDate">End Date</label>
+                <p-datepicker id="qEndDate" formControlName="end_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qTest">Test Name</label>
+                <input pInputText id="qTest" formControlName="test" class="w-full" placeholder="e.g., Written Test, Practical Exam" />
+            </div>
+            <div class="form-field">
+                <label for="qResult">Test Result</label>
+                <p-select id="qResult"
+                    [options]="[{label: 'Pending', value: 'pending'}, {label: 'In Progress', value: 'in_progress'}, {label: 'Passed', value: 'passed'}, {label: 'Failed', value: 'failed'}]"
+                    formControlName="test_result" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
         </div>
 
         <div class="form-field">
-            <label for="qFormation">Formation *</label>
-            <p-select id="qFormation" [options]="formations" formControlName="id_formation" optionLabel="name_formation"
-                optionValue="id_formation" class="w-full" appendTo="body"></p-select>
-        </div>
-
-        <div class="form-field">
-            <label for="qTrainer">Trainer *</label>
-            <p-select id="qTrainer" [options]="formateurs" formControlName="Trainer" optionLabel="Name"
-                optionValue="TrainerID" class="w-full" appendTo="body"></p-select>
-        </div>
-
-        <div class="form-field">
-            <label for="qStartDate">Start Date *</label>
-            <p-datepicker id="qStartDate" formControlName="start_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
-                class="w-full" appendTo="body"></p-datepicker>
+            <label for="qScore">Score (%)</label>
+            <p-inputNumber id="qScore" formControlName="score" [min]="0" [max]="100" [showButtons]="true"
+                suffix="%" class="w-full"></p-inputNumber>
         </div>
 
         <div class="form-field">
             <label for="qComment">Comment</label>
-            <textarea pInputTextarea id="qComment" formControlName="comment_qualif" rows="3" class="w-full"></textarea>
+            <textarea pInputTextarea id="qComment" formControlName="comment_qualif" rows="3" class="w-full"
+                placeholder="Additional notes about the qualification..."></textarea>
         </div>
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showQualificationDialog = false"></p-button>
-        <p-button label="Create" icon="pi pi-check" (click)="saveQualification()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showQualificationDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveQualification()"></button>
     </ng-template>
 </p-dialog>
 
@@ -734,27 +1341,39 @@
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showTeamDialog = false"></p-button>
-        <p-button label="Create" icon="pi pi-check" (click)="saveTeam()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showTeamDialog = false"></button>
+        <button pButton label="Create" icon="pi pi-check" (click)="saveTeam()"></button>
     </ng-template>
 </p-dialog>
 
 <!-- Formateur Dialog -->
-<p-dialog [(visible)]="showFormateurDialog" header="New Trainer" [modal]="true" [style]="{width: '450px'}">
+<p-dialog [(visible)]="showFormateurDialog" [header]="isEditModeFormateur ? 'Edit Trainer' : 'New Trainer'" [modal]="true" [style]="{width: '500px'}">
     <form [formGroup]="formateurForm">
         <div class="form-field">
             <label for="trainerName">Name *</label>
-            <input pInputText id="trainerName" formControlName="Name" class="w-full" />
+            <input pInputText id="trainerName" formControlName="Name" class="w-full" placeholder="Enter trainer name" />
         </div>
 
         <div class="form-field">
             <label for="trainerEmail">Email</label>
-            <input pInputText id="trainerEmail" formControlName="Email" type="email" class="w-full" />
+            <input pInputText id="trainerEmail" formControlName="Email" type="email" class="w-full" placeholder="trainer@example.com" />
         </div>
 
         <div class="form-field">
             <label for="trainerLogin">Login *</label>
-            <input pInputText id="trainerLogin" formControlName="login" class="w-full" />
+            <input pInputText id="trainerLogin" formControlName="login" class="w-full" placeholder="Enter login username" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerPhone">Phone</label>
+            <input pInputText id="trainerPhone" formControlName="phone" class="w-full" placeholder="+212 6XX XXX XXX" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerSpecialization">Specialization</label>
+            <p-select id="trainerSpecialization" [options]="specializationOptions" formControlName="specialization"
+                optionLabel="label" optionValue="value" class="w-full" appendTo="body"
+                placeholder="Select specialization" [showClear]="true"></p-select>
         </div>
 
         <div class="form-field">
@@ -765,8 +1384,8 @@
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showFormateurDialog = false"></p-button>
-        <p-button label="Create" icon="pi pi-check" (click)="saveFormateur()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showFormateurDialog = false"></button>
+        <button pButton [label]="isEditModeFormateur ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveFormateur()"></button>
     </ng-template>
 </p-dialog>
 
@@ -866,8 +1485,8 @@
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showUserDialog = false"></p-button>
-        <p-button [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveUser()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showUserDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveUser()"></button>
     </ng-template>
 </p-dialog>
 
@@ -887,8 +1506,8 @@
     </form>
 
     <ng-template pTemplate="footer">
-        <p-button label="Cancel" icon="pi pi-times" [text]="true" (click)="showDepartmentDialog = false"></p-button>
-        <p-button [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveDepartment()"></p-button>
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showDepartmentDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveDepartment()"></button>
     </ng-template>
 </p-dialog>
 
@@ -906,6 +1525,240 @@
             </ng-template>
         </p-fileUpload>
     </div>
+</p-dialog>
+
+<!-- License Dialog -->
+<p-dialog [(visible)]="showLicenseDialog" [header]="isEditMode ? 'Edit License' : 'New License'" [modal]="true"
+    [style]="{width: '600px'}" [closable]="true">
+    <form [formGroup]="licenseForm" class="license-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="licEmployee">Employee *</label>
+                <p-select id="licEmployee" [options]="employees" formControlName="employee" optionLabel="Prenom_Emp"
+                    optionValue="Id_Emp" [filter]="true" placeholder="Select employee" class="w-full" appendTo="body">
+                    <ng-template let-emp pTemplate="item">
+                        {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="licType">License Type *</label>
+                <p-select id="licType" [options]="licenseTypes" formControlName="license_type" optionLabel="name"
+                    optionValue="id" placeholder="Select license type" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="licNumber">License Number *</label>
+                <input pInputText id="licNumber" formControlName="license_number" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="licAuthority">Issuing Authority *</label>
+                <input pInputText id="licAuthority" formControlName="issuing_authority" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="licIssueDate">Issue Date *</label>
+                <p-datepicker id="licIssueDate" formControlName="issue_date" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="licExpiryDate">Expiry Date *</label>
+                <p-datepicker id="licExpiryDate" formControlName="expiry_date" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="licDocUrl">Document URL</label>
+            <input pInputText id="licDocUrl" formControlName="document_url" class="w-full" placeholder="https://..." />
+        </div>
+
+        <div class="form-field">
+            <label for="licNotes">Notes</label>
+            <textarea pInputTextarea id="licNotes" formControlName="notes" rows="3" class="w-full"></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showLicenseDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveLicense()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- License Type Dialog -->
+<p-dialog [(visible)]="showLicenseTypeDialog" [header]="isEditMode ? 'Edit License Type' : 'New License Type'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="licenseTypeForm" class="license-type-form">
+        <div class="form-field">
+            <label for="ltName">Name *</label>
+            <input pInputText id="ltName" formControlName="name" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="ltDescription">Description</label>
+            <textarea pInputTextarea id="ltDescription" formControlName="description" rows="2" class="w-full"></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="ltValidity">Validity (Months) *</label>
+                <p-inputNumber id="ltValidity" formControlName="validity_months" [min]="1" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+            <div class="form-field">
+                <label for="ltRenewal">Renewal Advance (Days)</label>
+                <p-inputNumber id="ltRenewal" formControlName="renewal_advance_days" [min]="0" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_mandatory" [binary]="true" inputId="ltMandatory"></p-checkbox>
+            <label for="ltMandatory" class="ml-2">This license is mandatory</label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showLicenseTypeDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveLicenseType()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Workstation Dialog -->
+<p-dialog [(visible)]="showWorkstationDialog" [header]="isEditMode ? 'Edit Workstation' : 'New Workstation'" [modal]="true"
+    [style]="{width: '650px'}" [closable]="true">
+    <form [formGroup]="workstationForm" class="workstation-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsName">Name *</label>
+                <input pInputText id="wsName" formControlName="name" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="wsCode">Code *</label>
+                <input pInputText id="wsCode" formControlName="code" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsProdLine">Production Line *</label>
+                <p-select id="wsProdLine" [options]="productionLines" formControlName="production_line" optionLabel="name"
+                    optionValue="id" placeholder="Select production line" class="w-full" appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="wsMode">Process Mode</label>
+                <p-select id="wsMode" [options]="processModeOptions" formControlName="process_mode" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsTypOrder">Typ Order</label>
+                <input pInputText id="wsTypOrder" formControlName="typ_order" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="wsProcessOrder">Process Order</label>
+                <p-inputNumber id="wsProcessOrder" formControlName="process_order" [min]="0" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsCycle">Cycle Time (seconds)</label>
+                <p-inputNumber id="wsCycle" formControlName="cycle_time_seconds" [min]="0" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+            <div class="form-field">
+                <label for="wsOperators">Max Operators</label>
+                <p-inputNumber id="wsOperators" formControlName="max_operators" [min]="1" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="wsDescription">Description</label>
+            <textarea pInputTextarea id="wsDescription" formControlName="description" rows="2" class="w-full"></textarea>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_critical" [binary]="true" inputId="wsCritical"></p-checkbox>
+            <label for="wsCritical" class="ml-2">
+                <i class="pi pi-exclamation-triangle text-danger mr-1"></i>
+                Mark as critical workstation
+            </label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showWorkstationDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveWorkstation()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Process Dialog -->
+<p-dialog [(visible)]="showProcessDialog" [header]="isEditMode ? 'Edit Process' : 'New Process'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="processForm" class="process-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="processCode">Code *</label>
+                <input pInputText id="processCode" formControlName="code" class="w-full" placeholder="e.g., ASSY-01" />
+            </div>
+            <div class="form-field">
+                <label for="processName">Name *</label>
+                <input pInputText id="processName" formControlName="name" class="w-full" placeholder="e.g., Assembly Process" />
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="processDesc">Description</label>
+            <textarea pInputTextarea id="processDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe the manufacturing process..."></textarea>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_active" [binary]="true" inputId="processActive"></p-checkbox>
+            <label for="processActive" class="ml-2">Active</label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showProcessDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveProcess()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Specialization Dialog -->
+<p-dialog [(visible)]="showSpecializationDialog" [header]="isEditModeSpecialization ? 'Edit Specialization' : 'New Specialization'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="specializationForm" class="specialization-form">
+        <div class="form-field">
+            <label for="specName">Name *</label>
+            <input pInputText id="specName" formControlName="name" class="w-full" placeholder="e.g., Assembly, Quality Control" />
+        </div>
+
+        <div class="form-field">
+            <label for="specDesc">Description</label>
+            <textarea pInputTextarea id="specDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe this specialization..."></textarea>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_active" [binary]="true" inputId="specActive"></p-checkbox>
+            <label for="specActive" class="ml-2">Active</label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showSpecializationDialog = false"></button>
+        <button pButton [label]="isEditModeSpecialization ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveSpecialization()"></button>
+    </ng-template>
 </p-dialog>
 
 <!-- Confirm Dialog -->

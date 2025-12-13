@@ -110,6 +110,16 @@ export const appRoutes: Routes = [
                 path: 'teams',
                 loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
                 data: { tab: 'teams' }
+            },
+            {
+                path: 'licenses',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'licenses' }
+            },
+            {
+                path: 'workstations',
+                loadComponent: () => import('./app/features/hr/hr.component').then(m => m.HrComponent),
+                data: { tab: 'workstations' }
             }
         ]
     },

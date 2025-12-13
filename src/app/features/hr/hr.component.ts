@@ -4,6 +4,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { trigger, transition, style, animate } from '@angular/animations';
 
 // PrimeNG Modules
 import { CardModule } from 'primeng/card';
@@ -27,6 +28,13 @@ import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { DividerModule } from 'primeng/divider';
 import { CheckboxModule } from 'primeng/checkbox';
+import { ToolbarModule } from 'primeng/toolbar';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
+import { ChipModule } from 'primeng/chip';
+import { SkeletonModule } from 'primeng/skeleton';
+import { AccordionModule } from 'primeng/accordion';
+import { SelectButtonModule } from 'primeng/selectbutton';
 import { MessageService, ConfirmationService } from 'primeng/api';
 
 // Services & Models
@@ -39,6 +47,7 @@ import {
     EmployeeCategory,
     Formation,
     Formateur,
+    TrainerSpecialization,
     Qualification,
     HRDashboardStats,
     FormationStats,
@@ -49,7 +58,11 @@ import {
     Trajet,
     TransportPlanning,
     DMSUser,
-    DMSUserCreate
+    DMSUserCreate,
+    License,
+    LicenseType,
+    LicenseCreate,
+    LicenseStats
 } from '../../core/models/employee.model';
 
 @Component({
@@ -79,11 +92,30 @@ import {
         TextareaModule,
         InputNumberModule,
         DividerModule,
-        CheckboxModule
+        CheckboxModule,
+        ToolbarModule,
+        IconFieldModule,
+        InputIconModule,
+        ChipModule,
+        SkeletonModule,
+        AccordionModule,
+        SelectButtonModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './hr.component.html',
-    styleUrls: ['./hr.component.scss']
+    styleUrls: ['./hr.component.scss'],
+    animations: [
+        trigger('slideDown', [
+            transition(':enter', [
+                style({ height: 0, opacity: 0, overflow: 'hidden' }),
+                animate('200ms ease-out', style({ height: '*', opacity: 1 }))
+            ]),
+            transition(':leave', [
+                style({ overflow: 'hidden' }),
+                animate('200ms ease-in', style({ height: 0, opacity: 0 }))
+            ])
+        ])
+    ]
 })
 export class HrComponent implements OnInit, OnDestroy {
     @ViewChild('employeeTable') employeeTable!: Table;
@@ -104,14 +136,20 @@ export class HrComponent implements OnInit, OnDestroy {
     departmentEntities: any[] = [];
     categories: EmployeeCategory[] = [];
     formations: Formation[] = [];
+    groupedFormations: Map<string, Formation[]> = new Map();
     formateurs: Formateur[] = [];
     qualifications: Qualification[] = [];
     recyclageEmployees: RecyclageEmployee[] = [];
     versatilityMatrix: VersatilityMatrix | null = null;
     workstations: HRWorkstation[] = [];
     processes: HRProcess[] = [];
+    specializations: TrainerSpecialization[] = [];
+    productionLines: any[] = [];
     trajets: Trajet[] = [];
     users: DMSUser[] = [];
+    licenses: License[] = [];
+    licenseTypes: LicenseType[] = [];
+    licenseStats: LicenseStats | null = null;
 
     // Dashboard Stats
     dashboardStats: HRDashboardStats | null = null;
@@ -123,6 +161,23 @@ export class HrComponent implements OnInit, OnDestroy {
     selectedCategory: string | null = null;
     selectedStatus: string | null = null;
 
+    // UX Enhancements
+    showAdvancedFilters = false;
+    activeFilters: { key: string; label: string; value: any }[] = [];
+    expandedRows: { [key: string]: boolean } = {};
+    skeletonRows = Array(5).fill({});
+
+    quickFilterOptions = [
+        { label: 'All', value: 'all' },
+        { label: 'Active', value: 'active' },
+        { label: 'On Leave', value: 'leave' },
+        { label: 'Training', value: 'training' }
+    ];
+    selectedQuickFilter = 'all';
+
+    // KPI Data for modern cards
+    kpiData: { label: string; value: number; icon: string; color: string; trend: number; progress: number }[] = [];
+
     // Dialogs
     showEmployeeDialog = false;
     showFormationDialog = false;
@@ -132,6 +187,11 @@ export class HrComponent implements OnInit, OnDestroy {
     showImportDialog = false;
     showUserDialog = false;
     showDepartmentDialog = false;
+    showLicenseDialog = false;
+    showLicenseTypeDialog = false;
+    showWorkstationDialog = false;
+    showProcessDialog = false;
+    showSpecializationDialog = false;
 
     // Forms
     employeeForm!: FormGroup;
@@ -141,17 +201,31 @@ export class HrComponent implements OnInit, OnDestroy {
     formateurForm!: FormGroup;
     userForm!: FormGroup;
     departmentForm!: FormGroup;
+    licenseForm!: FormGroup;
+    licenseTypeForm!: FormGroup;
+    workstationForm!: FormGroup;
+    processForm!: FormGroup;
+    specializationForm!: FormGroup;
 
     // Edit Mode
     isEditMode = false;
     selectedEmployee: Employee | null = null;
     selectedUser: DMSUser | null = null;
     selectedDepartmentEntity: any | null = null;
+    selectedLicense: License | null = null;
+    selectedLicenseType: LicenseType | null = null;
+    selectedWorkstation: HRWorkstation | null = null;
+    selectedProcess: HRProcess | null = null;
+    selectedFormateur: Formateur | null = null;
+    isEditModeFormateur = false;
+    selectedSpecialization: TrainerSpecialization | null = null;
+    isEditModeSpecialization = false;
 
     // Photo upload
     employeePhotoPreview: string | null = null;
     employeePhotoFile: File | null = null;
     selectedFormation: Formation | null = null;
+    isEditModeFormation = false;
 
     // Charts
     employeesByDeptChart: any;
@@ -199,6 +273,21 @@ export class HrComponent implements OnInit, OnDestroy {
         { label: 'Suspended', value: 'suspended' }
     ];
 
+    // Trainer specialization options
+    trainerSpecializationOptions = [
+        { label: 'Assembly', value: 'Assembly' },
+        { label: 'Quality Control', value: 'Quality Control' },
+        { label: 'Safety & HSE', value: 'Safety & HSE' },
+        { label: 'Machine Operation', value: 'Machine Operation' },
+        { label: 'Maintenance', value: 'Maintenance' },
+        { label: 'Process Improvement', value: 'Process Improvement' },
+        { label: 'Welding', value: 'Welding' },
+        { label: 'Electrical', value: 'Electrical' },
+        { label: 'Packaging', value: 'Packaging' },
+        { label: 'Logistics', value: 'Logistics' },
+        { label: 'Other', value: 'Other' }
+    ];
+
     // Tab mapping from route data
     private tabMapping: { [key: string]: string } = {
         'dashboard': '0',
@@ -208,8 +297,24 @@ export class HrComponent implements OnInit, OnDestroy {
         'versatility': '3',
         'recyclage': '4',
         'teams': '5',
-        'users': '6'
+        'users': '6',
+        'licenses': '7',
+        'workstations': '8'
     };
+
+    // License status options
+    licenseStatusOptions = [
+        { label: 'Active', value: 'active' },
+        { label: 'Expired', value: 'expired' },
+        { label: 'Expiring Soon', value: 'expiring_soon' }
+    ];
+
+    // Workstation process mode options
+    processModeOptions = [
+        { label: 'Manual', value: 'manual' },
+        { label: 'Semi-Automatic', value: 'semi_auto' },
+        { label: 'Full Automatic', value: 'full_auto' }
+    ];
 
     constructor(
         private hrService: HRService,
@@ -266,13 +371,17 @@ export class HrComponent implements OnInit, OnDestroy {
             EmpStatus: ['Active', Validators.required],
             team: [null],
             trajet: [null],
-            BadgeNumber: ['']
+            BadgeNumber: [''],
+            email: ['', Validators.email],
+            phone: ['']
         });
 
         this.formationForm = this.fb.group({
-            name_formation: ['', Validators.required],
-            type_formation: ['', Validators.required],
-            id_process: [null, Validators.required]
+            name: ['', Validators.required],
+            type: ['', Validators.required],
+            process: [null, Validators.required],
+            duration_hours: [0],
+            description: ['']
         });
 
         this.qualificationForm = this.fb.group({
@@ -281,7 +390,11 @@ export class HrComponent implements OnInit, OnDestroy {
             Trainer: [null, Validators.required],
             Id_Project: [null],
             start_qualif: [new Date(), Validators.required],
-            test_result: [''],
+            end_qualif: [null],
+            test: [''],
+            test_result: ['pending'],
+            score: [null],
+            prod_line: [''],
             comment_qualif: ['']
         });
 
@@ -293,8 +406,9 @@ export class HrComponent implements OnInit, OnDestroy {
             Name: ['', Validators.required],
             Email: ['', [Validators.email]],
             login: ['', Validators.required],
-            Status: ['Active', Validators.required],
-            IsAdmin: [false]
+            phone: [''],
+            specialization: [''],
+            Status: ['Active', Validators.required]
         });
 
         this.userForm = this.fb.group({
@@ -316,6 +430,51 @@ export class HrComponent implements OnInit, OnDestroy {
         this.departmentForm = this.fb.group({
             name: ['', Validators.required],
             description: ['']
+        });
+
+        this.licenseForm = this.fb.group({
+            employee: [null, Validators.required],
+            license_type: [null, Validators.required],
+            license_number: ['', Validators.required],
+            issue_date: [new Date(), Validators.required],
+            expiry_date: [null, Validators.required],
+            issuing_authority: ['', Validators.required],
+            document_url: [''],
+            notes: ['']
+        });
+
+        this.licenseTypeForm = this.fb.group({
+            name: ['', Validators.required],
+            description: [''],
+            validity_months: [12, [Validators.required, Validators.min(1)]],
+            renewal_advance_days: [30],
+            is_mandatory: [false]
+        });
+
+        this.workstationForm = this.fb.group({
+            name: ['', Validators.required],
+            code: ['', Validators.required],
+            production_line: [null, Validators.required],
+            process_order: [0],
+            process_mode: ['manual'],
+            typ_order: [''],
+            cycle_time_seconds: [0],
+            max_operators: [1],
+            is_critical: [false],
+            description: ['']
+        });
+
+        this.processForm = this.fb.group({
+            name: ['', Validators.required],
+            code: ['', Validators.required],
+            description: [''],
+            is_active: [true]
+        });
+
+        this.specializationForm = this.fb.group({
+            name: ['', Validators.required],
+            description: [''],
+            is_active: [true]
         });
     }
 
@@ -449,6 +608,7 @@ export class HrComponent implements OnInit, OnDestroy {
                 };
 
                 this.updateCharts();
+                this.updateKpiData();
                 this.loadingStats = false;
             },
             error: (err) => {
@@ -506,8 +666,15 @@ export class HrComponent implements OnInit, OnDestroy {
             error: (err) => { console.error('Failed to load categories:', err); this.categories = []; }
         });
         this.hrService.getFormations().subscribe({
-            next: (data) => this.formations = data,
-            error: (err) => { console.error('Failed to load formations:', err); this.formations = []; }
+            next: (data) => {
+                this.formations = data;
+                this.updateGroupedFormations();
+            },
+            error: (err) => {
+                console.error('Failed to load formations:', err);
+                this.formations = [];
+                this.updateGroupedFormations();
+            }
         });
         this.hrService.getFormateurs().subscribe({
             next: (data) => this.formateurs = data,
@@ -516,6 +683,10 @@ export class HrComponent implements OnInit, OnDestroy {
         this.hrService.getProcesses().subscribe({
             next: (data) => this.processes = data,
             error: (err) => { console.error('Failed to load processes:', err); this.processes = []; }
+        });
+        this.hrService.getSpecializations().subscribe({
+            next: (data) => this.specializations = data,
+            error: (err) => { console.error('Failed to load specializations:', err); this.specializations = []; }
         });
         this.hrService.getWorkstations().subscribe({
             next: (data) => this.workstations = data,
@@ -537,6 +708,14 @@ export class HrComponent implements OnInit, OnDestroy {
 
         // Load department entities
         this.loadDepartmentEntities();
+
+        // Load licenses data
+        this.loadLicenses();
+        this.loadLicenseTypes();
+        this.loadLicenseStats();
+
+        // Load production lines for workstation form
+        this.loadProductionLines();
     }
 
     loadUsers(): void {
@@ -550,6 +729,35 @@ export class HrComponent implements OnInit, OnDestroy {
         this.hrService.getDepartmentEntities().subscribe({
             next: (data) => this.departmentEntities = data,
             error: (err) => { console.error('Failed to load department entities:', err); this.departmentEntities = []; }
+        });
+    }
+
+    // ==================== LICENSE DATA LOADING ====================
+    loadLicenses(): void {
+        this.hrService.getLicenses().subscribe({
+            next: (data) => this.licenses = data,
+            error: (err) => { console.error('Failed to load licenses:', err); this.licenses = []; }
+        });
+    }
+
+    loadLicenseTypes(): void {
+        this.hrService.getLicenseTypes().subscribe({
+            next: (data) => this.licenseTypes = data,
+            error: (err) => { console.error('Failed to load license types:', err); this.licenseTypes = []; }
+        });
+    }
+
+    loadLicenseStats(): void {
+        this.hrService.getLicenseStats().subscribe({
+            next: (data) => this.licenseStats = data,
+            error: (err) => { console.error('Failed to load license stats:', err); this.licenseStats = null; }
+        });
+    }
+
+    loadProductionLines(): void {
+        this.hrService.getProductionLines().subscribe({
+            next: (data) => this.productionLines = data,
+            error: (err) => { console.error('Failed to load production lines:', err); this.productionLines = []; }
         });
     }
 
@@ -988,16 +1196,26 @@ export class HrComponent implements OnInit, OnDestroy {
 
     // ==================== FORMATION CRUD ====================
     openNewFormationDialog(): void {
-        this.isEditMode = false;
+        this.isEditModeFormation = false;
         this.selectedFormation = null;
         this.formationForm.reset();
         this.showFormationDialog = true;
     }
 
     editFormation(formation: Formation): void {
-        this.isEditMode = true;
+        if (!formation) {
+            console.error('Formation is null or undefined');
+            return;
+        }
+        this.isEditModeFormation = true;
         this.selectedFormation = formation;
-        this.formationForm.patchValue(formation);
+        this.formationForm.patchValue({
+            name: formation.name || '',
+            type: formation.type || '',
+            process: formation.process || null,
+            duration_hours: formation.duration_hours || 0,
+            description: formation.description || ''
+        });
         this.showFormationDialog = true;
     }
 
@@ -1009,13 +1227,14 @@ export class HrComponent implements OnInit, OnDestroy {
 
         const formationData = this.formationForm.value;
 
-        if (this.isEditMode && this.selectedFormation) {
-            this.hrService.updateFormation(this.selectedFormation.id_formation, formationData).subscribe({
+        if (this.isEditModeFormation && this.selectedFormation) {
+            this.hrService.updateFormation(this.selectedFormation.id, formationData).subscribe({
                 next: (updated) => {
-                    const index = this.formations.findIndex(f => f.id_formation === updated.id_formation);
+                    const index = this.formations.findIndex(f => f.id === updated.id);
                     if (index > -1) this.formations[index] = updated;
                     this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Formation updated successfully' });
                     this.showFormationDialog = false;
+                    this.loadFormations();
                 },
                 error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update formation' })
             });
@@ -1025,10 +1244,179 @@ export class HrComponent implements OnInit, OnDestroy {
                     this.formations.push(newFormation);
                     this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Formation created successfully' });
                     this.showFormationDialog = false;
+                    this.loadFormations();
                 },
                 error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to create formation' })
             });
         }
+    }
+
+    loadFormations(): void {
+        this.hrService.getFormations().subscribe({
+            next: (data) => {
+                this.formations = data;
+                this.updateGroupedFormations();
+            },
+            error: (err) => {
+                console.error('Failed to load formations:', err);
+                this.formations = [];
+                this.updateGroupedFormations();
+            }
+        });
+    }
+
+    // ==================== PROCESS ====================
+    openNewProcessDialog(): void {
+        this.isEditMode = false;
+        this.selectedProcess = null;
+        this.processForm.reset({
+            is_active: true
+        });
+        this.showProcessDialog = true;
+    }
+
+    editProcess(process: HRProcess): void {
+        this.isEditMode = true;
+        this.selectedProcess = process;
+        this.processForm.patchValue(process);
+        this.showProcessDialog = true;
+    }
+
+    saveProcess(): void {
+        if (this.processForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const processData = this.processForm.value;
+
+        if (this.isEditMode && this.selectedProcess) {
+            this.hrService.updateProcess(this.selectedProcess.id, processData).subscribe({
+                next: (updated) => {
+                    const index = this.processes.findIndex(p => p.id === updated.id);
+                    if (index > -1) this.processes[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Process updated successfully' });
+                    this.showProcessDialog = false;
+                },
+                error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update process' })
+            });
+        } else {
+            this.hrService.createProcess(processData).subscribe({
+                next: (newProcess) => {
+                    this.processes.push(newProcess);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Process created successfully' });
+                    this.showProcessDialog = false;
+                },
+                error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to create process' })
+            });
+        }
+    }
+
+    deleteProcess(process: HRProcess): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete the process "${process.name}"?`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteProcess(process.id).subscribe({
+                    next: () => {
+                        this.processes = this.processes.filter(p => p.id !== process.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Process deleted successfully' });
+                    },
+                    error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete process. It may be in use.' })
+                });
+            }
+        });
+    }
+
+    // ==================== SPECIALIZATION ====================
+    openNewSpecializationDialog(): void {
+        this.isEditModeSpecialization = false;
+        this.selectedSpecialization = null;
+        this.specializationForm.reset({
+            is_active: true
+        });
+        this.showSpecializationDialog = true;
+    }
+
+    editSpecialization(specialization: TrainerSpecialization): void {
+        this.isEditModeSpecialization = true;
+        this.selectedSpecialization = specialization;
+        this.specializationForm.patchValue({
+            name: specialization.name,
+            description: specialization.description || '',
+            is_active: specialization.is_active !== false
+        });
+        this.showSpecializationDialog = true;
+    }
+
+    saveSpecialization(): void {
+        if (this.specializationForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const specializationData = this.specializationForm.value;
+
+        if (this.isEditModeSpecialization && this.selectedSpecialization) {
+            this.hrService.updateSpecialization(this.selectedSpecialization.id, specializationData).subscribe({
+                next: (updated) => {
+                    const index = this.specializations.findIndex(s => s.id === updated.id);
+                    if (index > -1) this.specializations[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Specialization updated successfully' });
+                    this.showSpecializationDialog = false;
+                    this.loadSpecializations();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createSpecialization(specializationData).subscribe({
+                next: (newSpecialization) => {
+                    this.specializations.push(newSpecialization);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Specialization created successfully' });
+                    this.showSpecializationDialog = false;
+                    this.loadSpecializations();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteSpecialization(specialization: TrainerSpecialization): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete the specialization "${specialization.name}"?`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteSpecialization(specialization.id).subscribe({
+                    next: () => {
+                        this.specializations = this.specializations.filter(s => s.id !== specialization.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Specialization deleted successfully' });
+                    },
+                    error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete specialization. It may be in use.' })
+                });
+            }
+        });
+    }
+
+    loadSpecializations(): void {
+        this.hrService.getSpecializations().subscribe({
+            next: (data) => this.specializations = data,
+            error: (err) => { console.error('Failed to load specializations:', err); this.specializations = []; }
+        });
+    }
+
+    // Helper to get specialization options for trainer dropdown
+    get specializationOptions(): { label: string; value: string }[] {
+        return this.specializations
+            .filter(s => s.is_active !== false)
+            .map(s => ({ label: s.name, value: s.name }));
     }
 
     // ==================== QUALIFICATION ====================
@@ -1078,7 +1466,23 @@ export class HrComponent implements OnInit, OnDestroy {
 
     // ==================== FORMATEUR CRUD ====================
     openNewFormateurDialog(): void {
-        this.formateurForm.reset({ Status: 'Active', IsAdmin: false });
+        this.isEditModeFormateur = false;
+        this.selectedFormateur = null;
+        this.formateurForm.reset({ Status: 'Active' });
+        this.showFormateurDialog = true;
+    }
+
+    editFormateur(formateur: Formateur): void {
+        this.isEditModeFormateur = true;
+        this.selectedFormateur = formateur;
+        this.formateurForm.patchValue({
+            Name: formateur.name || formateur.Name,
+            Email: formateur.email,
+            login: formateur.login,
+            Status: formateur.is_active ? 'Active' : (formateur.Status || 'Active'),
+            phone: formateur.phone,
+            specialization: formateur.specialization
+        });
         this.showFormateurDialog = true;
     }
 
@@ -1088,15 +1492,60 @@ export class HrComponent implements OnInit, OnDestroy {
             return;
         }
 
-        const formateurData = this.formateurForm.value;
+        const formateurData = {
+            ...this.formateurForm.value,
+            name: this.formateurForm.value.Name,
+            is_active: this.formateurForm.value.Status === 'Active'
+        };
 
-        this.hrService.createFormateur(formateurData).subscribe({
-            next: (newFormateur) => {
-                this.formateurs.push(newFormateur);
-                this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Trainer created successfully' });
-                this.showFormateurDialog = false;
-            },
-            error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to create trainer' })
+        if (this.isEditModeFormateur && this.selectedFormateur) {
+            const id = this.selectedFormateur.id || this.selectedFormateur.TrainerID;
+            if (id) {
+                this.hrService.updateFormateur(id, formateurData).subscribe({
+                    next: (updatedFormateur) => {
+                        const index = this.formateurs.findIndex(f => (f.id || f.TrainerID) === id);
+                        if (index !== -1) {
+                            this.formateurs[index] = updatedFormateur;
+                        }
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Trainer updated successfully' });
+                        this.showFormateurDialog = false;
+                        this.selectedFormateur = null;
+                    },
+                    error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update trainer' })
+                });
+            }
+        } else {
+            this.hrService.createFormateur(formateurData).subscribe({
+                next: (newFormateur) => {
+                    this.formateurs.push(newFormateur);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Trainer created successfully' });
+                    this.showFormateurDialog = false;
+                },
+                error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to create trainer' })
+            });
+        }
+    }
+
+    deleteFormateur(formateur: Formateur): void {
+        const id = formateur.id || formateur.TrainerID;
+        const name = formateur.name || formateur.Name || 'this trainer';
+
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete ${name}?`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () => {
+                if (id) {
+                    this.hrService.deleteFormateur(id).subscribe({
+                        next: () => {
+                            this.formateurs = this.formateurs.filter(f => (f.id || f.TrainerID) !== id);
+                            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Trainer deleted successfully' });
+                        },
+                        error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete trainer' })
+                    });
+                }
+            }
         });
     }
 
@@ -1584,5 +2033,478 @@ export class HrComponent implements OnInit, OnDestroy {
 
     getEmployeeCountByDepartment(department: string): number {
         return this.employees.filter(e => e.Departement_Emp === department).length;
+    }
+
+    // ==================== LICENSE MANAGEMENT ====================
+    openNewLicenseDialog(): void {
+        this.isEditMode = false;
+        this.selectedLicense = null;
+        this.licenseForm.reset({
+            issue_date: new Date()
+        });
+        this.showLicenseDialog = true;
+    }
+
+    editLicense(license: License): void {
+        this.isEditMode = true;
+        this.selectedLicense = license;
+        this.licenseForm.patchValue({
+            employee: license.employee,
+            license_type: license.license_type,
+            license_number: license.license_number,
+            issue_date: new Date(license.issue_date),
+            expiry_date: new Date(license.expiry_date),
+            issuing_authority: license.issuing_authority,
+            document_url: license.document_url || '',
+            notes: license.notes || ''
+        });
+        this.showLicenseDialog = true;
+    }
+
+    saveLicense(): void {
+        if (this.licenseForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const formValue = this.licenseForm.value;
+
+        // Format dates to YYYY-MM-DD
+        const formatDate = (date: Date | string): string => {
+            const d = new Date(date);
+            return d.toISOString().split('T')[0];
+        };
+
+        const licenseData: LicenseCreate = {
+            employee: typeof formValue.employee === 'object' ? formValue.employee.Id_Emp || formValue.employee.id : formValue.employee,
+            license_type: typeof formValue.license_type === 'object' ? formValue.license_type.id : formValue.license_type,
+            license_number: formValue.license_number,
+            issue_date: formatDate(formValue.issue_date),
+            expiry_date: formatDate(formValue.expiry_date),
+            issuing_authority: formValue.issuing_authority,
+            document_url: formValue.document_url || undefined,
+            notes: formValue.notes || undefined
+        };
+
+        if (this.isEditMode && this.selectedLicense) {
+            this.hrService.updateLicense(this.selectedLicense.id, licenseData).subscribe({
+                next: (updated) => {
+                    const index = this.licenses.findIndex(l => l.id === updated.id);
+                    if (index > -1) this.licenses[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'License updated successfully' });
+                    this.showLicenseDialog = false;
+                    this.loadLicenses();
+                    this.loadLicenseStats();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createLicense(licenseData).subscribe({
+                next: (newLicense) => {
+                    this.licenses.push(newLicense);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'License created successfully' });
+                    this.showLicenseDialog = false;
+                    this.loadLicenses();
+                    this.loadLicenseStats();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteLicense(license: License): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete license "${license.license_number}"?`,
+            header: 'Delete Confirmation',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteLicense(license.id).subscribe({
+                    next: () => {
+                        this.licenses = this.licenses.filter(l => l.id !== license.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'License deleted successfully' });
+                        this.loadLicenseStats();
+                    },
+                    error: (err) => {
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete license' });
+                    }
+                });
+            }
+        });
+    }
+
+    getLicenseStatusSeverity(status: string): 'success' | 'danger' | 'warn' | 'info' {
+        const map: { [key: string]: 'success' | 'danger' | 'warn' | 'info' } = {
+            'active': 'success',
+            'expired': 'danger',
+            'expiring_soon': 'warn'
+        };
+        return map[status] || 'info';
+    }
+
+    // ==================== LICENSE TYPE MANAGEMENT ====================
+    openNewLicenseTypeDialog(): void {
+        this.isEditMode = false;
+        this.selectedLicenseType = null;
+        this.licenseTypeForm.reset({
+            validity_months: 12,
+            renewal_advance_days: 30,
+            is_mandatory: false
+        });
+        this.showLicenseTypeDialog = true;
+    }
+
+    editLicenseType(licenseType: LicenseType): void {
+        this.isEditMode = true;
+        this.selectedLicenseType = licenseType;
+        this.licenseTypeForm.patchValue({
+            name: licenseType.name,
+            description: licenseType.description || '',
+            validity_months: licenseType.validity_months,
+            renewal_advance_days: licenseType.renewal_advance_days || 30,
+            is_mandatory: licenseType.is_mandatory
+        });
+        this.showLicenseTypeDialog = true;
+    }
+
+    saveLicenseType(): void {
+        if (this.licenseTypeForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const licenseTypeData = this.licenseTypeForm.value;
+
+        if (this.isEditMode && this.selectedLicenseType) {
+            this.hrService.updateLicenseType(this.selectedLicenseType.id, licenseTypeData).subscribe({
+                next: (updated) => {
+                    const index = this.licenseTypes.findIndex(lt => lt.id === updated.id);
+                    if (index > -1) this.licenseTypes[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'License type updated successfully' });
+                    this.showLicenseTypeDialog = false;
+                    this.loadLicenseTypes();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createLicenseType(licenseTypeData).subscribe({
+                next: (newLicenseType) => {
+                    this.licenseTypes.push(newLicenseType);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'License type created successfully' });
+                    this.showLicenseTypeDialog = false;
+                    this.loadLicenseTypes();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteLicenseType(licenseType: LicenseType): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete license type "${licenseType.name}"?`,
+            header: 'Delete Confirmation',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteLicenseType(licenseType.id).subscribe({
+                    next: () => {
+                        this.licenseTypes = this.licenseTypes.filter(lt => lt.id !== licenseType.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'License type deleted successfully' });
+                    },
+                    error: (err) => {
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete license type. It may be in use.' });
+                    }
+                });
+            }
+        });
+    }
+
+    // ==================== WORKSTATION MANAGEMENT ====================
+    openNewWorkstationDialog(): void {
+        this.isEditMode = false;
+        this.selectedWorkstation = null;
+        this.workstationForm.reset({
+            process_order: 0,
+            process_mode: 'manual',
+            cycle_time_seconds: 0,
+            max_operators: 1,
+            is_critical: false
+        });
+        this.showWorkstationDialog = true;
+    }
+
+    editWorkstation(workstation: any): void {
+        this.isEditMode = true;
+        this.selectedWorkstation = workstation;
+        this.workstationForm.patchValue({
+            name: workstation.name,
+            code: workstation.code,
+            production_line: workstation.production_line,
+            process_order: workstation.process_order || 0,
+            process_mode: workstation.process_mode || 'manual',
+            typ_order: workstation.typ_order || '',
+            cycle_time_seconds: workstation.cycle_time_seconds || 0,
+            max_operators: workstation.max_operators || 1,
+            is_critical: workstation.is_critical || false,
+            description: workstation.description || ''
+        });
+        this.showWorkstationDialog = true;
+    }
+
+    saveWorkstation(): void {
+        if (this.workstationForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const workstationData = this.workstationForm.value;
+
+        if (this.isEditMode && this.selectedWorkstation) {
+            this.hrService.updateWorkstation((this.selectedWorkstation as any).id, workstationData).subscribe({
+                next: (updated: any) => {
+                    const index = this.workstations.findIndex((w: any) => w.id === updated.id);
+                    if (index > -1) this.workstations[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Workstation updated successfully' });
+                    this.showWorkstationDialog = false;
+                    this.loadWorkstations();
+                },
+                error: (err: any) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createWorkstation(workstationData).subscribe({
+                next: (newWorkstation: any) => {
+                    this.workstations.push(newWorkstation);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Workstation created successfully' });
+                    this.showWorkstationDialog = false;
+                    this.loadWorkstations();
+                },
+                error: (err: any) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteWorkstation(workstation: any): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete workstation "${workstation.name}"?`,
+            header: 'Delete Confirmation',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteWorkstation(workstation.id).subscribe({
+                    next: () => {
+                        this.workstations = this.workstations.filter((w: any) => w.id !== workstation.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Workstation deleted successfully' });
+                    },
+                    error: (err: any) => {
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete workstation' });
+                    }
+                });
+            }
+        });
+    }
+
+    loadWorkstations(): void {
+        this.hrService.getWorkstations().subscribe({
+            next: (data) => this.workstations = data,
+            error: (err) => { console.error('Failed to load workstations:', err); this.workstations = []; }
+        });
+    }
+
+    getProcessModeSeverity(mode: string): 'success' | 'warn' | 'info' {
+        const map: { [key: string]: 'success' | 'warn' | 'info' } = {
+            'manual': 'info',
+            'semi_auto': 'warn',
+            'full_auto': 'success'
+        };
+        return map[mode] || 'info';
+    }
+
+    getProcessName(processId: number): string {
+        const process = this.processes.find(p => p.id === processId);
+        return process?.name || '-';
+    }
+
+    // ==================== UX ENHANCEMENT METHODS ====================
+
+    updateKpiData(): void {
+        if (!this.dashboardStats) return;
+
+        this.kpiData = [
+            {
+                label: 'Total Employees',
+                value: this.dashboardStats.totalEmployees,
+                icon: 'pi pi-users',
+                color: 'blue',
+                trend: 5,
+                progress: 100
+            },
+            {
+                label: 'Active Employees',
+                value: this.dashboardStats.activeEmployees,
+                icon: 'pi pi-check-circle',
+                color: 'green',
+                trend: 3,
+                progress: this.dashboardStats.totalEmployees > 0
+                    ? (this.dashboardStats.activeEmployees / this.dashboardStats.totalEmployees) * 100
+                    : 0
+            },
+            {
+                label: 'Recyclage Required',
+                value: this.dashboardStats.employeesRequiringRecyclage,
+                icon: 'pi pi-refresh',
+                color: 'orange',
+                trend: -2,
+                progress: this.dashboardStats.totalEmployees > 0
+                    ? (this.dashboardStats.employeesRequiringRecyclage / this.dashboardStats.totalEmployees) * 100
+                    : 0
+            },
+            {
+                label: 'Avg. Versatility',
+                value: Math.round(this.dashboardStats.averageVersatility),
+                icon: 'pi pi-chart-line',
+                color: 'purple',
+                trend: 8,
+                progress: this.dashboardStats.averageVersatility
+            }
+        ];
+    }
+
+    hasActiveFilters(): boolean {
+        return this.activeFilters.length > 0;
+    }
+
+    get activeFilterCount(): number {
+        return this.activeFilters.length;
+    }
+
+    applyQuickFilter(): void {
+        // Clear existing status filter
+        this.activeFilters = this.activeFilters.filter(f => f.key !== 'quickFilter');
+
+        if (this.selectedQuickFilter !== 'all') {
+            this.activeFilters.push({
+                key: 'quickFilter',
+                label: this.quickFilterOptions.find(o => o.value === this.selectedQuickFilter)?.label || '',
+                value: this.selectedQuickFilter
+            });
+        }
+        // filteredEmployees getter handles filtering automatically
+    }
+
+    removeFilter(filter: { key: string; label: string; value: any }): void {
+        this.activeFilters = this.activeFilters.filter(f => f.key !== filter.key);
+
+        // Reset corresponding filter value
+        switch (filter.key) {
+            case 'department':
+                this.selectedDepartment = null;
+                break;
+            case 'category':
+                this.selectedCategory = null;
+                break;
+            case 'status':
+                this.selectedStatus = null;
+                break;
+            case 'quickFilter':
+                this.selectedQuickFilter = 'all';
+                break;
+        }
+        // filteredEmployees getter handles filtering automatically
+    }
+
+    clearAllFilters(): void {
+        this.activeFilters = [];
+        this.selectedDepartment = null;
+        this.selectedCategory = null;
+        this.selectedStatus = null;
+        this.selectedQuickFilter = 'all';
+        this.searchTerm = '';
+        // filteredEmployees getter handles filtering automatically
+    }
+
+    applyFilters(): void {
+        // Update active filters based on selected values
+        this.activeFilters = [];
+
+        if (this.selectedDepartment) {
+            this.activeFilters.push({
+                key: 'department',
+                label: `Dept: ${this.selectedDepartment}`,
+                value: this.selectedDepartment
+            });
+        }
+
+        if (this.selectedCategory) {
+            this.activeFilters.push({
+                key: 'category',
+                label: `Category: ${this.selectedCategory}`,
+                value: this.selectedCategory
+            });
+        }
+
+        if (this.selectedStatus) {
+            this.activeFilters.push({
+                key: 'status',
+                label: `Status: ${this.selectedStatus}`,
+                value: this.selectedStatus
+            });
+        }
+        // filteredEmployees getter handles filtering automatically
+    }
+
+    deleteFormation(formation: Formation): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete formation "${formation.name}"?`,
+            header: 'Delete Confirmation',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteFormation(formation.id).subscribe({
+                    next: () => {
+                        this.formations = this.formations.filter(f => f.id !== formation.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Formation deleted successfully' });
+                    },
+                    error: (err: any) => {
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete formation' });
+                    }
+                });
+            }
+        });
+    }
+
+    // Group formations by process for accordion display
+    updateGroupedFormations(): void {
+        const grouped = new Map<string, Formation[]>();
+        this.formations.forEach(formation => {
+            const processName = formation.process_name || this.getProcessName(formation.process) || 'Other';
+            if (!grouped.has(processName)) {
+                grouped.set(processName, []);
+            }
+            grouped.get(processName)!.push(formation);
+        });
+        this.groupedFormations = grouped;
+    }
+
+    get activeTrainersCount(): number {
+        return this.formateurs.filter(f => f.is_active || f.Status === 'Active').length;
+    }
+
+    get ongoingSessions(): number {
+        // Return count of ongoing formation sessions (placeholder)
+        return this.formationStats?.plannedFormations || 0;
     }
 }

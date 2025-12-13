@@ -182,11 +182,15 @@ export interface VersatilityMatrix {
 
 // ==================== FORMATION ====================
 export interface Formation {
-    id_formation: number;
-    name_formation: string;
-    type_formation: string;
-    id_process: number;
-    Process?: HRProcess;
+    id: number;
+    name: string;
+    type: string;
+    process: number;
+    process_name?: string;
+    duration_hours?: number;
+    description?: string;
+    is_active?: boolean;
+    created_at?: string;
 }
 
 export interface FormationPlan {
@@ -220,11 +224,23 @@ export interface Formateur {
     Email?: string;
 }
 
+// ==================== TRAINER SPECIALIZATION ====================
+export interface TrainerSpecialization {
+    id: number;
+    name: string;
+    description?: string;
+    is_active?: boolean;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
 // ==================== PROCESS & HR WORKSTATION ====================
 export interface HRProcess {
-    id_process: number;
-    desc_process: string;
-    ZoneID?: number;
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    is_active?: boolean;
 }
 
 export interface HRWorkstation {
@@ -237,6 +253,13 @@ export interface HRWorkstation {
     id_formation?: number;
     processIndex?: number;
     Process?: HRProcess;
+    // Enhanced fields
+    process_mode?: 'manual' | 'semi_auto' | 'full_auto';
+    typ_order?: string;
+    cycle_time_seconds?: number;
+    max_operators?: number;
+    is_critical?: boolean;
+    description?: string;
 }
 
 // ==================== RECYCLAGE (RETRAINING) ====================
@@ -311,4 +334,57 @@ export interface EmployeeDetail extends Employee {
     team?: Team;
     category?: EmployeeCategory;
     trajet?: Trajet;
+}
+
+// ==================== LICENSE MANAGEMENT ====================
+export interface LicenseType {
+    id: number;
+    name: string;
+    description?: string;
+    validity_months: number;
+    renewal_advance_days?: number;
+    is_mandatory: boolean;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+export interface License {
+    id: number;
+    employee: number;
+    employee_name?: string;
+    employee_id_display?: string;
+    license_type: number;
+    license_type_name?: string;
+    license_number: string;
+    issue_date: Date;
+    expiry_date: Date;
+    issuing_authority: string;
+    document_url?: string;
+    notes?: string;
+    status: 'active' | 'expired' | 'expiring_soon';
+    days_until_expiry?: number;
+    created_by?: string;
+    changed_by?: string;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+export interface LicenseCreate {
+    employee: number;
+    license_type: number;
+    license_number: string;
+    issue_date: Date | string;
+    expiry_date: Date | string;
+    issuing_authority: string;
+    document_url?: string;
+    notes?: string;
+    created_by?: string;
+}
+
+export interface LicenseStats {
+    total: number;
+    active: number;
+    expired: number;
+    expiring_soon: number;
+    by_type: { license_type__name: string; count: number }[];
 }

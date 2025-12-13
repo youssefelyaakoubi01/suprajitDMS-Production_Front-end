@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, BehaviorSubject } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { map, tap, catchError } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import {
     Employee,
@@ -18,6 +18,7 @@ import {
     Formation,
     FormationPlan,
     Formateur,
+    TrainerSpecialization,
     HRProcess,
     HRWorkstation,
     RecyclageEmployee,
@@ -25,7 +26,11 @@ import {
     Attendance,
     HRDashboardStats,
     FormationStats,
-    EmployeeDetail
+    EmployeeDetail,
+    License,
+    LicenseType,
+    LicenseCreate,
+    LicenseStats
 } from '../models/employee.model';
 
 @Injectable({
@@ -349,13 +354,87 @@ export class HRService {
         });
     }
 
+    // ==================== TRAINER SPECIALIZATIONS ====================
+    // Default specializations (fallback when API not available)
+    private defaultSpecializations: TrainerSpecialization[] = [
+        { id: 1, name: 'Assembly', description: 'Assembly line operations', is_active: true },
+        { id: 2, name: 'Quality Control', description: 'Quality inspection and control', is_active: true },
+        { id: 3, name: 'Safety & HSE', description: 'Health, Safety and Environment', is_active: true },
+        { id: 4, name: 'Machine Operation', description: 'Machine operation and handling', is_active: true },
+        { id: 5, name: 'Maintenance', description: 'Equipment maintenance', is_active: true },
+        { id: 6, name: 'Process Improvement', description: 'Continuous improvement methods', is_active: true },
+        { id: 7, name: 'Welding', description: 'Welding techniques and safety', is_active: true },
+        { id: 8, name: 'Electrical', description: 'Electrical systems and safety', is_active: true }
+    ];
+
+    getSpecializations(params?: { status?: string }): Observable<TrainerSpecialization[]> {
+        return this.api.get<TrainerSpecialization[]>(`${this.endpoint}/specializations`, params).pipe(
+            catchError(err => {
+                console.warn('Specializations API not available, using default data');
+                return of(this.defaultSpecializations);
+            })
+        );
+    }
+
+    getSpecialization(id: number): Observable<TrainerSpecialization> {
+        return this.api.get<TrainerSpecialization>(`${this.endpoint}/specializations/${id}`);
+    }
+
+    createSpecialization(specialization: Partial<TrainerSpecialization>): Observable<TrainerSpecialization> {
+        return this.api.post<TrainerSpecialization>(`${this.endpoint}/specializations`, specialization);
+    }
+
+    updateSpecialization(id: number, specialization: Partial<TrainerSpecialization>): Observable<TrainerSpecialization> {
+        return this.api.put<TrainerSpecialization>(`${this.endpoint}/specializations/${id}`, specialization);
+    }
+
+    deleteSpecialization(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/specializations/${id}`);
+    }
+
     // ==================== PROCESSES & WORKSTATIONS ====================
     getProcesses(): Observable<HRProcess[]> {
         return this.api.get<HRProcess[]>(`${this.endpoint}/processes`);
     }
 
+    getProcess(id: number): Observable<HRProcess> {
+        return this.api.get<HRProcess>(`${this.endpoint}/processes/${id}`);
+    }
+
+    createProcess(process: Partial<HRProcess>): Observable<HRProcess> {
+        return this.api.post<HRProcess>(`${this.endpoint}/processes`, process);
+    }
+
+    updateProcess(id: number, process: Partial<HRProcess>): Observable<HRProcess> {
+        return this.api.put<HRProcess>(`${this.endpoint}/processes/${id}`, process);
+    }
+
+    deleteProcess(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/processes/${id}`);
+    }
+
     getWorkstations(params?: { processId?: number; prodLineId?: number }): Observable<HRWorkstation[]> {
         return this.api.get<HRWorkstation[]>('production/workstations', params);
+    }
+
+    getWorkstation(id: number): Observable<HRWorkstation> {
+        return this.api.get<HRWorkstation>(`production/workstations/${id}`);
+    }
+
+    createWorkstation(workstation: Partial<HRWorkstation>): Observable<HRWorkstation> {
+        return this.api.post<HRWorkstation>('production/workstations', workstation);
+    }
+
+    updateWorkstation(id: number, workstation: Partial<HRWorkstation>): Observable<HRWorkstation> {
+        return this.api.put<HRWorkstation>(`production/workstations/${id}`, workstation);
+    }
+
+    deleteWorkstation(id: number): Observable<void> {
+        return this.api.delete<void>(`production/workstations/${id}`);
+    }
+
+    getProductionLines(): Observable<any[]> {
+        return this.api.get<any[]>('production/lines');
     }
 
     assignEmployeeToWorkstation(employeeId: number, workstationId: number): Observable<void> {
@@ -472,6 +551,67 @@ export class HRService {
         processId?: number;
     }): Observable<Blob> {
         return this.api.get<Blob>(`${this.endpoint}/reports/versatility`, { ...params, responseType: 'blob' });
+    }
+
+    // ==================== LICENSES ====================
+    getLicenses(params?: {
+        employee?: number;
+        license_type?: number;
+    }): Observable<License[]> {
+        return this.api.get<License[]>(`${this.endpoint}/licenses`, params);
+    }
+
+    getLicense(id: number): Observable<License> {
+        return this.api.get<License>(`${this.endpoint}/licenses/${id}`);
+    }
+
+    createLicense(license: LicenseCreate): Observable<License> {
+        return this.api.post<License>(`${this.endpoint}/licenses`, license);
+    }
+
+    updateLicense(id: number, license: Partial<LicenseCreate>): Observable<License> {
+        return this.api.put<License>(`${this.endpoint}/licenses/${id}`, license);
+    }
+
+    deleteLicense(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/licenses/${id}`);
+    }
+
+    getExpiringLicenses(days: number = 30): Observable<License[]> {
+        return this.api.get<License[]>(`${this.endpoint}/licenses/expiring`, { days });
+    }
+
+    getExpiredLicenses(): Observable<License[]> {
+        return this.api.get<License[]>(`${this.endpoint}/licenses/expired`);
+    }
+
+    getLicenseStats(): Observable<LicenseStats> {
+        return this.api.get<LicenseStats>(`${this.endpoint}/licenses/stats`);
+    }
+
+    getLicensesByEmployee(employeeId: number): Observable<License[]> {
+        return this.api.get<License[]>(`${this.endpoint}/licenses/by-employee`, { employee_id: employeeId });
+    }
+
+    // ==================== LICENSE TYPES ====================
+    getLicenseTypes(): Observable<LicenseType[]> {
+        return this.api.get<LicenseType[]>(`${this.endpoint}/license-types`);
+    }
+
+    getLicenseType(id: number): Observable<LicenseType> {
+        return this.api.get<LicenseType>(`${this.endpoint}/license-types/${id}`);
+    }
+
+    createLicenseType(licenseType: Partial<LicenseType>): Observable<LicenseType> {
+        return this.api.post<LicenseType>(`${this.endpoint}/license-types`, licenseType);
+    }
+
+    updateLicenseType(id: number, licenseType: Partial<LicenseType>): Observable<LicenseType> {
+        return this.api.put<LicenseType>(`${this.endpoint}/license-types/${id}`, licenseType);
+    }
+
+    deleteLicenseType(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/license-types/${id}`);
     }
 
     // ==================== CACHE GETTERS ====================
