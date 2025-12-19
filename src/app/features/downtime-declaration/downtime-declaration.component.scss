@@ -536,6 +536,54 @@
     margin: 0.25rem 0 0 0;
 }
 
+// ==================== TECHNICIAN SELECTION ====================
+
+.required-indicator {
+    color: var(--red-500);
+    font-weight: 700;
+    margin-left: 0.25rem;
+}
+
+.technician-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+
+    .tech-name {
+        font-weight: 500;
+        color: var(--text-color);
+    }
+
+    .tech-dept {
+        font-size: 0.75rem;
+        color: var(--text-color-secondary);
+    }
+}
+
+.no-technicians-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--orange-50);
+    border: 1px solid var(--orange-200);
+    border-radius: 6px;
+    color: var(--orange-700);
+    font-size: 0.875rem;
+
+    i {
+        font-size: 1rem;
+        color: var(--orange-500);
+    }
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-color-secondary);
+}
+
 // ==================== RESPONSIVE ====================
 
 @media (max-width: 768px) {

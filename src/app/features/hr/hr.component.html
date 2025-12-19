@@ -69,7 +69,7 @@
                                 <span class="kpi-value">{{ kpi.value }}</span>
                                 <div class="kpi-trend" [class.positive]="kpi.trend > 0" [class.negative]="kpi.trend < 0">
                                     <i [ngClass]="kpi.trend >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"></i>
-                                    <span>{{ kpi.trend >= 0 ? '+' : '' }}{{ kpi.trend }}% vs last month</span>
+                                    <span>{{ kpi.trend }} {{ kpi.trendLabel || '' }}</span>
                                 </div>
                             </div>
                             <p-progressBar [value]="kpi.progress" [showValue]="false" styleClass="h-1 mt-3"></p-progressBar>
@@ -88,6 +88,13 @@
                         <p-card header="Employees by Category">
                             <div class="chart-container">
                                 <p-chart type="pie" [data]="employeesByCategoryChart"
+                                    [options]="pieChartOptions"></p-chart>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Employees by Status">
+                            <div class="chart-container">
+                                <p-chart type="doughnut" [data]="employeesByStatusChart"
                                     [options]="pieChartOptions"></p-chart>
                             </div>
                         </p-card>
@@ -171,11 +178,13 @@
                         <p-select [options]="departmentEntities" [(ngModel)]="selectedDepartment" optionLabel="name"
                             optionValue="name" placeholder="Department" [showClear]="true"
                             (onChange)="applyFilters()"></p-select>
-                        <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="categoryDescription"
-                            optionValue="categoryDescription" placeholder="Category" [showClear]="true"
+                        <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="name"
+                            optionValue="name" placeholder="Category" [showClear]="true"
                             (onChange)="applyFilters()"></p-select>
-                        <p-select [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label"
-                            optionValue="value" placeholder="Status" [showClear]="true"
+                        <p-select [options]="statuses.length > 0 ? statuses : statusOptions" [(ngModel)]="selectedStatus"
+                            [optionLabel]="statuses.length > 0 ? 'name' : 'label'"
+                            [optionValue]="statuses.length > 0 ? 'name' : 'value'"
+                            placeholder="Status" [showClear]="true"
                             (onChange)="applyFilters()"></p-select>
                     </div>
 
@@ -232,7 +241,7 @@
                             </td>
                             <td>
                                 <div class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</div>
-                                <div class="text-sm text-color-secondary">{{ emp.category_fk?.name || emp.Categorie_Emp }}</div>
+                                <div class="text-sm text-color-secondary">{{ emp.category_fk_detail?.name || emp.Categorie_Emp }}</div>
                             </td>
                             <td><code>{{ emp.BadgeNumber || emp.employee_id || '-' }}</code></td>
                             <td>{{ emp.Departement_Emp }}</td>
@@ -264,7 +273,7 @@
                                             </div>
                                             <div class="field">
                                                 <label>Category</label>
-                                                <p>{{ emp.category_fk?.name || emp.Categorie_Emp }}</p>
+                                                <p>{{ emp.category_fk_detail?.name || emp.Categorie_Emp }}</p>
                                             </div>
                                         </div>
                                         <div class="col-12 md:col-4">
@@ -661,48 +670,146 @@
 
             <!-- TAB 4: Recyclage -->
             <p-tabpanel value="4">
-                <div class="tab-header">
-                    <h3>Employee Recyclage (Retraining)</h3>
-                    <p class="text-color-secondary">Employees who have completed 1 year since hiring and require
-                        retraining</p>
-                </div>
+                <!-- Section 1: All Employees - Select for Recyclage -->
+                <p-toolbar styleClass="mb-3 surface-ground border-round">
+                    <ng-template #start>
+                        <p-iconfield iconPosition="left">
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input pInputText [(ngModel)]="playlistSearchTerm" placeholder="Search employees..."
+                                (input)="filterEmployeePlaylist()" style="width: 280px" />
+                        </p-iconfield>
+                    </ng-template>
 
-                <p-card>
-                    <p-table [value]="recyclageEmployees" [rows]="10" [paginator]="true">
+                    <ng-template #center>
+                        <div class="flex align-items-center gap-2">
+                            <p-select [options]="departmentEntities" [(ngModel)]="playlistDeptFilter"
+                                optionLabel="name" optionValue="name" placeholder="Department"
+                                (onChange)="filterEmployeePlaylist()" [showClear]="true" [style]="{width: '150px'}">
+                            </p-select>
+                            <p-select [options]="categories" [(ngModel)]="playlistCategoryFilter"
+                                optionLabel="name" optionValue="name" placeholder="Category"
+                                (onChange)="filterEmployeePlaylist()" [showClear]="true" [style]="{width: '140px'}">
+                            </p-select>
+                        </div>
+                    </ng-template>
+
+                    <ng-template #end>
+                        <button pButton icon="pi pi-calendar-plus"
+                            [label]="'Plan Recyclage' + (selectedPlaylistEmployees.length > 0 ? ' (' + selectedPlaylistEmployees.length + ')' : '')"
+                            class="p-button-success" (click)="openBatchRecyclageDialog()"
+                            [disabled]="selectedPlaylistEmployees.length === 0">
+                        </button>
+                    </ng-template>
+                </p-toolbar>
+
+                <p-table #recyclageTable [value]="filteredEmployeePlaylist" [paginator]="true" [rows]="10"
+                    [rowHover]="true" [rowsPerPageOptions]="[10, 25, 50]" [(selection)]="selectedPlaylistEmployees"
+                    dataKey="Id_Emp" [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'BadgeNumber', 'Departement_Emp']">
+
+                    <ng-template pTemplate="caption">
+                        <div class="flex justify-content-between align-items-center">
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-users mr-2"></i>All Employees ({{ filteredEmployeePlaylist.length }})
+                            </span>
+                            <div class="flex align-items-center gap-3" *ngIf="selectedPlaylistEmployees.length > 0">
+                                <span class="text-primary font-medium">{{ selectedPlaylistEmployees.length }} selected</span>
+                                <button pButton label="Clear" icon="pi pi-times" class="p-button-text p-button-sm"
+                                    (click)="clearEmployeeSelection()"></button>
+                            </div>
+                        </div>
+                    </ng-template>
+
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th style="width: 3rem"><p-tableHeaderCheckbox></p-tableHeaderCheckbox></th>
+                            <th style="width: 60px">Photo</th>
+                            <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
+                            <th pSortableColumn="BadgeNumber">Badge <p-sortIcon field="BadgeNumber"></p-sortIcon></th>
+                            <th pSortableColumn="Departement_Emp">Department <p-sortIcon field="Departement_Emp"></p-sortIcon></th>
+                            <th style="width: 100px">Status</th>
+                            <th style="width: 100px">Actions</th>
+                        </tr>
+                    </ng-template>
+
+                    <ng-template pTemplate="body" let-emp>
+                        <tr>
+                            <td><p-tableCheckbox [value]="emp"></p-tableCheckbox></td>
+                            <td>
+                                <p-avatar *ngIf="emp.Picture" [image]="getEmployeePictureUrl(emp.Picture)"
+                                    shape="circle" size="large"></p-avatar>
+                                <p-avatar *ngIf="!emp.Picture" [label]="getInitials(emp)" shape="circle"
+                                    size="large" styleClass="bg-primary text-white"></p-avatar>
+                            </td>
+                            <td>
+                                <div class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</div>
+                                <div class="text-sm text-color-secondary">{{ emp.category_fk?.name || emp.Categorie_Emp }}</div>
+                            </td>
+                            <td><code>{{ emp.BadgeNumber || emp.Id_Emp || '-' }}</code></td>
+                            <td>{{ emp.Departement_Emp }}</td>
+                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag></td>
+                            <td>
+                                <button pButton icon="pi pi-calendar-plus" class="p-button-rounded p-button-text"
+                                    (click)="openSingleRecyclageFromPlaylist(emp)" pTooltip="Plan Recyclage"></button>
+                            </td>
+                        </tr>
+                    </ng-template>
+
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="7" class="text-center p-4">
+                                <i class="pi pi-search text-4xl text-color-secondary mb-3" style="display: block;"></i>
+                                <p class="text-lg font-medium">No employees found</p>
+                                <p class="text-color-secondary">Try adjusting your search or filters</p>
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+
+                <!-- Section 2: Employees Requiring Recyclage (Alert Section) -->
+                <div class="mt-4">
+                    <p-table [value]="recyclageEmployees" [rows]="5" [paginator]="true" [rowHover]="true">
+                        <ng-template pTemplate="caption">
+                            <div class="flex justify-content-between align-items-center">
+                                <span class="text-xl font-semibold">
+                                    <i class="pi pi-exclamation-triangle mr-2 text-orange-500"></i>
+                                    Employees Requiring Recyclage
+                                </span>
+                                <p-tag [value]="recyclageEmployees.length + ' employees'" severity="warn"></p-tag>
+                            </div>
+                        </ng-template>
+
                         <ng-template pTemplate="header">
                             <tr>
-                                <th>Employee</th>
+                                <th style="width: 60px">Photo</th>
+                                <th>Name</th>
                                 <th>Hire Date</th>
                                 <th>Last Qualification</th>
-                                <th>Days Until Recyclage</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th>Days Remaining</th>
+                                <th style="width: 100px">Status</th>
+                                <th style="width: 120px">Actions</th>
                             </tr>
                         </ng-template>
+
                         <ng-template pTemplate="body" let-rec>
-                            <tr>
+                            <tr [ngClass]="{'surface-100': rec.isOverdue}">
                                 <td>
-                                    <div class="employee-info-mini">
-                                        <p-avatar [label]="getInitials(rec.Employee)" shape="circle"
-                                            styleClass="bg-primary text-white"></p-avatar>
-                                        <div>
-                                            <span class="font-semibold">{{ rec.Employee.Prenom_Emp }} {{
-                                                rec.Employee.Nom_Emp }}</span>
-                                            <br><small class="text-color-secondary">{{ rec.Employee.Categorie_Emp
-                                                }}</small>
-                                        </div>
-                                    </div>
+                                    <p-avatar *ngIf="rec.Employee?.Picture" [image]="rec.Employee.Picture"
+                                        shape="circle" size="large"></p-avatar>
+                                    <p-avatar *ngIf="!rec.Employee?.Picture" [label]="getInitials(rec.Employee)"
+                                        shape="circle" size="large" styleClass="bg-primary text-white"></p-avatar>
+                                </td>
+                                <td>
+                                    <div class="font-semibold">{{ rec.Employee?.Prenom_Emp }} {{ rec.Employee?.Nom_Emp }}</div>
+                                    <div class="text-sm text-color-secondary">{{ rec.Employee?.Categorie_Emp }}</div>
                                 </td>
                                 <td>{{ rec.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
                                 <td>
                                     <span *ngIf="rec.lastQualificationDate">{{ rec.lastQualificationDate | date:'dd/MM/yyyy' }}</span>
-                                    <span *ngIf="!rec.lastQualificationDate" class="text-color-secondary">No qualification</span>
+                                    <span *ngIf="!rec.lastQualificationDate" class="text-color-secondary">-</span>
                                 </td>
                                 <td>
-                                    <span
-                                        [class]="rec.isOverdue ? 'text-danger font-bold' : (rec.daysUntilRecyclage <= 30 ? 'text-warning font-bold' : '')">
-                                        {{ rec.isOverdue ? 'Overdue by ' + (-rec.daysUntilRecyclage) + ' days' :
-                                        rec.daysUntilRecyclage + ' days remaining' }}
+                                    <span [class]="rec.isOverdue ? 'text-red-600 font-bold' : (rec.daysUntilRecyclage <= 30 ? 'text-orange-600 font-bold' : '')">
+                                        {{ rec.isOverdue ? 'Overdue ' + getAbsValue(rec.daysUntilRecyclage) + 'd' : rec.daysUntilRecyclage + ' days' }}
                                     </span>
                                 </td>
                                 <td>
@@ -710,21 +817,240 @@
                                         [value]="rec.isOverdue ? 'OVERDUE' : (rec.daysUntilRecyclage <= 30 ? 'DUE SOON' : 'OK')"></p-tag>
                                 </td>
                                 <td>
-                                    <button pButton label="Plan Recyclage" icon="pi pi-calendar" class="p-button-sm"
+                                    <button pButton label="Plan" icon="pi pi-calendar" class="p-button-sm"
                                         (click)="planRecyclage(rec)"></button>
                                 </td>
                             </tr>
                         </ng-template>
+
                         <ng-template pTemplate="emptymessage">
                             <tr>
-                                <td colspan="6" class="text-center p-4">
-                                    <i class="pi pi-check-circle text-4xl text-success mb-3"></i>
-                                    <p>No employees require recyclage at this time</p>
+                                <td colspan="7" class="text-center p-4">
+                                    <i class="pi pi-check-circle text-4xl text-green-500 mb-3" style="display: block;"></i>
+                                    <p class="font-medium text-green-600">All employees are up to date!</p>
+                                    <p class="text-color-secondary text-sm">No employees require recyclage</p>
                                 </td>
                             </tr>
                         </ng-template>
                     </p-table>
-                </p-card>
+                </div>
+
+                <!-- Section 3: Planned Recyclages -->
+                <div class="mt-4">
+                    <p-toolbar styleClass="mb-3 surface-ground border-round">
+                        <ng-template #start>
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-calendar-clock mr-2 text-cyan-500"></i>Planned Recyclages
+                            </span>
+                            <div class="flex gap-2 ml-3">
+                                <p-tag [value]="getRecyclageCountByStatus('pending') + ' Pending'" severity="warn"></p-tag>
+                                <p-tag [value]="getRecyclageCountByStatus('in_progress') + ' In Progress'" severity="info"></p-tag>
+                            </div>
+                        </ng-template>
+
+                        <ng-template #end>
+                            <p-iconfield iconPosition="left" class="mr-2">
+                                <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                                <input pInputText [(ngModel)]="recyclageSearchTerm" placeholder="Search..."
+                                    (input)="filterRecyclages()" style="width: 180px" />
+                            </p-iconfield>
+                            <p-select [options]="recyclageStatusOptions" [(ngModel)]="recyclageStatusFilter"
+                                placeholder="Status" (onChange)="filterRecyclages()"
+                                [showClear]="true" [style]="{width: '130px'}">
+                            </p-select>
+                        </ng-template>
+                    </p-toolbar>
+
+                    <p-table [value]="filteredRecyclages" [rows]="10" [paginator]="true" [rowHover]="true"
+                        [globalFilterFields]="['employee_name', 'formation_name']">
+
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th style="width: 60px">Photo</th>
+                                <th>Employee</th>
+                                <th>Formation</th>
+                                <th>Trainer</th>
+                                <th>Planned Date</th>
+                                <th style="width: 90px">Time</th>
+                                <th style="width: 130px">Status</th>
+                                <th style="width: 120px" class="text-center">Actions</th>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="body" let-qual>
+                            <tr [ngClass]="{'surface-100': qual.test_result === 'passed', 'border-left-3 border-red-500': getDaysUntilDate(qual.start_date) < 0}">
+                                <td>
+                                    <p-avatar *ngIf="qual.employee_picture" [image]="qual.employee_picture"
+                                        shape="circle" size="large"></p-avatar>
+                                    <p-avatar *ngIf="!qual.employee_picture" [label]="qual.employee_name?.charAt(0)"
+                                        shape="circle" size="large" [style]="{'background-color': '#8B5CF6', 'color': 'white'}"></p-avatar>
+                                </td>
+                                <td>
+                                    <div class="font-semibold">{{ qual.employee_name }}</div>
+                                    <div class="text-sm text-color-secondary">ID: {{ qual.employee }}</div>
+                                </td>
+                                <td>
+                                    <div class="font-medium">{{ qual.formation_name }}</div>
+                                    <p-tag *ngIf="qual.formation_type" [value]="qual.formation_type"
+                                        [severity]="qual.formation_type === 'practical' ? 'success' : 'info'"
+                                        [style]="{fontSize: '0.65rem'}"></p-tag>
+                                </td>
+                                <td>
+                                    <span *ngIf="qual.trainer_name">{{ qual.trainer_name }}</span>
+                                    <span *ngIf="!qual.trainer_name" class="text-color-secondary">-</span>
+                                </td>
+                                <td>{{ qual.start_date | date:'dd/MM/yyyy' }}</td>
+                                <td>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) > 7"
+                                        [value]="getDaysUntilDate(qual.start_date) + 'd'" severity="success"></p-tag>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) <= 7 && getDaysUntilDate(qual.start_date) > 0"
+                                        [value]="getDaysUntilDate(qual.start_date) + 'd'" severity="warn"></p-tag>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) === 0" value="Today" severity="info"></p-tag>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) < 0"
+                                        [value]="getAbsValue(getDaysUntilDate(qual.start_date)) + 'd late'" severity="danger"></p-tag>
+                                </td>
+                                <td>
+                                    <p-select [options]="[
+                                        {label: 'Pending', value: 'pending'},
+                                        {label: 'In Progress', value: 'in_progress'},
+                                        {label: 'Passed', value: 'passed'},
+                                        {label: 'Failed', value: 'failed'}
+                                    ]" [(ngModel)]="qual.test_result"
+                                        (onChange)="updateRecyclageStatus(qual, $event.value)"
+                                        optionLabel="label" optionValue="value" appendTo="body"
+                                        [style]="{width: '115px'}">
+                                    </p-select>
+                                </td>
+                                <td class="text-center">
+                                    <button pButton icon="pi pi-eye" class="p-button-rounded p-button-text p-button-info"
+                                        pTooltip="View" (click)="viewRecyclageDetails(qual)"></button>
+                                    <button pButton icon="pi pi-check" class="p-button-rounded p-button-text p-button-success"
+                                        pTooltip="Complete" (click)="completeRecyclage(qual)"
+                                        *ngIf="qual.test_result !== 'passed'"></button>
+                                    <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                        pTooltip="Delete" (click)="deleteQualification(qual)"></button>
+                                </td>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="emptymessage">
+                            <tr>
+                                <td colspan="8" class="text-center p-4">
+                                    <i class="pi pi-calendar text-4xl text-color-secondary mb-3" style="display: block;"></i>
+                                    <p class="text-lg font-medium">No planned recyclages</p>
+                                    <p class="text-color-secondary text-sm">Select employees above to plan recyclage</p>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </div>
+
+                <!-- Recyclage Details Dialog -->
+                <p-dialog [(visible)]="showRecyclageDetailsDialog" header="Recyclage Details" [modal]="true"
+                    [style]="{width: '500px'}" [draggable]="false" [resizable]="false">
+                    <div *ngIf="selectedRecyclageDetails" class="flex flex-column gap-3">
+                        <div class="flex align-items-center gap-3 p-3 surface-100 border-round">
+                            <p-avatar *ngIf="selectedRecyclageDetails.employee_picture"
+                                [image]="selectedRecyclageDetails.employee_picture" shape="circle" size="xlarge"></p-avatar>
+                            <p-avatar *ngIf="!selectedRecyclageDetails.employee_picture"
+                                [label]="selectedRecyclageDetails.employee_name?.charAt(0)" shape="circle" size="xlarge"
+                                [style]="{'background-color': '#8B5CF6', 'color': 'white'}"></p-avatar>
+                            <div>
+                                <div class="text-xl font-semibold">{{ selectedRecyclageDetails.employee_name }}</div>
+                                <div class="text-color-secondary">ID: {{ selectedRecyclageDetails.employee }}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid">
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Formation</label>
+                                <div class="font-medium">{{ selectedRecyclageDetails.formation_name }}</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Type</label>
+                                <p-tag [value]="selectedRecyclageDetails.formation_type || 'N/A'"
+                                    [severity]="selectedRecyclageDetails.formation_type === 'practical' ? 'success' : 'info'"></p-tag>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Trainer</label>
+                                <div class="font-medium">{{ selectedRecyclageDetails.trainer_name || '-' }}</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Status</label>
+                                <p-tag [value]="selectedRecyclageDetails.test_result"
+                                    [severity]="getQualificationStatusSeverity(selectedRecyclageDetails.test_result)"></p-tag>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Planned Date</label>
+                                <div class="font-medium">{{ selectedRecyclageDetails.start_date | date:'dd/MM/yyyy' }}</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">End Date</label>
+                                <div class="font-medium">{{ (selectedRecyclageDetails.end_date | date:'dd/MM/yyyy') || '-' }}</div>
+                            </div>
+                        </div>
+
+                        <div *ngIf="selectedRecyclageDetails.notes">
+                            <label class="text-color-secondary text-sm block mb-1">Notes</label>
+                            <div class="p-3 surface-100 border-round">{{ selectedRecyclageDetails.notes }}</div>
+                        </div>
+                    </div>
+                    <ng-template pTemplate="footer">
+                        <button pButton label="Close" icon="pi pi-times" class="p-button-text"
+                            (click)="showRecyclageDetailsDialog = false"></button>
+                        <button pButton label="Complete" icon="pi pi-check" class="p-button-success"
+                            (click)="completeRecyclage(selectedRecyclageDetails); showRecyclageDetailsDialog = false"
+                            *ngIf="selectedRecyclageDetails?.test_result !== 'passed'"></button>
+                    </ng-template>
+                </p-dialog>
+
+                <!-- Batch Recyclage Dialog -->
+                <p-dialog [(visible)]="showBatchRecyclageDialog" header="Plan Recyclage" [modal]="true"
+                    [style]="{width: '550px'}" [draggable]="false" [resizable]="false">
+                    <div class="flex flex-column gap-4">
+                        <div>
+                            <label class="text-color-secondary text-sm block mb-2">
+                                Selected Employees ({{ selectedPlaylistEmployees.length }})
+                            </label>
+                            <div class="flex flex-wrap gap-2 p-3 surface-100 border-round" style="max-height: 120px; overflow-y: auto;">
+                                <p-chip *ngFor="let emp of selectedPlaylistEmployees"
+                                    [label]="emp.Prenom_Emp + ' ' + emp.Nom_Emp"
+                                    [removable]="true" (onRemove)="toggleEmployeeSelection(emp)"></p-chip>
+                            </div>
+                        </div>
+
+                        <form [formGroup]="batchRecyclageForm" class="flex flex-column gap-3">
+                            <div class="field">
+                                <label class="block font-medium mb-2">Formation *</label>
+                                <p-select formControlName="formation_id" [options]="formations"
+                                    optionLabel="name" optionValue="id" placeholder="Select formation"
+                                    [style]="{width: '100%'}" [filter]="true" filterBy="name" appendTo="body"></p-select>
+                            </div>
+                            <div class="field">
+                                <label class="block font-medium mb-2">Trainer</label>
+                                <p-select formControlName="trainer_id" [options]="formateurs"
+                                    optionLabel="Name" optionValue="id" placeholder="Select trainer"
+                                    [style]="{width: '100%'}" [showClear]="true" appendTo="body"></p-select>
+                            </div>
+                            <div class="field">
+                                <label class="block font-medium mb-2">Planned Date *</label>
+                                <p-datepicker formControlName="planned_date" [style]="{width: '100%'}"
+                                    [showIcon]="true" dateFormat="dd/mm/yy" appendTo="body"></p-datepicker>
+                            </div>
+                            <div class="field">
+                                <label class="block font-medium mb-2">Notes</label>
+                                <textarea pInputTextarea formControlName="notes" rows="2"
+                                    placeholder="Optional notes..." [style]="{width: '100%'}"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <ng-template pTemplate="footer">
+                        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text"
+                            (click)="showBatchRecyclageDialog = false"></button>
+                        <button pButton label="Plan Recyclage" icon="pi pi-check" class="p-button-success"
+                            (click)="saveBatchRecyclage()" [disabled]="batchRecyclageForm.invalid"></button>
+                    </ng-template>
+                </p-dialog>
             </p-tabpanel>
 
             <!-- TAB 5: Teams & Trainers -->
@@ -747,13 +1073,103 @@
                     </p-card>
 
                     <!-- Categories -->
-                    <p-card header="Employee Categories">
-                        <div class="category-list">
-                            <div class="category-item" *ngFor="let cat of categories">
-                                <span class="category-name">{{ cat.name }}</span>
-                                <p-badge [value]="getEmployeeCountByCategory(cat.name)"></p-badge>
+                    <p-card>
+                        <ng-template pTemplate="header">
+                            <div class="card-header-with-action">
+                                <span>Employee Categories</span>
+                                <p-button icon="pi pi-plus" label="New Category" [text]="true" size="small"
+                                    (click)="openNewCategoryDialog()"></p-button>
                             </div>
-                        </div>
+                        </ng-template>
+                        <p-table [value]="categories" [rows]="5" [paginator]="categories.length > 5" [rowHover]="true" styleClass="p-datatable-sm">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th style="width: 80px">Employees</th>
+                                    <th style="width: 100px">Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-cat>
+                                <tr>
+                                    <td>
+                                        <span class="font-semibold">{{ cat.name }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-color-secondary text-sm">{{ cat.description || '-' }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <p-badge [value]="getEmployeeCountByCategory(cat.name)"></p-badge>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
+                                                pTooltip="Edit" (click)="editCategory(cat)"></p-button>
+                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                                pTooltip="Delete" (click)="deleteCategory(cat)"></p-button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td colspan="4" class="text-center text-color-secondary p-4">
+                                        <i class="pi pi-inbox text-2xl mb-2"></i>
+                                        <p>No categories defined. Click "New Category" to add one.</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </p-card>
+
+                    <!-- Employee Statuses -->
+                    <p-card>
+                        <ng-template pTemplate="header">
+                            <div class="card-header-with-action">
+                                <span>Employee Statuses</span>
+                                <p-button icon="pi pi-plus" label="New Status" [text]="true" size="small"
+                                    (click)="openNewStatusDialog()"></p-button>
+                            </div>
+                        </ng-template>
+                        <p-table [value]="statuses" [rows]="5" [paginator]="statuses.length > 5" [rowHover]="true" styleClass="p-datatable-sm">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Code</th>
+                                    <th>Color</th>
+                                    <th style="width: 100px">Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-status>
+                                <tr>
+                                    <td>
+                                        <span class="font-semibold">{{ status.name }}</span>
+                                    </td>
+                                    <td>
+                                        <code>{{ status.code }}</code>
+                                    </td>
+                                    <td>
+                                        <p-tag [value]="status.color || 'info'" [severity]="status.color || 'info'"></p-tag>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
+                                                pTooltip="Edit" (click)="editStatus(status)"></p-button>
+                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                                pTooltip="Delete" (click)="deleteStatus(status)"></p-button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td colspan="4" class="text-center text-color-secondary p-4">
+                                        <i class="pi pi-inbox text-2xl mb-2"></i>
+                                        <p>No statuses defined. Click "New Status" to add one.</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
                     </p-card>
 
                     <!-- Departments -->
@@ -1152,7 +1568,16 @@
             <div class="form-field">
                 <label for="category">Category *</label>
                 <p-select id="category" [options]="categories" formControlName="category_fk" optionLabel="name"
-                    class="w-full" appendTo="body"></p-select>
+                    optionValue="id" placeholder="Select category" [filter]="true" filterBy="name"
+                    class="w-full" appendTo="body">
+                    <ng-template pTemplate="empty">
+                        <div class="p-3 text-center">
+                            <p class="text-color-secondary mb-2">No categories found</p>
+                            <p-button label="Create Category" icon="pi pi-plus" size="small" [text]="true"
+                                (click)="openNewCategoryDialog()"></p-button>
+                        </div>
+                    </ng-template>
+                </p-select>
             </div>
             <div class="form-field">
                 <label for="department">Department *</label>
@@ -1169,21 +1594,23 @@
             </div>
             <div class="form-field">
                 <label for="status">Status *</label>
-                <p-select id="status" [options]="statusOptions" formControlName="EmpStatus" optionLabel="label"
-                    optionValue="value" class="w-full" appendTo="body"></p-select>
+                <p-select id="status" [options]="statuses.length > 0 ? statuses : statusOptions" formControlName="EmpStatus"
+                    [optionLabel]="statuses.length > 0 ? 'name' : 'label'"
+                    [optionValue]="statuses.length > 0 ? 'name' : 'value'"
+                    class="w-full" appendTo="body"></p-select>
             </div>
         </div>
 
         <div class="form-row">
             <div class="form-field">
                 <label for="team">Team</label>
-                <p-select id="team" [options]="teams" formControlName="team" optionLabel="name" [showClear]="true"
-                    placeholder="Select team" class="w-full" appendTo="body"></p-select>
+                <p-select id="team" [options]="teams" formControlName="team" optionLabel="name" optionValue="id"
+                    [showClear]="true" placeholder="Select team" class="w-full" appendTo="body"></p-select>
             </div>
             <div class="form-field">
                 <label for="trajet">Trajet</label>
-                <p-select id="trajet" [options]="trajets" formControlName="trajet" optionLabel="name" [showClear]="true"
-                    placeholder="Select trajet" class="w-full" appendTo="body"></p-select>
+                <p-select id="trajet" [options]="trajets" formControlName="trajet" optionLabel="name" optionValue="id"
+                    [showClear]="true" placeholder="Select trajet" class="w-full" appendTo="body"></p-select>
             </div>
         </div>
 
@@ -1758,6 +2185,114 @@
     <ng-template pTemplate="footer">
         <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showSpecializationDialog = false"></button>
         <button pButton [label]="isEditModeSpecialization ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveSpecialization()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Category Dialog -->
+<p-dialog [(visible)]="showCategoryDialog" [header]="isEditModeCategory ? 'Edit Category' : 'New Category'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="categoryForm" class="category-form">
+        <div class="form-field">
+            <label for="catName">Category Name *</label>
+            <input pInputText id="catName" formControlName="name" class="w-full"
+                placeholder="e.g., Technician Maintenance, Operator, Team Leader" />
+            <small class="text-color-secondary">This name will appear in the employee form dropdown</small>
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="catDesc">Description</label>
+            <textarea pInputTextarea id="catDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe this employee category..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showCategoryDialog = false"></button>
+        <button pButton [label]="isEditModeCategory ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveCategory()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Status Dialog -->
+<p-dialog [(visible)]="showStatusDialog" [header]="isEditModeStatus ? 'Edit Status' : 'New Status'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="statusForm" class="status-form">
+        <div class="form-field">
+            <label for="statusName">Status Name *</label>
+            <input pInputText id="statusName" formControlName="name" class="w-full"
+                placeholder="e.g., Active, Inactive, On Leave" />
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="statusCode">Code *</label>
+            <input pInputText id="statusCode" formControlName="code" class="w-full"
+                placeholder="e.g., active, inactive, on_leave" />
+            <small class="text-color-secondary">Used internally to match employee status</small>
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="statusColor">Color</label>
+            <p-select id="statusColor" formControlName="color" [options]="[
+                {label: 'Success (Green)', value: 'success'},
+                {label: 'Warning (Orange)', value: 'warning'},
+                {label: 'Danger (Red)', value: 'danger'},
+                {label: 'Info (Blue)', value: 'info'},
+                {label: 'Secondary (Gray)', value: 'secondary'}
+            ]" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></p-select>
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="statusDesc">Description</label>
+            <textarea pInputTextarea id="statusDesc" formControlName="description" rows="2" class="w-full"
+                placeholder="Description of this status..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showStatusDialog = false"></button>
+        <button pButton [label]="isEditModeStatus ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveStatus()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Plan Recyclage Dialog -->
+<p-dialog [(visible)]="showRecyclageDialog" header="Plan Recyclage Training" [modal]="true"
+    [style]="{width: '550px'}" [closable]="true">
+    <form [formGroup]="recyclageForm" class="recyclage-form">
+        <div class="form-field mb-3">
+            <label for="employee_name" class="font-semibold">Employee</label>
+            <input pInputText id="employee_name" formControlName="employee_name" class="w-full" [readonly]="true" />
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="formation_id" class="font-semibold">Formation <span class="text-danger">*</span></label>
+            <p-select id="formation_id" [options]="formations" formControlName="formation_id"
+                optionLabel="name" optionValue="id" placeholder="Select formation"
+                class="w-full" appendTo="body" [filter]="true"></p-select>
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="trainer_id" class="font-semibold">Trainer <span class="text-danger">*</span></label>
+            <p-select id="trainer_id" [options]="formateurs" formControlName="trainer_id"
+                optionLabel="name" optionValue="id" placeholder="Select trainer"
+                class="w-full" appendTo="body" [filter]="true"></p-select>
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="planned_date" class="font-semibold">Planned Date <span class="text-danger">*</span></label>
+            <p-datepicker id="planned_date" formControlName="planned_date" [showIcon]="true"
+                dateFormat="yy-mm-dd" class="w-full" appendTo="body"></p-datepicker>
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="notes" class="font-semibold">Notes</label>
+            <textarea pInputTextarea id="notes" formControlName="notes" rows="3" class="w-full"
+                placeholder="Additional notes..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showRecyclageDialog = false"></button>
+        <button pButton label="Plan Training" icon="pi pi-calendar-plus" (click)="saveRecyclage()"
+            [disabled]="recyclageForm.invalid"></button>
     </ng-template>
 </p-dialog>
 

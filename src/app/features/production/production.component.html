@@ -499,15 +499,6 @@
                                 size="small"
                                 (click)="openHourDialog(i)">
                             </p-button>
-                            <p-button
-                                *ngIf="hour.status === 'completed' && hour.hourlyProductionId"
-                                icon="pi pi-clock"
-                                severity="warn"
-                                size="small"
-                                [text]="true"
-                                pTooltip="Add Downtime"
-                                (click)="openDowntimeDialog(i)">
-                            </p-button>
                         </div>
                     </td>
                 </tr>
@@ -614,55 +605,122 @@
 
         <p-divider></p-divider>
 
-        <h4 class="section-title"><i class="pi pi-exclamation-triangle"></i> Downtime (Optional)</h4>
+        <h4 class="section-title">
+            <i class="pi pi-exclamation-triangle"></i> Downtimes
+            <span class="downtime-count-badge" *ngIf="hourProductionInput.downtimes && hourProductionInput.downtimes.length > 0">
+                ({{ hourProductionInput.downtimes.length }})
+            </span>
+        </h4>
 
-        <div class="checkbox-field">
-            <p-checkbox
-                [(ngModel)]="hourProductionInput.hasDowntime"
-                [binary]="true"
-                label="This hour had downtime"
-                inputId="hasDowntime">
-            </p-checkbox>
-        </div>
-
-        <div *ngIf="hourProductionInput.hasDowntime" class="downtime-inputs">
-            <div class="form-grid">
-                <div class="form-field">
-                    <label for="downtimeDuration">Duration (minutes) *</label>
-                    <p-inputNumber
-                        id="downtimeDuration"
-                        [(ngModel)]="hourProductionInput.downtime!.duration"
-                        [min]="1"
-                        suffix=" min"
-                        [style]="{ width: '100%' }">
-                    </p-inputNumber>
+        <!-- Existing Downtimes List -->
+        <div class="downtimes-list" *ngIf="hourProductionInput.downtimes && hourProductionInput.downtimes.length > 0">
+            <div class="downtime-item" *ngFor="let dt of hourProductionInput.downtimes; let idx = index">
+                <div class="downtime-item-content">
+                    <div class="downtime-item-header">
+                        <span class="downtime-duration">
+                            <i class="pi pi-clock"></i>
+                            {{ dt.duration }} min
+                        </span>
+                        <p-tag [value]="getDowntimeProblemName(dt.problemId)" severity="warn"></p-tag>
+                    </div>
+                    <div class="downtime-item-comment" *ngIf="dt.comment">
+                        {{ dt.comment }}
+                    </div>
                 </div>
-
-                <div class="form-field">
-                    <label for="downtimeProblem">Problem Category *</label>
-                    <p-select
-                        id="downtimeProblem"
-                        [(ngModel)]="hourProductionInput.downtime!.problemId"
-                        [options]="downtimeProblems"
-                        optionLabel="Name_DowntimeProblems"
-                        optionValue="Id_DowntimeProblems"
-                        placeholder="Select Problem"
-                        appendTo="body"
-                        [style]="{ width: '100%' }">
-                    </p-select>
+                <div class="downtime-item-actions">
+                    <p-button
+                        icon="pi pi-pencil"
+                        [text]="true"
+                        [rounded]="true"
+                        severity="info"
+                        size="small"
+                        pTooltip="Edit"
+                        (click)="editDowntimeInDialog(idx)">
+                    </p-button>
+                    <p-button
+                        icon="pi pi-trash"
+                        [text]="true"
+                        [rounded]="true"
+                        severity="danger"
+                        size="small"
+                        pTooltip="Remove"
+                        (click)="removeDowntimeFromDialog(idx)">
+                    </p-button>
                 </div>
             </div>
+            <div class="downtime-total">
+                <strong>Total Downtime:</strong> {{ getTotalDowntimeInDialog() }} min
+            </div>
+        </div>
 
-            <div class="form-field">
-                <label for="downtimeComment">Description</label>
-                <textarea
-                    id="downtimeComment"
-                    pTextarea
-                    [(ngModel)]="hourProductionInput.downtime!.comment"
-                    rows="3"
-                    class="w-full"
-                    placeholder="Describe the downtime issue and actions taken...">
-                </textarea>
+        <!-- Add New Downtime Form -->
+        <div class="add-downtime-section">
+            <p-button
+                *ngIf="!showAddDowntimeForm"
+                label="Add Downtime"
+                icon="pi pi-plus"
+                [outlined]="true"
+                size="small"
+                (click)="showAddDowntimeForm = true; resetNewDowntimeForm()">
+            </p-button>
+
+            <div *ngIf="showAddDowntimeForm" class="new-downtime-form">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="newDowntimeDuration">Duration (minutes) *</label>
+                        <p-inputNumber
+                            id="newDowntimeDuration"
+                            [(ngModel)]="newDowntimeInput.duration"
+                            [min]="1"
+                            [max]="60"
+                            [showButtons]="true"
+                            suffix=" min"
+                            [style]="{ width: '100%' }">
+                        </p-inputNumber>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="newDowntimeProblem">Problem Category *</label>
+                        <p-select
+                            id="newDowntimeProblem"
+                            [(ngModel)]="newDowntimeInput.problemId"
+                            [options]="downtimeProblems"
+                            optionLabel="Name_DowntimeProblems"
+                            optionValue="Id_DowntimeProblems"
+                            placeholder="Select Problem"
+                            appendTo="body"
+                            [style]="{ width: '100%' }">
+                        </p-select>
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <label for="newDowntimeComment">Description</label>
+                    <textarea
+                        id="newDowntimeComment"
+                        pTextarea
+                        [(ngModel)]="newDowntimeInput.comment"
+                        rows="2"
+                        class="w-full"
+                        placeholder="Describe the downtime issue...">
+                    </textarea>
+                </div>
+
+                <div class="form-actions-inline">
+                    <p-button
+                        [label]="editingDowntimeDialogIndex !== null ? 'Update' : 'Add'"
+                        icon="pi pi-check"
+                        size="small"
+                        (click)="confirmAddDowntimeInDialog()">
+                    </p-button>
+                    <p-button
+                        label="Cancel"
+                        icon="pi pi-times"
+                        [text]="true"
+                        size="small"
+                        (click)="cancelAddDowntimeInDialog()">
+                    </p-button>
+                </div>
             </div>
         </div>
     </div>
@@ -682,9 +740,9 @@
     </ng-template>
 </p-dialog>
 
-<!-- ADDITIONAL DOWNTIME DIALOG -->
+<!-- DOWNTIME DIALOG (Add or Edit) -->
 <p-dialog
-    header="Add Downtime Ticket"
+    [header]="editingDowntimeIndex !== null ? 'Modifier Downtime' : 'Ajouter Downtime'"
     [(visible)]="showDowntimeDialog"
     [modal]="true"
     [style]="{ width: '500px' }"
@@ -694,31 +752,34 @@
     <div class="dialog-content" *ngIf="downtimeHourIndex !== null">
         <div class="dialog-info">
             <p><strong>Hour {{ session.hours[downtimeHourIndex].hour }}</strong> ({{ session.hours[downtimeHourIndex].timeRange }})</p>
-            <p class="text-sm text-color-secondary">Add an additional downtime ticket for this hour</p>
+            <p class="text-sm text-color-secondary" *ngIf="editingDowntimeIndex === null">Ajouter un downtime pour cette heure</p>
+            <p class="text-sm text-color-secondary" *ngIf="editingDowntimeIndex !== null">Modifier le downtime existant pour cette heure</p>
         </div>
 
         <p-divider></p-divider>
 
         <div class="form-field">
-            <label for="addDowntimeProblem">Problem Category *</label>
+            <label for="addDowntimeProblem">Catégorie du problème *</label>
             <p-select
                 id="addDowntimeProblem"
                 [(ngModel)]="downtimeInput.Id_DowntimeProblems"
                 [options]="downtimeProblems"
                 optionLabel="Name_DowntimeProblems"
                 optionValue="Id_DowntimeProblems"
-                placeholder="Select Problem"
+                placeholder="Sélectionner le problème"
                 appendTo="body"
                 [style]="{ width: '100%' }">
             </p-select>
         </div>
 
         <div class="form-field">
-            <label for="addDowntimeDuration">Duration (minutes) *</label>
+            <label for="addDowntimeDuration">Durée (minutes) *</label>
             <p-inputNumber
                 id="addDowntimeDuration"
                 [(ngModel)]="downtimeInput.Total_Downtime"
                 [min]="1"
+                [max]="60"
+                [showButtons]="true"
                 suffix=" min"
                 [style]="{ width: '100%' }">
             </p-inputNumber>
@@ -730,22 +791,22 @@
                 id="addDowntimeComment"
                 pTextarea
                 [(ngModel)]="downtimeInput.Comment_Downtime"
-                rows="4"
+                rows="3"
                 class="w-full"
-                placeholder="Describe the downtime issue...">
+                placeholder="Décrivez le problème...">
             </textarea>
         </div>
     </div>
 
     <ng-template pTemplate="footer">
         <p-button
-            label="Cancel"
+            label="Annuler"
             icon="pi pi-times"
             [text]="true"
             (click)="closeDowntimeDialog()">
         </p-button>
         <p-button
-            label="Add Downtime"
+            [label]="editingDowntimeIndex !== null ? 'Modifier' : 'Ajouter'"
             icon="pi pi-check"
             (click)="saveAdditionalDowntime()">
         </p-button>

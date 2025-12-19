@@ -19,9 +19,27 @@
         "module": "ES2022",
         "baseUrl": "./",
         "paths": {
-            "@/*": [
-                "src/app/*"
-            ]
+            "@/*": ["src/app/*"],
+            "@core/*": ["src/app/core/*"],
+            "@core/services/*": ["src/app/core/services/*"],
+            "@core/models/*": ["src/app/core/models/*"],
+            "@core/guards/*": ["src/app/core/guards/*"],
+            "@shared/*": ["src/app/shared/*"],
+            "@domains/*": ["src/app/domains/*"],
+            "@domains/dms-production": ["src/app/domains/dms-production/index.ts"],
+            "@domains/dms-production/*": ["src/app/domains/dms-production/*"],
+            "@domains/dms-rh": ["src/app/domains/dms-rh/index.ts"],
+            "@domains/dms-rh/*": ["src/app/domains/dms-rh/*"],
+            "@domains/dms-quality": ["src/app/domains/dms-quality/index.ts"],
+            "@domains/dms-quality/*": ["src/app/domains/dms-quality/*"],
+            "@domains/dms-maintenance": ["src/app/domains/dms-maintenance/index.ts"],
+            "@domains/dms-maintenance/*": ["src/app/domains/dms-maintenance/*"],
+            "@domains/dms-inventory": ["src/app/domains/dms-inventory/index.ts"],
+            "@domains/dms-inventory/*": ["src/app/domains/dms-inventory/*"],
+            "@domains/dms-analytics": ["src/app/domains/dms-analytics/index.ts"],
+            "@domains/dms-analytics/*": ["src/app/domains/dms-analytics/*"],
+            "@layout/*": ["src/app/layout/*"],
+            "@features/*": ["src/app/features/*"]
         }
     },
     "angularCompilerOptions": {

@@ -76,10 +76,19 @@ export interface ShiftProductionSession {
     currentHourIndex: number | null;
 }
 
+export interface DowntimeDialogItem {
+    id?: number;
+    duration: number;
+    problemId: number;
+    machineId?: number;
+    comment: string;
+}
+
 export interface HourProductionInput {
     output: number;
     scrap: number;
     hasDowntime: boolean;
+    downtimes?: DowntimeDialogItem[];
     downtime?: {
         duration: number;
         problemId: number;

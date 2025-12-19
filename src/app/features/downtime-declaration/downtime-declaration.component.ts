@@ -20,6 +20,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { MaintenanceService, DowntimeDeclaration } from '../../core/services/maintenance.service';
 import { ProductionService } from '../production/production.service';
 import { EmployeeService } from '../../core/services/employee.service';
+import { DowntimeNotificationService, AlertPriority } from '../../core/services/downtime-notification.service';
 import { ProductionLine, Workstation, Machine } from '../../core/models';
 
 @Component({
@@ -108,6 +109,7 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
         private maintenanceService: MaintenanceService,
         private productionService: ProductionService,
         private employeeService: EmployeeService,
+        private notificationService: DowntimeNotificationService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService
     ) {}
@@ -183,18 +185,84 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             }
         });
 
-        // Load technicians (employees with category 'technician')
+        // Load technicians (employees with category 'technician' OR from Maintenance department)
+        this.loadTechnicians();
+    }
+
+    loadTechnicians(): void {
+        // First try to load technicians by category
         this.employeeService.getEmployees({ category: 'technician' }).subscribe({
             next: (response: any) => {
-                // Handle paginated response or direct array
+                const employees = Array.isArray(response) ? response : response.results || [];
+
+                if (employees.length > 0) {
+                    this.technicians = employees.map((e: any) => ({
+                        id: e.id,
+                        name: `${e.first_name} ${e.last_name}`,
+                        department: e.department
+                    }));
+                } else {
+                    // If no technicians found by category, try loading from Maintenance department
+                    this.loadTechniciansByDepartment();
+                }
+            },
+            error: (err) => {
+                console.error('Error loading technicians by category:', err);
+                // Fallback to department loading
+                this.loadTechniciansByDepartment();
+            }
+        });
+    }
+
+    loadTechniciansByDepartment(): void {
+        this.employeeService.getEmployees({ department: 'Maintenance' }).subscribe({
+            next: (response: any) => {
+                const employees = Array.isArray(response) ? response : response.results || [];
+
+                if (employees.length > 0) {
+                    this.technicians = employees.map((e: any) => ({
+                        id: e.id,
+                        name: `${e.first_name} ${e.last_name}`,
+                        department: e.department
+                    }));
+                } else {
+                    // If still no technicians, load all active employees as fallback
+                    this.loadAllActiveEmployees();
+                }
+            },
+            error: (err) => {
+                console.error('Error loading technicians by department:', err);
+                this.loadAllActiveEmployees();
+            }
+        });
+    }
+
+    loadAllActiveEmployees(): void {
+        this.employeeService.getEmployees({ status: 'active' }).subscribe({
+            next: (response: any) => {
                 const employees = Array.isArray(response) ? response : response.results || [];
                 this.technicians = employees.map((e: any) => ({
                     id: e.id,
-                    name: `${e.first_name} ${e.last_name}`
+                    name: `${e.first_name} ${e.last_name}`,
+                    department: e.department
                 }));
+
+                if (this.technicians.length === 0) {
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'No Technicians',
+                        detail: 'No technicians found in the system. Please add employees first.',
+                        life: 5000
+                    });
+                }
             },
             error: (err) => {
-                console.error('Error loading technicians:', err);
+                console.error('Error loading employees:', err);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to load technicians'
+                });
             }
         });
     }
@@ -319,10 +387,35 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
 
         this.maintenanceService.createDeclaration(declarationData).subscribe({
             next: (declaration) => {
+                // Send alert notification to maintenance team
+                this.notificationService.createDowntimeAlert({
+                    id: declaration.id,
+                    ticketNumber: declaration.ticket_number,
+                    workstation: declarationData.workstation?.toString(),
+                    workstationName: declaration.workstation_name || formValue.workstation?.Name_Workstation,
+                    productionLine: declarationData.production_line?.toString(),
+                    productionLineName: declaration.production_line_name || formValue.production_line?.name,
+                    machine: declarationData.machine?.toString(),
+                    machineName: declaration.machine_name || formValue.machine?.name,
+                    zone: formValue.production_line?.zone,
+                    reason: declarationData.reason,
+                    impactLevel: declarationData.impact_level as AlertPriority,
+                    declarationType: declarationData.declaration_type,
+                    declaredBy: declaration.declared_by_name
+                }).subscribe({
+                    next: () => {
+                        console.log('Alert sent to maintenance team');
+                    },
+                    error: (alertErr) => {
+                        console.warn('Could not send alert notification:', alertErr);
+                    }
+                });
+
                 this.messageService.add({
                     severity: 'success',
-                    summary: 'Success',
-                    detail: `Declaration ${declaration.ticket_number} created successfully`
+                    summary: 'Declaration Created',
+                    detail: `Declaration ${declaration.ticket_number} created and maintenance team notified`,
+                    life: 5000
                 });
                 this.showDeclarationDialog = false;
                 this.loadDeclarations();
@@ -387,15 +480,35 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
                     acknowledged_by: 1, // TODO: Get current user ID
                     assigned_technician: formValue.assigned_technician?.id
                 }).subscribe({
-                    next: () => this.handleActionSuccess('acknowledged'),
+                    next: () => {
+                        // Notify if technician assigned
+                        if (formValue.assigned_technician?.name) {
+                            this.notificationService.notifyTechnicianAssigned(id, formValue.assigned_technician.name);
+                        }
+                        this.handleActionSuccess('acknowledged');
+                    },
                     error: (err) => this.handleActionError(err)
                 });
                 break;
 
             case 'start_work':
-                const techId = formValue.assigned_technician?.id || 1; // TODO: Get current user ID
+                // Validate technician selection
+                if (!formValue.assigned_technician?.id) {
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Technician Required',
+                        detail: 'Please select a technician to start work on this downtime'
+                    });
+                    return;
+                }
+                const techId = formValue.assigned_technician.id;
+                const techName = formValue.assigned_technician.name;
                 this.maintenanceService.startWorkOnDeclaration(id, techId).subscribe({
-                    next: () => this.handleActionSuccess('started'),
+                    next: () => {
+                        // Notify that work has started
+                        this.notificationService.notifyWorkStarted(id, techName);
+                        this.handleActionSuccess('started');
+                    },
                     error: (err) => this.handleActionError(err)
                 });
                 break;
@@ -410,7 +523,11 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
                     return;
                 }
                 this.maintenanceService.resolveDeclaration(id, formValue.resolution_notes).subscribe({
-                    next: () => this.handleActionSuccess('resolved'),
+                    next: () => {
+                        // Notify that issue is resolved
+                        this.notificationService.notifyResolved(id, formValue.resolution_notes);
+                        this.handleActionSuccess('resolved');
+                    },
                     error: (err) => this.handleActionError(err)
                 });
                 break;

@@ -36,6 +36,15 @@ export interface EmployeeCategory {
     categoryDescription?: string;
 }
 
+export interface EmployeeStatus {
+    id?: number;
+    name: string;
+    code: string;
+    description?: string;
+    color?: string;  // 'success', 'warning', 'danger', 'info'
+    is_active?: boolean;
+}
+
 // ==================== TEAMS & TRANSPORT ====================
 export interface Team {
     id?: number;

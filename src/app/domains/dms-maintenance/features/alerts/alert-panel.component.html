@@ -1,0 +1,321 @@
+<div class="alert-panel-container">
+    <p-toast position="top-right"></p-toast>
+
+    <!-- Main Alert Card -->
+    <p-card styleClass="alert-card">
+        <!-- Card Header -->
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <div class="header-left">
+                    <p-avatar icon="pi pi-bell"
+                              [style]="{ 'background-color': hasUnread ? 'var(--red-100)' : 'var(--surface-100)', 'color': hasUnread ? 'var(--red-500)' : 'var(--text-color-secondary)' }"
+                              shape="circle"
+                              size="large">
+                    </p-avatar>
+                    <div class="header-title-section">
+                        <span class="card-title">Maintenance Alerts</span>
+                        <p-badge *ngIf="unreadCount > 0"
+                                 [value]="unreadCount.toString()"
+                                 severity="danger">
+                        </p-badge>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <p-button icon="pi pi-refresh"
+                              [rounded]="true"
+                              [text]="true"
+                              severity="secondary"
+                              size="small"
+                              pTooltip="Refresh"
+                              tooltipPosition="bottom"
+                              (onClick)="refresh()">
+                    </p-button>
+                    <p-button [icon]="expanded ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
+                              [rounded]="true"
+                              [text]="true"
+                              severity="secondary"
+                              size="small"
+                              pTooltip="Toggle size"
+                              tooltipPosition="bottom"
+                              (onClick)="toggleExpand()">
+                    </p-button>
+                    <p-button icon="pi pi-cog"
+                              [rounded]="true"
+                              [text]="true"
+                              severity="secondary"
+                              size="small"
+                              pTooltip="Settings"
+                              tooltipPosition="bottom"
+                              (onClick)="showSettings = true">
+                    </p-button>
+                </div>
+            </div>
+        </ng-template>
+
+        <!-- Connection Status -->
+        <div class="connection-status">
+            <p-tag [value]="isConnected ? 'Live' : 'Connecting...'"
+                   [severity]="isConnected ? 'success' : 'warn'"
+                   [rounded]="true"
+                   icon="pi pi-circle-fill">
+            </p-tag>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-row">
+            <p-select [options]="priorityOptions"
+                      [(ngModel)]="filterPriority"
+                      placeholder="All Priorities"
+                      [showClear]="true"
+                      (onChange)="applyFilters()">
+                <ng-template pTemplate="selectedItem" let-selected>
+                    <div class="flex align-items-center gap-2" *ngIf="selected">
+                        <p-tag [value]="selected.label" [severity]="getPrioritySeverity(selected.value)"></p-tag>
+                    </div>
+                </ng-template>
+                <ng-template pTemplate="item" let-item>
+                    <div class="flex align-items-center gap-2">
+                        <p-tag [value]="item.label" [severity]="getPrioritySeverity(item.value)"></p-tag>
+                    </div>
+                </ng-template>
+            </p-select>
+
+            <p-select [options]="typeOptions"
+                      [(ngModel)]="filterType"
+                      placeholder="All Types"
+                      [showClear]="true"
+                      (onChange)="applyFilters()">
+            </p-select>
+
+            <div class="flex-grow-1"></div>
+
+            <p-button *ngIf="unreadCount > 0"
+                      label="Mark all read"
+                      [text]="true"
+                      size="small"
+                      icon="pi pi-check-circle"
+                      (onClick)="markAllRead()">
+            </p-button>
+        </div>
+
+        <p-divider></p-divider>
+
+        <!-- Critical Alerts Banner -->
+        <p-message *ngIf="criticalAlerts.length > 0"
+                   severity="error"
+                   styleClass="w-full mb-3">
+            <ng-template pTemplate="content">
+                <div class="flex align-items-center gap-2 w-full">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    <span class="font-semibold">{{ criticalAlerts.length }} Critical Alert(s) - Immediate attention required</span>
+                </div>
+            </ng-template>
+        </p-message>
+
+        <!-- Alerts List -->
+        <div class="alerts-list-container" [style.height]="expanded ? '400px' : '280px'">
+            <!-- Empty State -->
+            <div class="empty-state" *ngIf="filteredAlerts.length === 0">
+                <p-avatar icon="pi pi-inbox"
+                          size="xlarge"
+                          [style]="{ 'background-color': 'var(--surface-100)', 'color': 'var(--text-color-secondary)' }">
+                </p-avatar>
+                <h4 class="mt-3 mb-1">No alerts</h4>
+                <p class="text-color-secondary m-0">All caught up!</p>
+            </div>
+
+            <!-- Alert Items -->
+            <p-card *ngFor="let alert of filteredAlerts; trackBy: trackByAlertId"
+                    styleClass="alert-item-card mb-2"
+                    [ngClass]="{'unread': alert.status === 'unread', 'priority-critical': alert.priority === 'critical', 'priority-high': alert.priority === 'high'}"
+                    (click)="handleAlertClick(alert)">
+
+                <ng-template pTemplate="header">
+                    <div class="alert-item-header">
+                        <!-- Icon + Title -->
+                        <div class="flex align-items-center gap-2 flex-1">
+                            <p-avatar [icon]="getTypeIcon(alert.type)"
+                                      size="normal"
+                                      [style]="{ 'background-color': getAvatarBg(alert.priority), 'color': getAvatarColor(alert.priority) }">
+                            </p-avatar>
+                            <div class="flex flex-column">
+                                <span class="font-semibold text-color" [class.font-bold]="alert.status === 'unread'">
+                                    {{ alert.title }}
+                                </span>
+                                <span class="text-xs text-color-secondary">{{ getTimeAgo(alert.createdAt) }}</span>
+                            </div>
+                        </div>
+                        <!-- Priority Tag -->
+                        <p-tag [value]="alert.priority | titlecase"
+                               [severity]="getPrioritySeverity(alert.priority)">
+                        </p-tag>
+                    </div>
+                </ng-template>
+
+                <!-- Alert Message -->
+                <p class="text-color-secondary text-sm m-0 mb-3">{{ alert.message }}</p>
+
+                <!-- Location Chips -->
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <p-chip *ngIf="alert.productionLine"
+                            [label]="alert.productionLine"
+                            icon="pi pi-sitemap"
+                            styleClass="chip-location">
+                    </p-chip>
+                    <p-chip *ngIf="alert.workstation"
+                            [label]="alert.workstation"
+                            icon="pi pi-desktop"
+                            styleClass="chip-location">
+                    </p-chip>
+                    <p-chip *ngIf="alert.machine"
+                            [label]="alert.machine"
+                            icon="pi pi-cog"
+                            styleClass="chip-location">
+                    </p-chip>
+                    <p-chip *ngIf="alert.declaredBy"
+                            [label]="alert.declaredBy"
+                            icon="pi pi-user"
+                            styleClass="chip-user">
+                    </p-chip>
+                </div>
+
+                <!-- Actions Footer -->
+                <ng-template pTemplate="footer">
+                    <div class="flex gap-2 flex-wrap" (click)="$event.stopPropagation()">
+                        <p-button *ngIf="alert.type === 'new_downtime'"
+                                  label="Acknowledge"
+                                  icon="pi pi-check"
+                                  size="small"
+                                  [outlined]="true"
+                                  (onClick)="acknowledgeAlert(alert)">
+                        </p-button>
+                        <p-button *ngIf="alert.type === 'new_downtime' || alert.type === 'acknowledged'"
+                                  label="Take Over"
+                                  icon="pi pi-user-plus"
+                                  size="small"
+                                  severity="success"
+                                  (onClick)="takeOverAlert(alert)">
+                        </p-button>
+                        <div class="flex-grow-1"></div>
+                        <p-button *ngIf="alert.status === 'unread'"
+                                  icon="pi pi-eye"
+                                  size="small"
+                                  [text]="true"
+                                  severity="secondary"
+                                  pTooltip="Mark as read"
+                                  (onClick)="markAsRead(alert)">
+                        </p-button>
+                        <p-button icon="pi pi-times"
+                                  size="small"
+                                  [text]="true"
+                                  severity="secondary"
+                                  pTooltip="Dismiss"
+                                  (onClick)="dismissAlert(alert)">
+                        </p-button>
+                    </div>
+                </ng-template>
+            </p-card>
+        </div>
+
+        <!-- Card Footer -->
+        <ng-template pTemplate="footer">
+            <div class="flex justify-content-between align-items-center">
+                <span class="text-sm text-color-secondary">
+                    <i class="pi pi-list mr-1"></i>
+                    {{ filteredAlerts.length }} alert(s) | {{ unreadCount }} unread
+                </span>
+                <p-button label="View All Tickets"
+                          icon="pi pi-external-link"
+                          [text]="true"
+                          size="small"
+                          (onClick)="viewAllTickets()">
+                </p-button>
+            </div>
+        </ng-template>
+    </p-card>
+
+    <!-- Settings Dialog -->
+    <p-dialog header="Notification Settings"
+              [(visible)]="showSettings"
+              [modal]="true"
+              [style]="{ width: '420px' }"
+              [draggable]="false"
+              [resizable]="false">
+
+        <div class="flex flex-column gap-4">
+            <!-- Sound Setting -->
+            <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+                <div class="flex align-items-center gap-3">
+                    <p-avatar icon="pi pi-volume-up"
+                              [style]="{ 'background-color': 'var(--primary-100)', 'color': 'var(--primary-color)' }">
+                    </p-avatar>
+                    <div>
+                        <div class="font-medium">Sound Alerts</div>
+                        <div class="text-sm text-color-secondary">Play sound on new alerts</div>
+                    </div>
+                </div>
+                <p-toggleSwitch [(ngModel)]="preferences.enableSound"
+                               (onChange)="savePreferences()">
+                </p-toggleSwitch>
+            </div>
+
+            <!-- Desktop Notifications -->
+            <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+                <div class="flex align-items-center gap-3">
+                    <p-avatar icon="pi pi-bell"
+                              [style]="{ 'background-color': 'var(--primary-100)', 'color': 'var(--primary-color)' }">
+                    </p-avatar>
+                    <div>
+                        <div class="font-medium">Desktop Notifications</div>
+                        <div class="text-sm text-color-secondary">Show browser notifications</div>
+                    </div>
+                </div>
+                <p-toggleSwitch [(ngModel)]="preferences.enableDesktop"
+                               (onChange)="savePreferences()">
+                </p-toggleSwitch>
+            </div>
+
+            <!-- Refresh Interval -->
+            <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+                <div class="flex align-items-center gap-3">
+                    <p-avatar icon="pi pi-sync"
+                              [style]="{ 'background-color': 'var(--primary-100)', 'color': 'var(--primary-color)' }">
+                    </p-avatar>
+                    <div>
+                        <div class="font-medium">Auto-refresh</div>
+                        <div class="text-sm text-color-secondary">Update interval</div>
+                    </div>
+                </div>
+                <p-select [options]="refreshIntervalOptions"
+                          [(ngModel)]="preferences.autoRefreshInterval"
+                          (onChange)="savePreferences()"
+                          [style]="{ width: '130px' }">
+                </p-select>
+            </div>
+
+            <!-- Critical Only -->
+            <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+                <div class="flex align-items-center gap-3">
+                    <p-avatar icon="pi pi-exclamation-triangle"
+                              [style]="{ 'background-color': 'var(--red-100)', 'color': 'var(--red-500)' }">
+                    </p-avatar>
+                    <div>
+                        <div class="font-medium">Critical Only</div>
+                        <div class="text-sm text-color-secondary">Show only critical alerts</div>
+                    </div>
+                </div>
+                <p-toggleSwitch [(ngModel)]="preferences.showCriticalOnly"
+                               (onChange)="applyFilters()">
+                </p-toggleSwitch>
+            </div>
+        </div>
+
+        <ng-template pTemplate="footer">
+            <p-button label="Close"
+                      icon="pi pi-times"
+                      [text]="true"
+                      (onClick)="showSettings = false">
+            </p-button>
+        </ng-template>
+    </p-dialog>
+</div>

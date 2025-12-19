@@ -35,6 +35,7 @@ import { ChipModule } from 'primeng/chip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { AccordionModule } from 'primeng/accordion';
 import { SelectButtonModule } from 'primeng/selectbutton';
+import { PaginatorModule } from 'primeng/paginator';
 import { MessageService, ConfirmationService } from 'primeng/api';
 
 // Services & Models
@@ -99,7 +100,8 @@ import {
         ChipModule,
         SkeletonModule,
         AccordionModule,
-        SelectButtonModule
+        SelectButtonModule,
+        PaginatorModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './hr.component.html',
@@ -140,6 +142,7 @@ export class HrComponent implements OnInit, OnDestroy {
     formateurs: Formateur[] = [];
     qualifications: Qualification[] = [];
     recyclageEmployees: RecyclageEmployee[] = [];
+    plannedRecyclages: any[] = [];
     versatilityMatrix: VersatilityMatrix | null = null;
     workstations: HRWorkstation[] = [];
     processes: HRProcess[] = [];
@@ -176,7 +179,7 @@ export class HrComponent implements OnInit, OnDestroy {
     selectedQuickFilter = 'all';
 
     // KPI Data for modern cards
-    kpiData: { label: string; value: number; icon: string; color: string; trend: number; progress: number }[] = [];
+    kpiData: { label: string; value: number | string; icon: string; color: string; trend: number; trendLabel?: string; progress: number }[] = [];
 
     // Dialogs
     showEmployeeDialog = false;
@@ -192,6 +195,9 @@ export class HrComponent implements OnInit, OnDestroy {
     showWorkstationDialog = false;
     showProcessDialog = false;
     showSpecializationDialog = false;
+    showCategoryDialog = false;
+    showStatusDialog = false;
+    showRecyclageDialog = false;
 
     // Forms
     employeeForm!: FormGroup;
@@ -206,6 +212,9 @@ export class HrComponent implements OnInit, OnDestroy {
     workstationForm!: FormGroup;
     processForm!: FormGroup;
     specializationForm!: FormGroup;
+    categoryForm!: FormGroup;
+    statusForm!: FormGroup;
+    recyclageForm!: FormGroup;
 
     // Edit Mode
     isEditMode = false;
@@ -220,6 +229,12 @@ export class HrComponent implements OnInit, OnDestroy {
     isEditModeFormateur = false;
     selectedSpecialization: TrainerSpecialization | null = null;
     isEditModeSpecialization = false;
+    selectedCategoryEntity: EmployeeCategory | null = null;
+    isEditModeCategory = false;
+    selectedStatusEntity: any | null = null;
+    isEditModeStatus = false;
+    statuses: any[] = [];
+    selectedRecyclageEmployee: RecyclageEmployee | null = null;
 
     // Photo upload
     employeePhotoPreview: string | null = null;
@@ -230,6 +245,7 @@ export class HrComponent implements OnInit, OnDestroy {
     // Charts
     employeesByDeptChart: any;
     employeesByCategoryChart: any;
+    employeesByStatusChart: any;
     formationsByTypeChart: any;
     chartOptions: any;
     pieChartOptions: any;
@@ -308,6 +324,31 @@ export class HrComponent implements OnInit, OnDestroy {
         { label: 'Expired', value: 'expired' },
         { label: 'Expiring Soon', value: 'expiring_soon' }
     ];
+
+    // Recyclage list filtering
+    filteredRecyclages: any[] = [];
+    recyclageSearchTerm = '';
+    recyclageStatusFilter: string | null = null;
+    recyclageStatusOptions = [
+        { label: 'Pending', value: 'pending' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Passed', value: 'passed' },
+        { label: 'Failed', value: 'failed' }
+    ];
+    showRecyclageDetailsDialog = false;
+    selectedRecyclageDetails: any = null;
+
+    // Employee Playlist for Recyclage
+    employeePlaylist: Employee[] = [];
+    filteredEmployeePlaylist: Employee[] = [];
+    selectedPlaylistEmployees: Employee[] = [];
+    playlistSearchTerm = '';
+    playlistDeptFilter: string | null = null;
+    playlistCategoryFilter: string | null = null;
+    playlistViewMode: 'grid' | 'list' = 'grid';
+    showBatchRecyclageDialog = false;
+    batchRecyclageForm!: FormGroup;
+    selectAllChecked = false;
 
     // Workstation process mode options
     processModeOptions = [
@@ -476,6 +517,34 @@ export class HrComponent implements OnInit, OnDestroy {
             description: [''],
             is_active: [true]
         });
+
+        this.categoryForm = this.fb.group({
+            name: ['', Validators.required],
+            description: ['']
+        });
+
+        this.statusForm = this.fb.group({
+            name: ['', Validators.required],
+            code: ['', Validators.required],
+            description: [''],
+            color: ['info']
+        });
+
+        this.recyclageForm = this.fb.group({
+            employee_id: [null, Validators.required],
+            employee_name: [''],
+            formation_id: [null, Validators.required],
+            trainer_id: [null, Validators.required],
+            planned_date: [new Date(), Validators.required],
+            notes: ['']
+        });
+
+        this.batchRecyclageForm = this.fb.group({
+            formation_id: [null, Validators.required],
+            trainer_id: [null],
+            planned_date: [new Date(), Validators.required],
+            notes: ['']
+        });
     }
 
     private initChartOptions(): void {
@@ -592,20 +661,36 @@ export class HrComponent implements OnInit, OnDestroy {
                     recentHires: [],
                     employeesRequiringRecyclage: stats.employees_requiring_recyclage,
                     qualificationCompletionRate: stats.qualification_rate,
-                    averageVersatility: 2.4
+                    averageVersatility: stats.average_versatility || 0
+                };
+
+                // Map formation type codes to display labels
+                const typeLabels: { [key: string]: string } = {
+                    'initial': 'Initial Training',
+                    'refresher': 'Refresher Training',
+                    'certification': 'Certification',
+                    'safety': 'Safety Training'
                 };
 
                 this.formationStats = {
                     totalFormations: stats.total_formations,
                     plannedFormations: stats.pending_qualifications,
                     completedFormations: stats.passed_qualifications,
-                    formationsByType: [
-                        { type: 'Safety', count: Math.floor(stats.total_formations * 0.33) },
-                        { type: 'Technical', count: Math.floor(stats.total_formations * 0.40) },
-                        { type: 'Quality', count: Math.floor(stats.total_formations * 0.27) }
-                    ],
+                    formationsByType: (stats.formations_by_type || []).map((f: any) => ({
+                        type: typeLabels[f.type] || f.type,
+                        count: f.count
+                    })),
                     upcomingFormations: []
                 };
+
+                // Store additional stats for KPIs
+                (this.dashboardStats as any).recentHiresCount = stats.recent_hires;
+                (this.dashboardStats as any).onLeaveEmployees = stats.on_leave_employees;
+                (this.dashboardStats as any).employeesWithVersatility = stats.employees_with_versatility;
+                (this.dashboardStats as any).employeesByStatus = stats.employees_by_status?.map((s: any) => ({
+                    status: s.status,
+                    count: s.count
+                })) || [];
 
                 this.updateCharts();
                 this.updateKpiData();
@@ -644,6 +729,7 @@ export class HrComponent implements OnInit, OnDestroy {
             next: (data) => {
                 this.employees = data;
                 this.loading = false;
+                this.loadEmployeePlaylist(); // Update playlist when employees are loaded
             },
             error: (err) => {
                 this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load employees' });
@@ -664,6 +750,10 @@ export class HrComponent implements OnInit, OnDestroy {
         this.hrService.getEmployeeCategories().subscribe({
             next: (data) => this.categories = data,
             error: (err) => { console.error('Failed to load categories:', err); this.categories = []; }
+        });
+        this.hrService.getEmployeeStatuses().subscribe({
+            next: (data) => this.statuses = data,
+            error: (err) => { console.error('Failed to load statuses:', err); this.statuses = []; }
         });
         this.hrService.getFormations().subscribe({
             next: (data) => {
@@ -699,6 +789,7 @@ export class HrComponent implements OnInit, OnDestroy {
 
         // Load recyclage employees from API
         this.loadRecyclageEmployees();
+        this.loadPlannedRecyclages();
 
         // Load versatility matrix from API
         this.loadVersatilityMatrix();
@@ -793,6 +884,309 @@ export class HrComponent implements OnInit, OnDestroy {
         });
     }
 
+    loadPlannedRecyclages(): void {
+        // Load qualifications with pending or in_progress status (these are planned recyclages)
+        this.hrService.getQualifications({}).subscribe({
+            next: (qualifications: any[]) => {
+                // Filter to show only pending and in_progress
+                this.plannedRecyclages = qualifications.filter(
+                    q => q.test_result === 'pending' || q.test_result === 'in_progress'
+                );
+                this.filterRecyclages(); // Apply initial filtering
+            },
+            error: (err) => {
+                console.error('Error loading planned recyclages:', err);
+                this.plannedRecyclages = [];
+                this.filteredRecyclages = [];
+            }
+        });
+    }
+
+    // Filter recyclages based on search and status
+    filterRecyclages(): void {
+        let filtered = [...this.plannedRecyclages];
+
+        // Filter by search term
+        if (this.recyclageSearchTerm) {
+            const term = this.recyclageSearchTerm.toLowerCase();
+            filtered = filtered.filter(q =>
+                q.employee_name?.toLowerCase().includes(term) ||
+                q.formation_name?.toLowerCase().includes(term)
+            );
+        }
+
+        // Filter by status
+        if (this.recyclageStatusFilter) {
+            filtered = filtered.filter(q => q.test_result === this.recyclageStatusFilter);
+        }
+
+        this.filteredRecyclages = filtered;
+    }
+
+    // Get count of recyclages by status
+    getRecyclageCountByStatus(status: string): number {
+        return this.plannedRecyclages.filter(q => q.test_result === status).length;
+    }
+
+    // Calculate days until a date
+    getDaysUntilDate(dateStr: string | Date): number {
+        if (!dateStr) return 0;
+        const date = new Date(dateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        const diffTime = date.getTime() - today.getTime();
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // Get absolute value (for template)
+    getAbsValue(num: number): number {
+        return Math.abs(num);
+    }
+
+    // View recyclage details
+    viewRecyclageDetails(qualification: any): void {
+        this.selectedRecyclageDetails = qualification;
+        this.showRecyclageDetailsDialog = true;
+    }
+
+    // ==================== EMPLOYEE PLAYLIST ====================
+    loadEmployeePlaylist(): void {
+        this.employeePlaylist = [...this.employees];
+        this.filterEmployeePlaylist();
+    }
+
+    filterEmployeePlaylist(): void {
+        let filtered = [...this.employees];
+
+        // Filter by search term
+        if (this.playlistSearchTerm) {
+            const term = this.playlistSearchTerm.toLowerCase();
+            filtered = filtered.filter(emp =>
+                emp.Prenom_Emp?.toLowerCase().includes(term) ||
+                emp.Nom_Emp?.toLowerCase().includes(term) ||
+                emp.BadgeNumber?.toLowerCase().includes(term) ||
+                emp.Id_Emp?.toString().includes(term)
+            );
+        }
+
+        // Filter by department
+        if (this.playlistDeptFilter) {
+            filtered = filtered.filter(emp => emp.Departement_Emp === this.playlistDeptFilter);
+        }
+
+        // Filter by category
+        if (this.playlistCategoryFilter) {
+            filtered = filtered.filter(emp =>
+                emp.Categorie_Emp === this.playlistCategoryFilter ||
+                emp.category_fk?.name === this.playlistCategoryFilter
+            );
+        }
+
+        this.filteredEmployeePlaylist = filtered;
+    }
+
+    toggleEmployeeSelection(employee: Employee): void {
+        const index = this.selectedPlaylistEmployees.findIndex(e => e.Id_Emp === employee.Id_Emp);
+        if (index > -1) {
+            this.selectedPlaylistEmployees.splice(index, 1);
+        } else {
+            this.selectedPlaylistEmployees.push(employee);
+        }
+    }
+
+    isEmployeeSelected(employee: Employee): boolean {
+        return this.selectedPlaylistEmployees.some(e => e.Id_Emp === employee.Id_Emp);
+    }
+
+    selectAllFilteredEmployees(): void {
+        this.selectedPlaylistEmployees = [...this.filteredEmployeePlaylist];
+    }
+
+    clearEmployeeSelection(): void {
+        this.selectedPlaylistEmployees = [];
+    }
+
+    getEmployeeQualificationCount(empId: number): number {
+        return this.qualifications.filter(q => q.Id_Emp === empId && q.test_result === 'passed').length;
+    }
+
+    openBatchRecyclageDialog(): void {
+        if (this.selectedPlaylistEmployees.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please select at least one employee'
+            });
+            return;
+        }
+        this.batchRecyclageForm.reset({
+            planned_date: new Date()
+        });
+        this.showBatchRecyclageDialog = true;
+    }
+
+    saveBatchRecyclage(): void {
+        if (this.batchRecyclageForm.invalid) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please fill all required fields'
+            });
+            return;
+        }
+
+        const formValue = this.batchRecyclageForm.value;
+        let completed = 0;
+        let errors = 0;
+
+        this.selectedPlaylistEmployees.forEach(emp => {
+            const qualificationData = {
+                employee: emp.Id_Emp,
+                formation: formValue.formation_id,
+                trainer: formValue.trainer_id || null,
+                start_date: formValue.planned_date,
+                test_result: 'pending',
+                notes: formValue.notes || ''
+            };
+
+            this.hrService.createQualification(qualificationData as any).subscribe({
+                next: () => {
+                    completed++;
+                    if (completed + errors === this.selectedPlaylistEmployees.length) {
+                        this.finishBatchRecyclage(completed, errors);
+                    }
+                },
+                error: () => {
+                    errors++;
+                    if (completed + errors === this.selectedPlaylistEmployees.length) {
+                        this.finishBatchRecyclage(completed, errors);
+                    }
+                }
+            });
+        });
+    }
+
+    private finishBatchRecyclage(completed: number, errors: number): void {
+        if (completed > 0) {
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: `Recyclage planned for ${completed} employee(s)`
+            });
+        }
+        if (errors > 0) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: `Failed for ${errors} employee(s)`
+            });
+        }
+        this.showBatchRecyclageDialog = false;
+        this.selectedPlaylistEmployees = [];
+        this.loadPlannedRecyclages();
+    }
+
+    openSingleRecyclageFromPlaylist(employee: Employee): void {
+        // Create a RecyclageEmployee-like object for the existing planRecyclage method
+        const recyclageEmployee: any = {
+            Id_Emp: employee.Id_Emp,
+            Employee: {
+                Id_Emp: employee.Id_Emp,
+                Prenom_Emp: employee.Prenom_Emp,
+                Nom_Emp: employee.Nom_Emp,
+                Picture: employee.Picture
+            }
+        };
+        this.planRecyclage(recyclageEmployee);
+    }
+
+    updateRecyclageStatus(qualification: any, newStatus: string): void {
+        this.hrService.updateQualification(qualification.id, { test_result: newStatus }).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Status updated successfully'
+                });
+                this.loadPlannedRecyclages();
+                this.loadRecyclageEmployees();
+            },
+            error: (err) => {
+                console.error('Error updating status:', err);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to update status'
+                });
+            }
+        });
+    }
+
+    completeRecyclage(qualification: any): void {
+        const endDate = new Date().toISOString().split('T')[0];
+        this.hrService.updateQualification(qualification.id, {
+            test_result: 'passed',
+            end_qualif: new Date(endDate)
+        } as any).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Recyclage completed successfully'
+                });
+                this.loadPlannedRecyclages();
+                this.loadRecyclageEmployees();
+            },
+            error: (err) => {
+                console.error('Error completing recyclage:', err);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to complete recyclage'
+                });
+            }
+        });
+    }
+
+    getQualificationStatusSeverity(status: string): string {
+        switch (status) {
+            case 'passed': return 'success';
+            case 'failed': return 'danger';
+            case 'in_progress': return 'info';
+            case 'pending': return 'warn';
+            default: return 'secondary';
+        }
+    }
+
+    deleteQualification(qualification: any): void {
+        this.confirmationService.confirm({
+            message: 'Are you sure you want to delete this planned recyclage?',
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteQualification(qualification.id).subscribe({
+                    next: () => {
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Success',
+                            detail: 'Planned recyclage deleted'
+                        });
+                        this.loadPlannedRecyclages();
+                    },
+                    error: (err) => {
+                        console.error('Error deleting qualification:', err);
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Error',
+                            detail: 'Failed to delete planned recyclage'
+                        });
+                    }
+                });
+            }
+        });
+    }
+
     loadVersatilityMatrix(): void {
         this.hrService.getVersatilityMatrix().subscribe({
             next: (data: any) => {
@@ -832,30 +1226,90 @@ export class HrComponent implements OnInit, OnDestroy {
 
     private updateCharts(): void {
         if (this.dashboardStats) {
-            this.employeesByDeptChart = {
-                labels: this.dashboardStats.employeesByDepartment.map(d => d.department),
-                datasets: [{
-                    data: this.dashboardStats.employeesByDepartment.map(d => d.count),
-                    backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
-                }]
-            };
+            const deptColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6'];
+            const catColors = ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#22D3EE', '#F472B6', '#2DD4BF'];
 
-            this.employeesByCategoryChart = {
-                labels: this.dashboardStats.employeesByCategory.map(c => c.category),
-                datasets: [{
-                    data: this.dashboardStats.employeesByCategory.map(c => c.count),
-                    backgroundColor: ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA']
-                }]
+            if (this.dashboardStats.employeesByDepartment.length > 0) {
+                this.employeesByDeptChart = {
+                    labels: this.dashboardStats.employeesByDepartment.map(d => d.department || 'Unknown'),
+                    datasets: [{
+                        data: this.dashboardStats.employeesByDepartment.map(d => d.count),
+                        backgroundColor: this.dashboardStats.employeesByDepartment.map((_, i) => deptColors[i % deptColors.length])
+                    }]
+                };
+            } else {
+                this.employeesByDeptChart = {
+                    labels: ['No data'],
+                    datasets: [{ data: [0], backgroundColor: ['#CBD5E1'] }]
+                };
+            }
+
+            if (this.dashboardStats.employeesByCategory.length > 0) {
+                this.employeesByCategoryChart = {
+                    labels: this.dashboardStats.employeesByCategory.map(c => c.category || 'Unknown'),
+                    datasets: [{
+                        data: this.dashboardStats.employeesByCategory.map(c => c.count),
+                        backgroundColor: this.dashboardStats.employeesByCategory.map((_, i) => catColors[i % catColors.length])
+                    }]
+                };
+            } else {
+                this.employeesByCategoryChart = {
+                    labels: ['No data'],
+                    datasets: [{ data: [0], backgroundColor: ['#CBD5E1'] }]
+                };
+            }
+
+            // Employees by Status chart
+            const statusLabels: { [key: string]: string } = {
+                'active': 'Active',
+                'inactive': 'Inactive',
+                'on_leave': 'On Leave',
+                'terminated': 'Terminated',
+                'suspended': 'Suspended'
             };
+            const statusColors: { [key: string]: string } = {
+                'active': '#10B981',      // Green
+                'inactive': '#6B7280',    // Gray
+                'on_leave': '#F59E0B',    // Orange
+                'terminated': '#EF4444',  // Red
+                'suspended': '#8B5CF6'    // Purple
+            };
+            const employeesByStatus = (this.dashboardStats as any).employeesByStatus || [];
+
+            if (employeesByStatus.length > 0) {
+                this.employeesByStatusChart = {
+                    labels: employeesByStatus.map((s: any) => statusLabels[s.status] || s.status),
+                    datasets: [{
+                        data: employeesByStatus.map((s: any) => s.count),
+                        backgroundColor: employeesByStatus.map((s: any) => statusColors[s.status] || '#CBD5E1')
+                    }]
+                };
+            } else {
+                this.employeesByStatusChart = {
+                    labels: ['No data'],
+                    datasets: [{ data: [0], backgroundColor: ['#CBD5E1'] }]
+                };
+            }
         }
 
-        if (this.formationStats) {
+        if (this.formationStats && this.formationStats.formationsByType.length > 0) {
+            const formationColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
             this.formationsByTypeChart = {
                 labels: this.formationStats.formationsByType.map(f => f.type),
                 datasets: [{
                     label: 'Formations',
                     data: this.formationStats.formationsByType.map(f => f.count),
-                    backgroundColor: '#3B82F6'
+                    backgroundColor: this.formationStats.formationsByType.map((_, i) => formationColors[i % formationColors.length])
+                }]
+            };
+        } else {
+            // Fallback if no data
+            this.formationsByTypeChart = {
+                labels: ['No data'],
+                datasets: [{
+                    label: 'Formations',
+                    data: [0],
+                    backgroundColor: '#CBD5E1'
                 }]
             };
         }
@@ -880,11 +1334,18 @@ export class HrComponent implements OnInit, OnDestroy {
         }
 
         if (this.selectedCategory) {
-            result = result.filter(emp => emp.Categorie_Emp === this.selectedCategory);
+            result = result.filter(emp => {
+                const empCategory = (emp as any).category_fk_detail?.name || emp.Categorie_Emp;
+                return empCategory?.toLowerCase() === this.selectedCategory?.toLowerCase();
+            });
         }
 
         if (this.selectedStatus) {
-            result = result.filter(emp => emp.EmpStatus === this.selectedStatus);
+            result = result.filter(emp => {
+                const empStatus = (emp.EmpStatus || (emp as any).status || '').toLowerCase().replace(/[_\s]/g, '');
+                const filterStatus = this.selectedStatus!.toLowerCase().replace(/[_\s]/g, '');
+                return empStatus === filterStatus;
+            });
         }
 
         return result;
@@ -963,41 +1424,27 @@ export class HrComponent implements OnInit, OnDestroy {
         const category = emp.Categorie_Emp || emp.category || '';
 
         // Find team, trajet and category objects from the loaded lists
-        // The dropdowns use objects with optionLabel="name", not just IDs
-        // Handle both ID (number) and object formats from backend
-        // Use _detail fields from backend (nested serializers) or fall back to ID fields
-        const teamDetail = emp.team_detail;
-        const trajetDetail = emp.trajet_detail;
-        const categoryFkDetail = emp.category_fk_detail;
-        const teamId = emp.team;
-        const trajetId = emp.trajet;
-        const categoryFkId = emp.category_fk;
+        // Extract IDs for dropdowns (using optionValue="id" in template)
+        // Handle both _detail objects and direct ID values from backend
+        const teamId = emp.team_detail?.id || (typeof emp.team === 'object' ? emp.team?.id : emp.team) || null;
+        const trajetId = emp.trajet_detail?.id || (typeof emp.trajet === 'object' ? emp.trajet?.id : emp.trajet) || null;
 
-        // Get team - prefer _detail object, fall back to ID lookup
-        let selectedTeam = null;
-        if (teamDetail && teamDetail.id) {
-            selectedTeam = this.teams.find(t => t.id === teamDetail.id);
-        } else if (teamId) {
-            const id = typeof teamId === 'object' ? teamId.id : teamId;
-            selectedTeam = this.teams.find(t => t.id === id);
-        }
+        // Get category_fk ID - try multiple sources:
+        // 1. From category_fk_detail (nested serializer)
+        // 2. From category_fk directly (might be ID or object)
+        // 3. Fallback: try to find category by name from the old 'category' field
+        let categoryFkId = emp.category_fk_detail?.id || (typeof emp.category_fk === 'object' ? emp.category_fk?.id : emp.category_fk) || null;
 
-        // Get trajet - prefer _detail object, fall back to ID lookup
-        let selectedTrajet = null;
-        if (trajetDetail && trajetDetail.id) {
-            selectedTrajet = this.trajets.find(t => t.id === trajetDetail.id);
-        } else if (trajetId) {
-            const id = typeof trajetId === 'object' ? trajetId.id : trajetId;
-            selectedTrajet = this.trajets.find(t => t.id === id);
-        }
-
-        // Get category - prefer _detail object, fall back to ID lookup
-        let selectedCategoryFk = null;
-        if (categoryFkDetail && categoryFkDetail.id) {
-            selectedCategoryFk = this.categories.find(c => c.id === categoryFkDetail.id);
-        } else if (categoryFkId) {
-            const id = typeof categoryFkId === 'object' ? categoryFkId.id : categoryFkId;
-            selectedCategoryFk = this.categories.find(c => c.id === id);
+        // If category_fk is null but we have an old category string, try to find matching category by name
+        if (!categoryFkId && (emp.category || emp.Categorie_Emp)) {
+            const oldCategoryValue = (emp.category || emp.Categorie_Emp || '').toLowerCase();
+            const matchingCategory = this.categories.find(c =>
+                c.name.toLowerCase() === oldCategoryValue ||
+                c.name.toLowerCase().replace(/[_\s]/g, '') === oldCategoryValue.replace(/[_\s]/g, '')
+            );
+            if (matchingCategory) {
+                categoryFkId = matchingCategory.id;
+            }
         }
 
         this.employeeForm.patchValue({
@@ -1005,13 +1452,15 @@ export class HrComponent implements OnInit, OnDestroy {
             Prenom_Emp: emp.Prenom_Emp || emp.first_name || '',
             DateNaissance_Emp: dateOfBirth,
             Genre_Emp: emp.Genre_Emp || emp.gender || 'M',
-            category_fk: selectedCategoryFk || null,
+            category_fk: categoryFkId,
             DateEmbauche_Emp: hireDate,
             Departement_Emp: emp.Departement_Emp || emp.department || '',
             EmpStatus: displayStatus,
-            team: selectedTeam || null,
-            trajet: selectedTrajet || null,
-            BadgeNumber: emp.BadgeNumber || emp.employee_id || ''
+            team: teamId,
+            trajet: trajetId,
+            BadgeNumber: emp.BadgeNumber || emp.employee_id || '',
+            email: emp.email || '',
+            phone: emp.phone || ''
         });
 
         this.showEmployeeDialog = true;
@@ -1087,6 +1536,14 @@ export class HrComponent implements OnInit, OnDestroy {
         // Optional badge number
         if (employeeData.BadgeNumber) {
             formData.append('employee_id', employeeData.BadgeNumber);
+        }
+
+        // Optional contact fields
+        if (employeeData.email) {
+            formData.append('email', employeeData.email);
+        }
+        if (employeeData.phone) {
+            formData.append('phone', employeeData.phone);
         }
 
         // Dates
@@ -1419,6 +1876,177 @@ export class HrComponent implements OnInit, OnDestroy {
             .map(s => ({ label: s.name, value: s.name }));
     }
 
+    // ==================== EMPLOYEE CATEGORIES ====================
+    openNewCategoryDialog(): void {
+        this.isEditModeCategory = false;
+        this.selectedCategoryEntity = null;
+        this.categoryForm.reset();
+        this.showCategoryDialog = true;
+    }
+
+    editCategory(category: EmployeeCategory): void {
+        this.isEditModeCategory = true;
+        this.selectedCategoryEntity = category;
+        this.categoryForm.patchValue({
+            name: category.name,
+            description: category.description || ''
+        });
+        this.showCategoryDialog = true;
+    }
+
+    saveCategory(): void {
+        if (this.categoryForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const categoryData = {
+            name: this.categoryForm.value.name,
+            description: this.categoryForm.value.description || ''  // Ensure description is never null
+        };
+
+        if (this.isEditModeCategory && this.selectedCategoryEntity) {
+            this.hrService.updateCategory(this.selectedCategoryEntity.id!, categoryData).subscribe({
+                next: (updated) => {
+                    const index = this.categories.findIndex(c => c.id === updated.id);
+                    if (index > -1) this.categories[index] = updated;
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Category updated successfully' });
+                    this.showCategoryDialog = false;
+                    this.loadCategories();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createCategory(categoryData).subscribe({
+                next: (newCategory) => {
+                    this.categories.push(newCategory);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Category created successfully' });
+                    this.showCategoryDialog = false;
+                    this.loadCategories();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteCategory(category: EmployeeCategory): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete the category "${category.name}"? Employees using this category will have their category set to null.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteCategory(category.id!).subscribe({
+                    next: () => {
+                        this.categories = this.categories.filter(c => c.id !== category.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Category deleted successfully' });
+                    },
+                    error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete category. It may be in use.' })
+                });
+            }
+        });
+    }
+
+    loadCategories(): void {
+        this.hrService.getEmployeeCategories().subscribe({
+            next: (data) => this.categories = data,
+            error: (err) => { console.error('Failed to load categories:', err); this.categories = []; }
+        });
+    }
+
+    // ==================== STATUS CRUD ====================
+    openNewStatusDialog(): void {
+        this.isEditModeStatus = false;
+        this.selectedStatusEntity = null;
+        this.statusForm.reset({ color: 'info' });
+        this.showStatusDialog = true;
+    }
+
+    editStatus(status: any): void {
+        this.isEditModeStatus = true;
+        this.selectedStatusEntity = status;
+        this.statusForm.patchValue({
+            name: status.name,
+            code: status.code,
+            description: status.description || '',
+            color: status.color || 'info'
+        });
+        this.showStatusDialog = true;
+    }
+
+    saveStatus(): void {
+        if (this.statusForm.invalid) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            return;
+        }
+
+        const statusData = {
+            name: this.statusForm.value.name,
+            code: this.statusForm.value.code,
+            description: this.statusForm.value.description || '',
+            color: this.statusForm.value.color || 'info'
+        };
+
+        if (this.isEditModeStatus && this.selectedStatusEntity) {
+            this.hrService.updateStatus(this.selectedStatusEntity.id!, statusData).subscribe({
+                next: () => {
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Status updated successfully' });
+                    this.showStatusDialog = false;
+                    this.loadStatuses();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        } else {
+            this.hrService.createStatus(statusData).subscribe({
+                next: (newStatus) => {
+                    this.statuses.push(newStatus);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Status created successfully' });
+                    this.showStatusDialog = false;
+                    this.loadStatuses();
+                },
+                error: (err) => {
+                    const errorDetail = this.parseApiError(err);
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                }
+            });
+        }
+    }
+
+    deleteStatus(status: any): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete the status "${status.name}"?`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            accept: () => {
+                this.hrService.deleteStatus(status.id).subscribe({
+                    next: () => {
+                        this.statuses = this.statuses.filter(s => s.id !== status.id);
+                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Status deleted successfully' });
+                    },
+                    error: (err) => {
+                        const errorDetail = this.parseApiError(err);
+                        this.messageService.add({ severity: 'error', summary: 'Error', detail: errorDetail });
+                    }
+                });
+            }
+        });
+    }
+
+    loadStatuses(): void {
+        this.hrService.getEmployeeStatuses().subscribe({
+            next: (data) => this.statuses = data,
+            error: (err) => { console.error('Failed to load statuses:', err); this.statuses = []; }
+        });
+    }
+
     // ==================== QUALIFICATION ====================
     openNewQualificationDialog(): void {
         this.qualificationForm.reset({
@@ -1682,12 +2310,63 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     planRecyclage(employee: RecyclageEmployee): void {
-        this.messageService.add({
-            severity: 'info',
-            summary: 'Plan Recyclage',
-            detail: `Planning recyclage for ${employee.Employee.Prenom_Emp} ${employee.Employee.Nom_Emp}`
+        this.selectedRecyclageEmployee = employee;
+        this.recyclageForm.reset();
+        this.recyclageForm.patchValue({
+            employee_id: employee.Id_Emp,
+            employee_name: `${employee.Employee.Prenom_Emp} ${employee.Employee.Nom_Emp}`,
+            planned_date: new Date()
         });
-        // TODO: Open dialog to plan recyclage
+        this.showRecyclageDialog = true;
+    }
+
+    saveRecyclage(): void {
+        if (this.recyclageForm.invalid) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Please fill all required fields'
+            });
+            return;
+        }
+
+        const formData = this.recyclageForm.value;
+
+        // Format date for API
+        const plannedDate = formData.planned_date instanceof Date
+            ? formData.planned_date.toISOString().split('T')[0]
+            : formData.planned_date;
+
+        // Create qualification record for recyclage
+        const qualificationData = {
+            employee: formData.employee_id,
+            formation: formData.formation_id,
+            trainer: formData.trainer_id,
+            start_date: plannedDate,
+            test_result: 'pending',
+            notes: formData.notes || 'Recyclage training'
+        };
+
+        this.hrService.createQualification(qualificationData).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Recyclage planned successfully'
+                });
+                this.showRecyclageDialog = false;
+                this.loadRecyclageEmployees();
+                this.loadPlannedRecyclages();
+            },
+            error: (err) => {
+                console.error('Error planning recyclage:', err);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to plan recyclage'
+                });
+            }
+        });
     }
 
     // ==================== USER MANAGEMENT ====================
@@ -2344,13 +3023,23 @@ export class HrComponent implements OnInit, OnDestroy {
     updateKpiData(): void {
         if (!this.dashboardStats) return;
 
+        const stats = this.dashboardStats as any;
+        const activeRate = this.dashboardStats.totalEmployees > 0
+            ? Math.round((this.dashboardStats.activeEmployees / this.dashboardStats.totalEmployees) * 100)
+            : 0;
+        const recyclageRate = this.dashboardStats.totalEmployees > 0
+            ? Math.round((this.dashboardStats.employeesRequiringRecyclage / this.dashboardStats.totalEmployees) * 100)
+            : 0;
+        const versatilityPercent = Math.round((this.dashboardStats.averageVersatility / 4) * 100);
+
         this.kpiData = [
             {
                 label: 'Total Employees',
                 value: this.dashboardStats.totalEmployees,
                 icon: 'pi pi-users',
                 color: 'blue',
-                trend: 5,
+                trend: stats.recentHiresCount || 0,
+                trendLabel: 'new this month',
                 progress: 100
             },
             {
@@ -2358,28 +3047,27 @@ export class HrComponent implements OnInit, OnDestroy {
                 value: this.dashboardStats.activeEmployees,
                 icon: 'pi pi-check-circle',
                 color: 'green',
-                trend: 3,
-                progress: this.dashboardStats.totalEmployees > 0
-                    ? (this.dashboardStats.activeEmployees / this.dashboardStats.totalEmployees) * 100
-                    : 0
+                trend: activeRate,
+                trendLabel: 'active rate',
+                progress: activeRate
             },
             {
                 label: 'Recyclage Required',
                 value: this.dashboardStats.employeesRequiringRecyclage,
                 icon: 'pi pi-refresh',
                 color: 'orange',
-                trend: -2,
-                progress: this.dashboardStats.totalEmployees > 0
-                    ? (this.dashboardStats.employeesRequiringRecyclage / this.dashboardStats.totalEmployees) * 100
-                    : 0
+                trend: recyclageRate,
+                trendLabel: 'of total',
+                progress: recyclageRate
             },
             {
                 label: 'Avg. Versatility',
-                value: Math.round(this.dashboardStats.averageVersatility),
+                value: this.dashboardStats.averageVersatility.toFixed(1),
                 icon: 'pi pi-chart-line',
                 color: 'purple',
-                trend: 8,
-                progress: this.dashboardStats.averageVersatility
+                trend: versatilityPercent,
+                trendLabel: 'of max (4.0)',
+                progress: versatilityPercent
             }
         ];
     }

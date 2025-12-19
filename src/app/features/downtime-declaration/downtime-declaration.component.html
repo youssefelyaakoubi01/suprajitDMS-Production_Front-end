@@ -349,6 +349,7 @@
                         placeholder="Select line"
                         [filter]="true"
                         filterBy="name"
+                        appendTo="body"
                         [style]="{ width: '100%' }">
                     </p-select>
                     <small class="error-text" *ngIf="declarationForm.get('production_line')?.invalid && declarationForm.get('production_line')?.touched">
@@ -365,6 +366,7 @@
                         placeholder="Select workstation"
                         [filter]="true"
                         filterBy="Name_Workstation"
+                        appendTo="body"
                         [style]="{ width: '100%' }">
                     </p-select>
                     <small class="error-text" *ngIf="declarationForm.get('workstation')?.invalid && declarationForm.get('workstation')?.touched && declarationForm.get('workstation')?.enabled">
@@ -385,6 +387,7 @@
                         [filter]="true"
                         filterBy="name"
                         [showClear]="true"
+                        appendTo="body"
                         [style]="{ width: '100%' }">
                         <ng-template let-machine pTemplate="item">
                             <div class="flex align-items-center gap-2">
@@ -410,6 +413,7 @@
                         formControlName="declaration_type"
                         optionLabel="label"
                         optionValue="value"
+                        appendTo="body"
                         [style]="{ width: '100%' }">
                     </p-select>
                 </div>
@@ -421,6 +425,7 @@
                         formControlName="impact_level"
                         optionLabel="label"
                         optionValue="value"
+                        appendTo="body"
                         [style]="{ width: '100%' }">
                     </p-select>
                 </div>
@@ -528,19 +533,37 @@
         <p-divider></p-divider>
 
         <form [formGroup]="actionForm">
-            <!-- Acknowledge: assign technician -->
+            <!-- Acknowledge/Start Work: assign technician -->
             <div *ngIf="actionType === 'acknowledge' || actionType === 'start_work'" class="form-field">
-                <label for="assigned_technician"><i class="pi pi-user"></i> Assign Technician</label>
+                <label for="assigned_technician">
+                    <i class="pi pi-user"></i> Assign Technician
+                    <span *ngIf="actionType === 'start_work'" class="required-indicator">*</span>
+                </label>
                 <p-select
+                    *ngIf="technicians.length > 0"
                     id="assigned_technician"
                     [options]="technicians"
                     formControlName="assigned_technician"
                     optionLabel="name"
-                    placeholder="Select technician"
+                    [placeholder]="actionType === 'start_work' ? 'Select technician (required)' : 'Select technician (optional)'"
                     [filter]="true"
-                    [showClear]="true"
+                    [showClear]="actionType !== 'start_work'"
+                    appendTo="body"
                     [style]="{ width: '100%' }">
+                    <ng-template pTemplate="item" let-tech>
+                        <div class="technician-option">
+                            <span class="tech-name">{{ tech.name }}</span>
+                            <span class="tech-dept" *ngIf="tech.department">{{ tech.department }}</span>
+                        </div>
+                    </ng-template>
                 </p-select>
+                <div *ngIf="technicians.length === 0" class="no-technicians-message">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    <span>No technicians available. Please add employees with 'technician' category or in 'Maintenance' department.</span>
+                </div>
+                <small *ngIf="actionType === 'start_work'" class="form-hint">
+                    A technician must be assigned to start working on this downtime.
+                </small>
             </div>
 
             <!-- Resolve: resolution notes -->

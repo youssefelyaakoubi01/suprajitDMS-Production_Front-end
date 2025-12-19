@@ -343,6 +343,21 @@ export class ProductionService {
         }
     }
 
+    updateDowntime(id: number, data: Partial<Downtime>): Observable<Downtime> {
+        const apiData: any = {
+            duration: data.Total_Downtime,
+            comment: data.Comment_Downtime,
+            problem: data.Id_DowntimeProblems,
+            hourly_production: data.Id_HourlyProd,
+            machine: (data as any).machine || null
+        };
+        return this.coreService.updateDowntime(id, apiData);
+    }
+
+    deleteDowntime(id: number): Observable<void> {
+        return this.coreService.deleteDowntime(id);
+    }
+
     getHourlyProductions(params?: {
         date?: string;
         shift?: string | number;

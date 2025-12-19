@@ -166,6 +166,23 @@ export class HRService {
         return this.api.delete<void>(`${this.endpoint}/categories/${id}`);
     }
 
+    // ==================== EMPLOYEE STATUSES ====================
+    getEmployeeStatuses(): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/statuses`);
+    }
+
+    createStatus(status: any): Observable<any> {
+        return this.api.post<any>(`${this.endpoint}/statuses`, status);
+    }
+
+    updateStatus(id: number, status: any): Observable<any> {
+        return this.api.put<any>(`${this.endpoint}/statuses/${id}`, status);
+    }
+
+    deleteStatus(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/statuses/${id}`);
+    }
+
     // ==================== DEPARTMENTS ====================
     getDepartments(): Observable<Department[]> {
         return this.api.get<Department[]>(`${this.endpoint}/departments`).pipe(
@@ -287,7 +304,11 @@ export class HRService {
     }
 
     updateQualification(id: number, qualification: Partial<Qualification>): Observable<Qualification> {
-        return this.api.put<Qualification>(`${this.endpoint}/qualifications/${id}`, qualification);
+        return this.api.patch<Qualification>(`${this.endpoint}/qualifications/${id}`, qualification);
+    }
+
+    deleteQualification(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/qualifications/${id}`);
     }
 
     validateQualification(id: number, result: string, comment?: string): Observable<Qualification> {

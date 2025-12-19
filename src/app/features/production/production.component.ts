@@ -19,6 +19,7 @@ import { AvatarModule } from 'primeng/avatar';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageModule } from 'primeng/message';
 import { CheckboxModule } from 'primeng/checkbox';
+import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
 import { ProductionService } from './production.service';
 import { EmployeeService } from '../../core/services/employee.service';
@@ -66,7 +67,8 @@ import { environment } from '../../../environments/environment';
         AvatarModule,
         ProgressBarModule,
         MessageModule,
-        CheckboxModule
+        CheckboxModule,
+        TooltipModule
     ],
     providers: [MessageService],
     templateUrl: './production.component.html',
@@ -129,6 +131,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         output: 0,
         scrap: 0,
         hasDowntime: false,
+        downtimes: [],
         downtime: {
             duration: 0,
             problemId: 0,
@@ -136,9 +139,19 @@ export class ProductionComponent implements OnInit, OnDestroy {
         }
     };
 
-    // Downtime Dialog (for adding downtime to existing hour)
+    // Multiple Downtimes in Dialog
+    showAddDowntimeForm = false;
+    editingDowntimeDialogIndex: number | null = null;
+    newDowntimeInput: { duration: number; problemId: number; comment: string; id?: number } = {
+        duration: 0,
+        problemId: 0,
+        comment: ''
+    };
+
+    // Downtime Dialog (for adding/editing downtime to existing hour)
     showDowntimeDialog = false;
     downtimeHourIndex: number | null = null;
+    editingDowntimeIndex: number | null = null; // Track which downtime is being edited
     downtimeInput: DowntimeExtended = {
         Total_Downtime: 0,
         Id_DowntimeProblems: 0,
@@ -1062,17 +1075,27 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.selectedHourIndex = hourIndex;
         const hour = this.session.hours[hourIndex];
 
+        // Reset the add downtime form state
+        this.showAddDowntimeForm = false;
+        this.editingDowntimeDialogIndex = null;
+        this.resetNewDowntimeForm();
+
         // If hour already has data, pre-fill the form
         if (hour.status === 'completed') {
+            // Convert existing downtimes to dialog format
+            const existingDowntimes = hour.downtimes.map(dt => ({
+                id: dt.Id_Downtime,
+                duration: dt.Total_Downtime,
+                problemId: dt.Id_DowntimeProblems,
+                comment: dt.Comment_Downtime || ''
+            }));
+
             this.hourProductionInput = {
                 output: hour.output || 0,
                 scrap: hour.scrap || 0,
                 hasDowntime: hour.downtimes.length > 0,
-                downtime: hour.downtimes.length > 0 ? {
-                    duration: hour.downtimes[0].Total_Downtime,
-                    problemId: hour.downtimes[0].Id_DowntimeProblems,
-                    comment: hour.downtimes[0].Comment_Downtime
-                } : {
+                downtimes: existingDowntimes,
+                downtime: {
                     duration: 0,
                     problemId: 0,
                     comment: ''
@@ -1084,6 +1107,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 output: 0,
                 scrap: 0,
                 hasDowntime: false,
+                downtimes: [],
                 downtime: {
                     duration: 0,
                     problemId: 0,
@@ -1206,10 +1230,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     this.saveTeamAssignmentsForHour(hour.hourlyProductionId);
                 }
 
-                // If downtime was added
-                if (this.hourProductionInput.hasDowntime && this.hourProductionInput.downtime &&
-                    this.hourProductionInput.downtime.duration > 0 && this.hourProductionInput.downtime.problemId > 0) {
-                    this.saveDowntimeForHour(this.selectedHourIndex!, this.hourProductionInput.downtime);
+                // Save all downtimes (new ones without id, update ones with id)
+                if (this.hourProductionInput.downtimes && this.hourProductionInput.downtimes.length > 0) {
+                    this.saveAllDowntimesForHour(this.selectedHourIndex!, hour.hourlyProductionId as number);
                 } else {
                     this.closeHourDialog();
                     this.messageService.add({
@@ -1341,6 +1364,189 @@ export class ProductionComponent implements OnInit, OnDestroy {
         });
     }
 
+    // ==================== MULTIPLE DOWNTIMES IN DIALOG ====================
+
+    saveAllDowntimesForHour(hourIndex: number, hourlyProductionId: number): void {
+        const hour = this.session.hours[hourIndex];
+        const downtimes = this.hourProductionInput.downtimes || [];
+
+        if (downtimes.length === 0) {
+            this.closeHourDialog();
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Saved',
+                detail: `Hour ${hour.hour} production saved successfully`
+            });
+            return;
+        }
+
+        let savedCount = 0;
+        let errorCount = 0;
+        const totalToSave = downtimes.length;
+
+        // Track which downtimes need to be deleted (existing ones not in the list anymore)
+        const existingDowntimeIds = hour.downtimes.map(d => d.Id_Downtime).filter(id => id);
+        const currentDowntimeIds = downtimes.map(d => d.id).filter(id => id);
+        const toDelete = existingDowntimeIds.filter(id => !currentDowntimeIds.includes(id));
+
+        // Delete removed downtimes
+        toDelete.forEach(id => {
+            this.productionService.deleteDowntime(id!).subscribe({
+                next: () => console.log('Deleted downtime:', id),
+                error: (err) => console.error('Error deleting downtime:', err)
+            });
+        });
+
+        // Save/update downtimes
+        downtimes.forEach((dt) => {
+            const downtimePayload = {
+                Total_Downtime: dt.duration,
+                Comment_Downtime: dt.comment,
+                Id_DowntimeProblems: dt.problemId,
+                Id_HourlyProd: hourlyProductionId,
+                Id_Downtime: dt.id // Include ID for updates
+            };
+
+            const saveObs = dt.id
+                ? this.productionService.updateDowntime(dt.id, downtimePayload)
+                : this.productionService.saveDowntime(downtimePayload);
+
+            saveObs.subscribe({
+                next: (response: any) => {
+                    savedCount++;
+                    // Update the ID if it was a new downtime
+                    if (!dt.id && response?.id) {
+                        dt.id = response.id;
+                    }
+
+                    if (savedCount + errorCount === totalToSave) {
+                        this.finalizeSaveDowntimes(hourIndex, hourlyProductionId, savedCount, errorCount);
+                    }
+                },
+                error: (error) => {
+                    errorCount++;
+                    console.error('Error saving downtime:', error);
+
+                    if (savedCount + errorCount === totalToSave) {
+                        this.finalizeSaveDowntimes(hourIndex, hourlyProductionId, savedCount, errorCount);
+                    }
+                }
+            });
+        });
+    }
+
+    finalizeSaveDowntimes(hourIndex: number, hourlyProductionId: number, savedCount: number, errorCount: number): void {
+        const hour = this.session.hours[hourIndex];
+
+        // Update hour's downtimes from dialog input
+        hour.downtimes = (this.hourProductionInput.downtimes || []).map(dt => ({
+            Id_Downtime: dt.id,
+            Total_Downtime: dt.duration,
+            Comment_Downtime: dt.comment,
+            Id_DowntimeProblems: dt.problemId,
+            Id_HourlyProd: hourlyProductionId,
+            problemName: this.getDowntimeProblemName(dt.problemId)
+        }));
+
+        hour.totalDowntime = hour.downtimes.reduce((sum, dt) => sum + dt.Total_Downtime, 0);
+
+        // Save session to localStorage
+        this.saveSessionToStorage();
+
+        this.closeHourDialog();
+
+        if (errorCount > 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Partially Saved',
+                detail: `Hour ${hour.hour}: ${savedCount} downtimes saved, ${errorCount} failed`
+            });
+        } else {
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Saved',
+                detail: `Hour ${hour.hour} production and ${savedCount} downtime(s) saved successfully`
+            });
+        }
+    }
+
+    getDowntimeProblemName(problemId: number): string {
+        const problem = this.downtimeProblems.find(p => p.Id_DowntimeProblems === problemId);
+        return problem?.Name_DowntimeProblems || 'Unknown';
+    }
+
+    getTotalDowntimeInDialog(): number {
+        if (!this.hourProductionInput.downtimes) return 0;
+        return this.hourProductionInput.downtimes.reduce((sum, dt) => sum + dt.duration, 0);
+    }
+
+    editDowntimeInDialog(index: number): void {
+        const dt = this.hourProductionInput.downtimes![index];
+        this.newDowntimeInput = {
+            id: dt.id,
+            duration: dt.duration,
+            problemId: dt.problemId,
+            comment: dt.comment
+        };
+        this.editingDowntimeDialogIndex = index;
+        this.showAddDowntimeForm = true;
+    }
+
+    removeDowntimeFromDialog(index: number): void {
+        if (!this.hourProductionInput.downtimes) return;
+        this.hourProductionInput.downtimes.splice(index, 1);
+    }
+
+    resetNewDowntimeForm(): void {
+        this.newDowntimeInput = {
+            duration: 0,
+            problemId: 0,
+            comment: ''
+        };
+        this.editingDowntimeDialogIndex = null;
+    }
+
+    confirmAddDowntimeInDialog(): void {
+        if (this.newDowntimeInput.duration <= 0 || this.newDowntimeInput.problemId === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Invalid Input',
+                detail: 'Please enter duration and select a problem category'
+            });
+            return;
+        }
+
+        if (!this.hourProductionInput.downtimes) {
+            this.hourProductionInput.downtimes = [];
+        }
+
+        if (this.editingDowntimeDialogIndex !== null) {
+            // Update existing
+            this.hourProductionInput.downtimes[this.editingDowntimeDialogIndex] = {
+                id: this.newDowntimeInput.id,
+                duration: this.newDowntimeInput.duration,
+                problemId: this.newDowntimeInput.problemId,
+                comment: this.newDowntimeInput.comment
+            };
+        } else {
+            // Add new
+            this.hourProductionInput.downtimes.push({
+                duration: this.newDowntimeInput.duration,
+                problemId: this.newDowntimeInput.problemId,
+                comment: this.newDowntimeInput.comment
+            });
+        }
+
+        this.hourProductionInput.hasDowntime = true;
+        this.showAddDowntimeForm = false;
+        this.resetNewDowntimeForm();
+    }
+
+    cancelAddDowntimeInDialog(): void {
+        this.showAddDowntimeForm = false;
+        this.resetNewDowntimeForm();
+    }
+
     // ==================== ADDITIONAL DOWNTIME ====================
 
     openDowntimeDialog(hourIndex: number): void {
@@ -1357,15 +1563,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         this.downtimeHourIndex = hourIndex;
 
-        // Pre-fill with existing downtime data if available
+        // Pre-fill with existing downtime data if available (edit mode)
         if (hour.downtimes && hour.downtimes.length > 0) {
             const existingDowntime = hour.downtimes[0]; // Use the first downtime
+            this.editingDowntimeIndex = 0; // Mark as editing the first downtime
             this.downtimeInput = {
                 Total_Downtime: existingDowntime.Total_Downtime || 0,
                 Id_DowntimeProblems: existingDowntime.Id_DowntimeProblems || 0,
-                Comment_Downtime: existingDowntime.Comment_Downtime || ''
+                Comment_Downtime: existingDowntime.Comment_Downtime || '',
+                Id_Downtime: existingDowntime.Id_Downtime // Keep the ID for update
             };
         } else {
+            this.editingDowntimeIndex = null; // New downtime
             this.downtimeInput = {
                 Total_Downtime: 0,
                 Id_DowntimeProblems: 0,
@@ -1379,6 +1588,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
     closeDowntimeDialog(): void {
         this.showDowntimeDialog = false;
         this.downtimeHourIndex = null;
+        this.editingDowntimeIndex = null;
     }
 
     saveAdditionalDowntime(): void {
@@ -1424,27 +1634,46 @@ export class ProductionComponent implements OnInit, OnDestroy {
             return;
         }
 
-        this.productionService.saveDowntime({
+        // Check if we're editing an existing downtime or creating a new one
+        const isEditing = hour.downtimes && hour.downtimes.length > 0 && this.editingDowntimeIndex !== null;
+
+        const downtimePayload = {
             ...this.downtimeInput,
             Id_HourlyProd: hour.hourlyProductionId!
-        }).subscribe({
-            next: () => {
-                const newDowntime: DowntimeExtended = {
+        };
+
+        // If editing existing, include the ID for update
+        if (isEditing && hour.downtimes[this.editingDowntimeIndex!]?.Id_Downtime) {
+            (downtimePayload as any).Id_Downtime = hour.downtimes[this.editingDowntimeIndex!].Id_Downtime;
+        }
+
+        this.productionService.saveDowntime(downtimePayload).subscribe({
+            next: (savedDowntime: any) => {
+                const downtimeData: DowntimeExtended = {
                     ...this.downtimeInput,
                     Id_HourlyProd: hour.hourlyProductionId!,
+                    Id_Downtime: savedDowntime?.id || savedDowntime?.Id_Downtime,
                     problemName: this.downtimeProblems.find(p => p.Id_DowntimeProblems === this.downtimeInput.Id_DowntimeProblems)?.Name_DowntimeProblems
                 };
-                hour.downtimes.push(newDowntime);
+
+                if (isEditing && this.editingDowntimeIndex !== null) {
+                    // Update existing downtime
+                    hour.downtimes[this.editingDowntimeIndex] = downtimeData;
+                } else {
+                    // Add new downtime
+                    hour.downtimes.push(downtimeData);
+                }
+
                 hour.totalDowntime = hour.downtimes.reduce((sum, dt) => sum + dt.Total_Downtime, 0);
 
-                // Save session to localStorage after adding downtime
+                // Save session to localStorage after adding/updating downtime
                 this.saveSessionToStorage();
 
                 this.closeDowntimeDialog();
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Saved',
-                    detail: 'Downtime ticket added successfully'
+                    detail: isEditing ? 'Downtime updated successfully' : 'Downtime added successfully'
                 });
             },
             error: (error) => {

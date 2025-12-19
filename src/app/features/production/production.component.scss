@@ -636,6 +636,111 @@
     }
 }
 
+// ==================== MULTIPLE DOWNTIMES IN DIALOG ====================
+
+.downtime-count-badge {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--orange-600);
+}
+
+.downtimes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.downtime-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.75rem;
+    background: var(--yellow-50);
+    border-radius: 6px;
+    border-left: 3px solid var(--yellow-500);
+}
+
+.downtime-item-content {
+    flex: 1;
+}
+
+.downtime-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.downtime-duration {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 600;
+    color: var(--orange-600);
+
+    i {
+        font-size: 0.875rem;
+    }
+}
+
+.downtime-item-comment {
+    font-size: 0.8rem;
+    color: var(--text-color-secondary);
+    margin-top: 0.25rem;
+}
+
+.downtime-item-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.downtime-total {
+    padding: 0.5rem 0.75rem;
+    background: var(--orange-100);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    color: var(--orange-700);
+    margin-top: 0.5rem;
+}
+
+.add-downtime-section {
+    margin-top: 0.5rem;
+}
+
+.new-downtime-form {
+    background: var(--surface-50);
+    padding: 1rem;
+    border-radius: 6px;
+    border: 1px dashed var(--surface-300);
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-field {
+        margin-bottom: 0.75rem;
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-color);
+            margin-bottom: 0.25rem;
+        }
+    }
+}
+
+.form-actions-inline {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+
 .dialog-info {
     padding: 0.75rem;
     background: var(--surface-50);

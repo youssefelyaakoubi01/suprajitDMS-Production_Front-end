@@ -2,6 +2,7 @@
 export * from './api.service';
 export * from './auth.service';
 export * from './notification.service';
+export * from './downtime-notification.service';
 
 // Feature Services
 export * from './dashboard.service';

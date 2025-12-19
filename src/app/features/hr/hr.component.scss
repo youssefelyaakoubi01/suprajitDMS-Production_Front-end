@@ -1872,3 +1872,37 @@ code {
         border-bottom: 1px solid var(--surface-200) !important;
     }
 }
+
+// Card Header with Action Button
+.card-header-with-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, var(--surface-50) 0%, var(--surface-card) 100%);
+    border-bottom: 1px solid var(--surface-200);
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
+// Category Form Styles
+.category-form {
+    .form-field {
+        margin-bottom: 1rem;
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+    }
+}
+
+// Action Buttons in Tables
+.action-buttons {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+}
