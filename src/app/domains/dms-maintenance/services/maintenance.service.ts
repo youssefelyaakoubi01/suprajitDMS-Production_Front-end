@@ -282,15 +282,25 @@ export class DmsMaintenanceService {
             downtimeList: (data.downtime_list || []).map((item: any) => ({
                 id: item.id,
                 ticketNo: item.ticket_no,
+                ticket: item.ticket_no,
                 zone: item.zone,
                 project: item.project,
+                impactedProject: item.project,
                 productionLine: item.production_line,
                 workstation: item.workstation,
+                impactedMachine: item.workstation,
                 description: item.description,
                 status: item.status,
                 downtimeMin: item.downtime_min,
                 createdOn: item.created_on,
-                assignedTo: item.assigned_to
+                createdAt: item.created_on,
+                downtimeStartsAt: item.downtime_starts_at,
+                closedAt: item.closed_at,
+                assignedTo: item.assigned_to,
+                acceptedBy: item.assigned_to,
+                interventionTime: item.intervention_time,
+                reactivityTime: item.reactivity_time,
+                waitingTime: item.waiting_time
             }))
         };
     }

@@ -164,6 +164,19 @@
                     </div>
 
                     <div class="form-field">
+                        <label for="zone">Zone</label>
+                        <p-select
+                            id="zone"
+                            formControlName="zone"
+                            [options]="zones"
+                            optionLabel="name"
+                            placeholder="Select Zone"
+                            [showClear]="true"
+                            [style]="{ width: '100%' }">
+                        </p-select>
+                    </div>
+
+                    <div class="form-field">
                         <label for="orderNo">Order NO</label>
                         <input
                             id="orderNo"
@@ -212,6 +225,10 @@
             <div class="summary-item" *ngIf="session.machine">
                 <span class="summary-label">Machine:</span>
                 <span class="summary-value">{{ session.machine.name }}</span>
+            </div>
+            <div class="summary-item" *ngIf="session.zone">
+                <span class="summary-label">Zone:</span>
+                <span class="summary-value">{{ session.zone.name }}</span>
             </div>
             <div class="summary-item" *ngIf="session.orderNo">
                 <span class="summary-label">Order NO:</span>

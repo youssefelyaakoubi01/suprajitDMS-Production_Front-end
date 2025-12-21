@@ -12,6 +12,19 @@ export interface Downtime {
     Id_DowntimeProblems: number;
     machine?: number;
     machine_name?: string;
+    machine_code?: string;
+    // Fields from backend serializer (via HourlyProduction)
+    date?: string;
+    hour?: number;
+    shift_name?: string;
+    production_line_name?: string;
+    project_name?: string;
+    workstation_name?: string;
+    part_number?: string;
+    zone_name?: string;
+    zone_code?: string;
+    problem_name?: string;
+    problem_category?: string;
 }
 
 // ==================== DOWNTIME PROBLEM ====================

@@ -1,0 +1,728 @@
+<div class="declaration-workflow-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Downtime Declaration</h1>
+            <p class="page-subtitle">Notify maintenance technicians about production downtimes</p>
+        </div>
+        <div class="header-actions">
+            <p-button
+                icon="pi pi-refresh"
+                [outlined]="true"
+                [loading]="isLoading"
+                (click)="loadDeclarations()"
+                pTooltip="Refresh">
+            </p-button>
+            <p-button
+                [icon]="autoRefreshEnabled ? 'pi pi-pause' : 'pi pi-play'"
+                [outlined]="true"
+                [severity]="autoRefreshEnabled ? 'success' : 'secondary'"
+                (click)="toggleAutoRefresh()"
+                [pTooltip]="autoRefreshEnabled ? 'Disable auto-refresh' : 'Enable auto-refresh'">
+            </p-button>
+            <p-button
+                label="New Declaration"
+                icon="pi pi-plus"
+                (click)="openNewDeclarationDialog()">
+            </p-button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--yellow-100);">
+                    <i class="pi pi-exclamation-triangle" style="color: var(--yellow-600);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Pending</span>
+                    <span class="summary-value">{{ pendingDeclarations.length }}</span>
+                </div>
+            </div>
+        </p-card>
+
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--blue-100);">
+                    <i class="pi pi-clock" style="color: var(--blue-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">In Progress</span>
+                    <span class="summary-value">{{ getCountByStatus('in_progress') }}</span>
+                </div>
+            </div>
+        </p-card>
+
+        <p-card styleClass="summary-card">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--green-100);">
+                    <i class="pi pi-check-circle" style="color: var(--green-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Resolved Today</span>
+                    <span class="summary-value">{{ getCountByStatus('resolved') }}</span>
+                </div>
+            </div>
+        </p-card>
+
+        <p-card styleClass="summary-card" [ngClass]="{'card-danger': pendingDeclarations.length > 0}">
+            <div class="summary-content">
+                <div class="summary-icon" style="background-color: var(--red-100);">
+                    <i class="pi pi-bolt" style="color: var(--red-500);"></i>
+                </div>
+                <div class="summary-info">
+                    <span class="summary-label">Critical</span>
+                    <span class="summary-value">{{ getCriticalCount() }}</span>
+                </div>
+            </div>
+        </p-card>
+    </div>
+
+    <!-- Pending Declarations Alert -->
+    <p-card *ngIf="pendingDeclarations.length > 0" styleClass="alert-card">
+        <div class="alert-content">
+            <div class="alert-icon">
+                <i class="pi pi-bell"></i>
+            </div>
+            <div class="alert-info">
+                <span class="alert-title">{{ pendingDeclarations.length }} Pending Declaration(s)</span>
+                <span class="alert-subtitle">Awaiting acknowledgment from maintenance team</span>
+            </div>
+            <div class="alert-actions">
+                <p-button
+                    label="View Pending"
+                    icon="pi pi-eye"
+                    severity="warn"
+                    size="small"
+                    (click)="statusFilter = 'declared'; onFilterChange()">
+                </p-button>
+            </div>
+        </div>
+    </p-card>
+
+    <!-- Filters Card -->
+    <p-card styleClass="filter-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <div class="header-left">
+                    <i class="pi pi-filter header-icon"></i>
+                    <h2 class="card-title">Filters</h2>
+                </div>
+                <div class="header-actions">
+                    <p-button
+                        *ngIf="statusFilter || lineFilter"
+                        label="Clear Filters"
+                        icon="pi pi-times"
+                        [text]="true"
+                        size="small"
+                        (click)="statusFilter = null; lineFilter = null; onFilterChange()">
+                    </p-button>
+                </div>
+            </div>
+        </ng-template>
+
+        <div class="filter-grid">
+            <div class="form-field">
+                <label for="statusFilter"><i class="pi pi-tag"></i> Status</label>
+                <p-select
+                    id="statusFilter"
+                    [options]="statusOptions"
+                    [(ngModel)]="statusFilter"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="All Statuses"
+                    [showClear]="true"
+                    (onChange)="onFilterChange()"
+                    [style]="{ width: '100%' }">
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="lineFilter"><i class="pi pi-sitemap"></i> Production Line</label>
+                <p-select
+                    id="lineFilter"
+                    [options]="productionLines"
+                    [(ngModel)]="lineFilter"
+                    optionLabel="name"
+                    optionValue="id"
+                    placeholder="All Lines"
+                    [showClear]="true"
+                    (onChange)="onFilterChange()"
+                    [style]="{ width: '100%' }">
+                </p-select>
+            </div>
+        </div>
+    </p-card>
+
+    <!-- Declarations Table -->
+    <p-card styleClass="declarations-card">
+        <ng-template pTemplate="header">
+            <div class="card-header">
+                <div class="header-left">
+                    <i class="pi pi-list header-icon"></i>
+                    <h2 class="card-title">Declarations</h2>
+                    <p-tag [value]="declarations.length + ' Total'" severity="info"></p-tag>
+                </div>
+            </div>
+        </ng-template>
+
+        <p-table
+            [value]="declarations"
+            [loading]="isLoading"
+            [rowHover]="true"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            [globalFilterFields]="['ticket_number', 'reason', 'workstation_name', 'production_line_name']"
+            styleClass="declarations-table">
+
+            <ng-template pTemplate="header">
+                <tr>
+                    <th style="width: 120px">Ticket</th>
+                    <th>Location</th>
+                    <th style="width: 110px">Type</th>
+                    <th style="width: 100px">Impact</th>
+                    <th>Reason</th>
+                    <th style="width: 110px">Status</th>
+                    <th style="width: 160px">Declared</th>
+                    <th style="width: 140px">Technician</th>
+                    <th style="width: 180px">Actions</th>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="body" let-declaration>
+                <tr [ngClass]="{
+                    'row-pending': declaration.status === 'declared',
+                    'row-in-progress': declaration.status === 'in_progress',
+                    'row-critical': declaration.impact_level === 'critical'
+                }">
+                    <td>
+                        <div class="ticket-number">
+                            <i [class]="getStatusIcon(declaration.status)"></i>
+                            <strong>{{ declaration.ticket_number }}</strong>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="location-info">
+                            <span class="line-name">{{ declaration.production_line_name }}</span>
+                            <span class="workstation-name">{{ declaration.workstation_name }}</span>
+                            <span class="machine-name" *ngIf="declaration.machine_name">
+                                <i class="pi pi-cog"></i> {{ declaration.machine_name }}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <p-tag
+                            [value]="declaration.declaration_type | titlecase"
+                            [severity]="getTypeSeverity(declaration.declaration_type)">
+                        </p-tag>
+                    </td>
+                    <td>
+                        <p-tag
+                            [value]="declaration.impact_level | titlecase"
+                            [severity]="getImpactSeverity(declaration.impact_level)">
+                        </p-tag>
+                    </td>
+                    <td>
+                        <div class="reason-text" [pTooltip]="declaration.reason" tooltipPosition="top">
+                            {{ declaration.reason }}
+                        </div>
+                    </td>
+                    <td>
+                        <p-tag
+                            [value]="declaration.status | titlecase"
+                            [severity]="getStatusSeverity(declaration.status)">
+                        </p-tag>
+                    </td>
+                    <td>
+                        <div class="datetime-info">
+                            <span class="date-value">{{ formatDateTime(declaration.declared_at) }}</span>
+                            <span class="by-value" *ngIf="declaration.declared_by_name">by {{ declaration.declared_by_name }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span *ngIf="declaration.assigned_technician_name" class="technician-name">
+                            <i class="pi pi-user"></i>
+                            {{ declaration.assigned_technician_name }}
+                        </span>
+                        <span *ngIf="!declaration.assigned_technician_name" class="not-assigned">
+                            Not assigned
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <p-button
+                                *ngIf="canAcknowledge(declaration)"
+                                icon="pi pi-check"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="info"
+                                pTooltip="Acknowledge"
+                                (click)="openActionDialog(declaration, 'acknowledge')">
+                            </p-button>
+                            <p-button
+                                *ngIf="canStartWork(declaration)"
+                                icon="pi pi-play"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="success"
+                                pTooltip="Start Work"
+                                (click)="openActionDialog(declaration, 'start_work')">
+                            </p-button>
+                            <p-button
+                                *ngIf="canResolve(declaration)"
+                                icon="pi pi-check-circle"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="success"
+                                pTooltip="Resolve"
+                                (click)="openActionDialog(declaration, 'resolve')">
+                            </p-button>
+                            <p-button
+                                *ngIf="canCancel(declaration)"
+                                icon="pi pi-times"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="warn"
+                                pTooltip="Cancel"
+                                (click)="openActionDialog(declaration, 'cancel')">
+                            </p-button>
+                            <p-button
+                                *ngIf="canDelete(declaration)"
+                                icon="pi pi-trash"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="danger"
+                                pTooltip="Delete"
+                                (click)="deleteDeclaration(declaration)">
+                            </p-button>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="9">
+                        <div class="empty-state">
+                            <i class="pi pi-inbox empty-icon"></i>
+                            <p class="empty-title">No declarations found</p>
+                            <p class="empty-subtitle">Create a new declaration to notify the maintenance team</p>
+                        </div>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </p-card>
+</div>
+
+<!-- New Declaration Dialog -->
+<p-dialog
+    [(visible)]="showDeclarationDialog"
+    [header]="isEditMode ? 'Edit Declaration' : 'New Downtime Declaration'"
+    [modal]="true"
+    [style]="{ width: '700px', maxWidth: '95vw' }"
+    [draggable]="false"
+    [resizable]="false"
+    styleClass="declaration-dialog">
+
+    <div class="dialog-content">
+        <form [formGroup]="declarationForm">
+            <!-- Impact Level Selection - Visual Buttons -->
+            <div class="impact-selection">
+                <label class="section-label">
+                    <i class="pi pi-exclamation-triangle"></i> Impact Level *
+                </label>
+                <div class="impact-options">
+                    <div class="impact-option"
+                         [class.selected]="declarationForm.get('impact_level')?.value === 'low'"
+                         [class.impact-low]="true"
+                         (click)="selectImpactLevel('low')">
+                        <i class="pi pi-check-circle"></i>
+                        <span class="impact-label">Low</span>
+                        <span class="impact-desc">Minor issue</span>
+                    </div>
+                    <div class="impact-option"
+                         [class.selected]="declarationForm.get('impact_level')?.value === 'medium'"
+                         [class.impact-medium]="true"
+                         (click)="selectImpactLevel('medium')">
+                        <i class="pi pi-info-circle"></i>
+                        <span class="impact-label">Medium</span>
+                        <span class="impact-desc">Moderate</span>
+                    </div>
+                    <div class="impact-option"
+                         [class.selected]="declarationForm.get('impact_level')?.value === 'high'"
+                         [class.impact-high]="true"
+                         (click)="selectImpactLevel('high')">
+                        <i class="pi pi-exclamation-circle"></i>
+                        <span class="impact-label">High</span>
+                        <span class="impact-desc">Significant</span>
+                    </div>
+                    <div class="impact-option"
+                         [class.selected]="declarationForm.get('impact_level')?.value === 'critical'"
+                         [class.impact-critical]="true"
+                         (click)="selectImpactLevel('critical')">
+                        <i class="pi pi-bolt"></i>
+                        <span class="impact-label">Critical</span>
+                        <span class="impact-desc">Line stopped</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Declaration Type Selection - Visual Buttons -->
+            <div class="type-selection">
+                <label class="section-label">
+                    <i class="pi pi-tag"></i> Type *
+                </label>
+                <div class="type-options">
+                    <div class="type-option"
+                         [class.selected]="declarationForm.get('declaration_type')?.value === 'planned'"
+                         (click)="selectDeclarationType('planned')">
+                        <i class="pi pi-calendar"></i>
+                        <span class="type-label">Planned</span>
+                        <span class="type-desc">Scheduled maintenance</span>
+                    </div>
+                    <div class="type-option"
+                         [class.selected]="declarationForm.get('declaration_type')?.value === 'unplanned'"
+                         (click)="selectDeclarationType('unplanned')">
+                        <i class="pi pi-exclamation-triangle"></i>
+                        <span class="type-label">Unplanned</span>
+                        <span class="type-desc">Unexpected issue</span>
+                    </div>
+                    <div class="type-option"
+                         [class.selected]="declarationForm.get('declaration_type')?.value === 'emergency'"
+                         (click)="selectDeclarationType('emergency')">
+                        <i class="pi pi-bolt"></i>
+                        <span class="type-label">Emergency</span>
+                        <span class="type-desc">Immediate action</span>
+                    </div>
+                </div>
+            </div>
+
+            <p-divider></p-divider>
+
+            <!-- Location Section -->
+            <div class="section-header">
+                <i class="pi pi-map-marker"></i>
+                <span>Location</span>
+            </div>
+
+            <div class="form-grid-4">
+                <div class="form-field">
+                    <label for="zone">Zone *</label>
+                    <p-select
+                        id="zone"
+                        [options]="zones"
+                        formControlName="zone"
+                        optionLabel="name"
+                        placeholder="Select zone"
+                        [filter]="true"
+                        filterBy="name"
+                        appendTo="body"
+                        styleClass="w-full">
+                        <ng-template let-zone pTemplate="item">
+                            <div class="zone-item">
+                                <i class="pi pi-building"></i>
+                                <span>{{ zone.name }}</span>
+                            </div>
+                        </ng-template>
+                    </p-select>
+                    <small class="error-text" *ngIf="declarationForm.get('zone')?.invalid && declarationForm.get('zone')?.touched">
+                        Required
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="production_line">Production Line *</label>
+                    <p-select
+                        id="production_line"
+                        [options]="productionLines"
+                        formControlName="production_line"
+                        optionLabel="name"
+                        placeholder="Select line"
+                        [filter]="true"
+                        filterBy="name"
+                        appendTo="body"
+                        styleClass="w-full">
+                    </p-select>
+                    <small class="error-text" *ngIf="declarationForm.get('production_line')?.invalid && declarationForm.get('production_line')?.touched && declarationForm.get('production_line')?.enabled">
+                        Required
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="workstation">Workstation *</label>
+                    <p-select
+                        id="workstation"
+                        [options]="workstations"
+                        formControlName="workstation"
+                        optionLabel="Name_Workstation"
+                        placeholder="Select workstation"
+                        [filter]="true"
+                        filterBy="Name_Workstation"
+                        appendTo="body"
+                        styleClass="w-full">
+                    </p-select>
+                    <small class="error-text" *ngIf="declarationForm.get('workstation')?.invalid && declarationForm.get('workstation')?.touched && declarationForm.get('workstation')?.enabled">
+                        Required
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="machine">Machine</label>
+                    <p-select
+                        id="machine"
+                        [options]="machines"
+                        formControlName="machine"
+                        optionLabel="name"
+                        placeholder="Select machine"
+                        [filter]="true"
+                        filterBy="name"
+                        [showClear]="true"
+                        appendTo="body"
+                        styleClass="w-full">
+                        <ng-template let-machine pTemplate="item">
+                            <div class="machine-item">
+                                <span>{{ machine.name }}</span>
+                                <small>({{ machine.code }})</small>
+                            </div>
+                        </ng-template>
+                    </p-select>
+                </div>
+            </div>
+
+            <p-divider></p-divider>
+
+            <!-- Problem Details Section -->
+            <div class="section-header">
+                <i class="pi pi-info-circle"></i>
+                <span>Problem Details</span>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="form-field">
+                    <label for="problem_type">Problem Type *</label>
+                    <p-select
+                        id="problem_type"
+                        [options]="downtimeProblems"
+                        formControlName="problem_type"
+                        optionLabel="Name_DowntimeProblems"
+                        placeholder="Select problem type"
+                        [filter]="true"
+                        filterBy="Name_DowntimeProblems"
+                        appendTo="body"
+                        styleClass="w-full">
+                    </p-select>
+                    <small class="error-text" *ngIf="declarationForm.get('problem_type')?.invalid && declarationForm.get('problem_type')?.touched">
+                        Required
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="duration">Duration *</label>
+                    <p-inputNumber
+                        id="duration"
+                        formControlName="duration"
+                        [min]="1"
+                        [max]="480"
+                        [showButtons]="true"
+                        buttonLayout="horizontal"
+                        spinnerMode="horizontal"
+                        decrementButtonClass="p-button-secondary"
+                        incrementButtonClass="p-button-secondary"
+                        incrementButtonIcon="pi pi-plus"
+                        decrementButtonIcon="pi pi-minus"
+                        suffix=" min"
+                        styleClass="w-full">
+                    </p-inputNumber>
+                    <small class="error-text" *ngIf="declarationForm.get('duration')?.invalid && declarationForm.get('duration')?.touched">
+                        Required (1-480 min)
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="reason">Description *</label>
+                <textarea
+                    id="reason"
+                    pTextarea
+                    formControlName="reason"
+                    rows="3"
+                    class="w-full"
+                    placeholder="Describe the problem and what happened...">
+                </textarea>
+                <div class="field-footer">
+                    <small class="error-text" *ngIf="declarationForm.get('reason')?.invalid && declarationForm.get('reason')?.touched">
+                        Minimum 10 characters required
+                    </small>
+                    <small class="char-count">{{ declarationForm.get('reason')?.value?.length || 0 }} / 10 min</small>
+                </div>
+            </div>
+
+            <p-divider></p-divider>
+
+            <!-- Notification Section -->
+            <div class="notification-section" [class.active]="notifyMaintenance">
+                <div class="notification-toggle">
+                    <p-checkbox
+                        [(ngModel)]="notifyMaintenance"
+                        [ngModelOptions]="{standalone: true}"
+                        [binary]="true"
+                        inputId="notifyMaint">
+                    </p-checkbox>
+                    <label for="notifyMaint" class="notification-label">
+                        <div class="notification-title">
+                            <i class="pi pi-bell"></i>
+                            <span>Notify Maintenance Team</span>
+                        </div>
+                        <span class="notification-desc">Send an immediate alert to available technicians</span>
+                    </label>
+                </div>
+
+                <!-- Alert Preview -->
+                <div class="alert-preview" *ngIf="notifyMaintenance">
+                    <div class="preview-header">
+                        <i class="pi pi-send"></i>
+                        <span>Alert Preview</span>
+                    </div>
+                    <div class="preview-content">
+                        <p-tag [value]="getImpactLabel()" [severity]="getImpactTagSeverity()"></p-tag>
+                        <span class="preview-text">
+                            {{ getPreviewMessage() }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <div class="dialog-footer">
+            <div class="footer-info" *ngIf="notifyMaintenance">
+                <i class="pi pi-info-circle"></i>
+                <span>Maintenance team will be notified immediately</span>
+            </div>
+            <div class="footer-actions">
+                <p-button
+                    label="Cancel"
+                    icon="pi pi-times"
+                    [text]="true"
+                    (click)="showDeclarationDialog = false">
+                </p-button>
+                <p-button
+                    [label]="notifyMaintenance ? 'Create & Notify' : 'Create Declaration'"
+                    [icon]="notifyMaintenance ? 'pi pi-bell' : 'pi pi-check'"
+                    [severity]="notifyMaintenance ? 'warn' : 'primary'"
+                    (click)="saveDeclaration()"
+                    [disabled]="declarationForm.invalid"
+                    [loading]="isSaving">
+                </p-button>
+            </div>
+        </div>
+    </ng-template>
+</p-dialog>
+
+<!-- Action Dialog -->
+<p-dialog
+    [(visible)]="showActionDialog"
+    [header]="getActionLabel()"
+    [modal]="true"
+    [style]="{ width: '500px' }"
+    [draggable]="false"
+    [resizable]="false">
+
+    <div class="dialog-content" *ngIf="actionDeclaration">
+        <!-- Declaration summary -->
+        <div class="dialog-info">
+            <div class="info-header">
+                <span class="ticket-badge">{{ actionDeclaration.ticket_number }}</span>
+                <p-tag [value]="actionDeclaration.status | titlecase" [severity]="getStatusSeverity(actionDeclaration.status)"></p-tag>
+            </div>
+            <div class="info-location">
+                <i class="pi pi-map-marker"></i>
+                {{ actionDeclaration.production_line_name }} - {{ actionDeclaration.workstation_name }}
+            </div>
+            <div class="info-reason">{{ actionDeclaration.reason }}</div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <form [formGroup]="actionForm">
+            <!-- Acknowledge/Start Work: assign technician -->
+            <div *ngIf="actionType === 'acknowledge' || actionType === 'start_work'" class="form-field">
+                <label for="assigned_technician">
+                    <i class="pi pi-user"></i> Assign Technician
+                    <span *ngIf="actionType === 'start_work'" class="required-indicator">*</span>
+                </label>
+                <p-select
+                    *ngIf="technicians.length > 0"
+                    id="assigned_technician"
+                    [options]="technicians"
+                    formControlName="assigned_technician"
+                    optionLabel="name"
+                    [placeholder]="actionType === 'start_work' ? 'Select technician (required)' : 'Select technician (optional)'"
+                    [filter]="true"
+                    [showClear]="actionType !== 'start_work'"
+                    appendTo="body"
+                    [style]="{ width: '100%' }">
+                    <ng-template pTemplate="item" let-tech>
+                        <div class="technician-option">
+                            <span class="tech-name">{{ tech.name }}</span>
+                            <span class="tech-dept" *ngIf="tech.department">{{ tech.department }}</span>
+                        </div>
+                    </ng-template>
+                </p-select>
+                <div *ngIf="technicians.length === 0" class="no-technicians-message">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    <span>No technicians available. Please add employees with 'technician' category or in 'Maintenance' department.</span>
+                </div>
+                <small *ngIf="actionType === 'start_work'" class="form-hint">
+                    A technician must be assigned to start working on this downtime.
+                </small>
+            </div>
+
+            <!-- Resolve: resolution notes -->
+            <div *ngIf="actionType === 'resolve'" class="form-field">
+                <label for="resolution_notes"><i class="pi pi-check-circle"></i> Resolution Notes *</label>
+                <textarea
+                    id="resolution_notes"
+                    pTextarea
+                    formControlName="resolution_notes"
+                    rows="4"
+                    class="w-full"
+                    placeholder="Describe what was done to resolve the issue...">
+                </textarea>
+            </div>
+
+            <!-- Cancel: reason -->
+            <div *ngIf="actionType === 'cancel'" class="form-field">
+                <label for="cancel_reason"><i class="pi pi-times-circle"></i> Cancellation Reason</label>
+                <textarea
+                    id="cancel_reason"
+                    pTextarea
+                    formControlName="cancel_reason"
+                    rows="3"
+                    class="w-full"
+                    placeholder="Reason for cancellation...">
+                </textarea>
+            </div>
+        </form>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <p-button
+            label="Cancel"
+            icon="pi pi-times"
+            [text]="true"
+            (click)="showActionDialog = false">
+        </p-button>
+        <p-button
+            [label]="getActionLabel()"
+            [icon]="actionType === 'cancel' ? 'pi pi-times' : 'pi pi-check'"
+            [severity]="actionType === 'cancel' ? 'warn' : 'success'"
+            (click)="executeAction()">
+        </p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Confirm Dialog -->
+<p-confirmDialog></p-confirmDialog>
+
+<!-- Toast -->
+<p-toast position="top-right"></p-toast>

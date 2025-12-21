@@ -108,6 +108,18 @@ export class DmsSelectorComponent {
             route: '/analytics/kpi',
             features: ['KPI Dashboards', 'Performance Reports', 'Lessons Learned', 'Trend Analysis'],
             isActive: true
+        },
+        {
+            id: 'tech',
+            title: 'DMS Tech',
+            subtitle: 'Configuration',
+            description: 'Configure and manage master data: Projects, Production Lines, Parts, Machines, Zones and Targets.',
+            icon: 'pi pi-cog',
+            color: '#6366F1',
+            gradient: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+            route: '/dms-tech/dashboard',
+            features: ['Projects', 'Production Lines', 'Parts & Machines', 'Targets & Headcount'],
+            isActive: true
         }
     ];
 

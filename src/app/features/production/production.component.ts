@@ -30,8 +30,10 @@ import {
     Workstation,
     Machine,
     Shift,
+    ShiftType,
     DowntimeProblem,
-    Downtime
+    Downtime,
+    Zone
 } from '../../core/models';
 import {
     ShiftProductionSession,
@@ -39,8 +41,7 @@ import {
     HourProductionInput,
     DowntimeExtended,
     HourStatus,
-    HourType,
-    HOUR_TYPE_TARGET_PERCENTAGE
+    HourType
 } from '../../core/models/production-session.model';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
 import { environment } from '../../../environments/environment';
@@ -83,6 +84,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         productionLine: null,
         part: null,
         machine: null,
+        zone: null,
         orderNo: '',
         team: [],
         actors: {
@@ -109,14 +111,11 @@ export class ProductionComponent implements OnInit, OnDestroy {
     workstations: Workstation[] = [];
     machines: Machine[] = [];
     downtimeProblems: DowntimeProblem[] = [];
+    shiftTypes: ShiftType[] = [];
+    zones: Zone[] = [];
 
-    // Hour Type Options
-    hourTypeOptions: { label: string; value: HourType }[] = [
-        { label: 'Normal', value: 'normal' },
-        { label: 'Setup', value: 'setup' },
-        { label: 'Break', value: 'break' },
-        { label: 'Extra Hour Break', value: 'extra_hour_break' }
-    ];
+    // Hour Type Options - loaded from database, empty by default
+    hourTypeOptions: { label: string; value: string }[] = [];
 
     // Team Assignment
     employeeIdScan = '';
@@ -675,7 +674,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             project: [null, Validators.required],
             productionLine: [null, Validators.required],
             partNumber: [null, Validators.required],
-            machine: [null]
+            machine: [null],
+            zone: [null]
         });
 
         // Watch for project changes
@@ -708,6 +708,33 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.productionService.getShifts().subscribe(shifts => this.shifts = shifts);
         this.productionService.getProjects().subscribe(projects => this.projects = projects);
         this.productionService.getDowntimeProblems().subscribe(problems => this.downtimeProblems = problems);
+        this.productionService.getActiveShiftTypes().subscribe({
+            next: (shiftTypes) => {
+                this.shiftTypes = shiftTypes;
+                console.log('Loaded shift types:', shiftTypes);
+                // Update hourTypeOptions with database values
+                if (shiftTypes && shiftTypes.length > 0) {
+                    this.hourTypeOptions = shiftTypes.map(st => ({
+                        label: `${st.name} (${st.target_percentage}%)`,
+                        value: st.code
+                    }));
+                    console.log('Updated hourTypeOptions:', this.hourTypeOptions);
+                }
+            },
+            error: (err) => {
+                console.error('Error loading shift types:', err);
+                // Keep fallback options if loading fails
+            }
+        });
+        this.productionService.getActiveZones().subscribe({
+            next: (zones) => {
+                this.zones = zones;
+                console.log('Loaded zones:', zones);
+            },
+            error: (err) => {
+                console.error('Error loading zones:', err);
+            }
+        });
     }
 
     loadProductionLines(projectId: number): void {
@@ -791,6 +818,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.session.productionLine = formValue.productionLine;
         this.session.part = formValue.partNumber;
         this.session.machine = formValue.machine;
+        this.session.zone = formValue.zone;
         this.session.isSetupComplete = true;
 
         // Generate hours for the shift
@@ -1024,8 +1052,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
         const baseTarget = this.getBaseHourlyTarget();
 
         hour.hourType = newType;
-        // Recalculate target based on hour type
-        const targetPercentage = HOUR_TYPE_TARGET_PERCENTAGE[newType];
+        // Recalculate target based on hour type using dynamic ShiftType percentage
+        const shiftType = this.shiftTypes.find(st => st.code === newType);
+        const targetPercentage = shiftType?.target_percentage ?? 100;
         hour.target = Math.round(baseTarget * (targetPercentage / 100));
 
         // Recalculate efficiency if output exists
@@ -1050,23 +1079,23 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     getHourTypeLabel(type: HourType): string {
-        const labels: Record<HourType, string> = {
-            'normal': 'Normal',
-            'setup': 'Setup',
-            'break': 'Break',
-            'extra_hour_break': 'Extra Hour Break'
-        };
-        return labels[type] || type;
+        const shiftType = this.shiftTypes.find(st => st.code === type);
+        if (shiftType) {
+            return `${shiftType.name} (${shiftType.target_percentage}%)`;
+        }
+        return type || '';
     }
 
     getHourTypeSeverity(type: HourType): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
-        const severities: Record<HourType, 'success' | 'info' | 'warn' | 'danger' | 'secondary'> = {
-            'normal': 'success',
-            'setup': 'info',
-            'break': 'warn',
-            'extra_hour_break': 'secondary'
-        };
-        return severities[type] || 'info';
+        const shiftType = this.shiftTypes.find(st => st.code === type);
+        if (shiftType) {
+            // Color based on target percentage
+            if (shiftType.target_percentage >= 100) return 'success';
+            if (shiftType.target_percentage >= 50) return 'info';
+            if (shiftType.target_percentage > 0) return 'warn';
+            return 'secondary'; // 0% target (break)
+        }
+        return 'secondary';
     }
 
     // ==================== HOUR PRODUCTION ====================
@@ -1739,6 +1768,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             productionLine: null,
             part: null,
             machine: null,
+            zone: null,
             orderNo: '',
             team: [],
             actors: {

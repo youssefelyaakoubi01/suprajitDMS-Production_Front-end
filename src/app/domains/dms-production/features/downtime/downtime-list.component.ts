@@ -25,11 +25,9 @@ import { DialogModule } from 'primeng/dialog';
 // Domain imports
 import { DmsProductionService, Downtime, DowntimeProblem } from '@domains/dms-production';
 
+// Extended interface for internal use (Date object instead of string)
 interface DowntimeWithDetails extends Downtime {
-    problemName?: string;
-    productionLine?: string;
-    date?: Date;
-    hour?: number;
+    dateObj?: Date;  // Parsed Date object from date string
 }
 
 @Component({
@@ -188,10 +186,10 @@ interface DowntimeWithDetails extends Downtime {
                                 </span>
                             </td>
                             <td>
-                                <span>{{ dt.productionLine || '-' }}</span>
+                                <span>{{ dt.production_line_name || '-' }}</span>
                             </td>
                             <td>
-                                <p-tag [value]="dt.problemName || 'Unknown'"
+                                <p-tag [value]="dt.problem_name || 'Unknown'"
                                        [severity]="getProblemSeverity(dt.Id_DowntimeProblems)">
                                 </p-tag>
                             </td>
@@ -249,11 +247,11 @@ interface DowntimeWithDetails extends Downtime {
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Production Line:</span>
-                        <span class="detail-value">{{ selectedDowntime.productionLine }}</span>
+                        <span class="detail-value">{{ selectedDowntime.production_line_name || '-' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Problem Type:</span>
-                        <p-tag [value]="selectedDowntime.problemName || 'Unknown'"
+                        <p-tag [value]="selectedDowntime.problem_name || 'Unknown'"
                                [severity]="getProblemSeverity(selectedDowntime.Id_DowntimeProblems)">
                         </p-tag>
                     </div>
@@ -486,8 +484,12 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this.destroy$))
             .subscribe({
                 next: (data) => {
-                    this.downtimes = data;
-                    this.filteredDowntimes = [...data];
+                    // Parse dates and enrich data
+                    this.downtimes = data.map(dt => ({
+                        ...dt,
+                        dateObj: dt.date ? new Date(dt.date) : undefined
+                    }));
+                    this.filteredDowntimes = [...this.downtimes];
                     this.buildCharts();
                     this.loading = false;
                 },
@@ -530,10 +532,10 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     }
 
     private buildCharts(): void {
-        // Category chart
+        // Category chart - using problem_name from backend
         const categoryMap = new Map<string, number>();
         this.downtimes.forEach(dt => {
-            const name = dt.problemName || 'Unknown';
+            const name = dt.problem_name || 'Unknown';
             categoryMap.set(name, (categoryMap.get(name) || 0) + dt.Total_Downtime);
         });
 
@@ -545,14 +547,58 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
             }]
         };
 
-        // Trend chart (mock data for last 7 days)
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        // Trend chart - Real data for last 7 days
+        this.buildTrendChart();
+    }
+
+    private buildTrendChart(): void {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Create array of last 7 days
+        const last7Days: { date: Date; label: string; total: number }[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            last7Days.push({
+                date: date,
+                label: date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }),
+                total: 0
+            });
+        }
+
+        // Aggregate downtime by day using dateObj or parsing date string
+        this.downtimes.forEach(dt => {
+            let dtDate: Date | undefined = dt.dateObj;
+
+            // If no dateObj, try to parse from date string
+            if (!dtDate && dt.date) {
+                dtDate = new Date(dt.date);
+            }
+
+            if (!dtDate || isNaN(dtDate.getTime())) return;
+
+            // Normalize to midnight
+            const normalizedDate = new Date(dtDate);
+            normalizedDate.setHours(0, 0, 0, 0);
+
+            const dayEntry = last7Days.find(day => {
+                return day.date.getTime() === normalizedDate.getTime();
+            });
+
+            if (dayEntry) {
+                dayEntry.total += dt.Total_Downtime || 0;
+            }
+        });
+
+        // Build chart data with dynamic colors based on severity
         this.trendChartData = {
-            labels: days,
+            labels: last7Days.map(d => d.label),
             datasets: [{
                 label: 'Downtime (min)',
-                data: [45, 30, 60, 25, 40, 15, 35],
-                backgroundColor: '#EF4444'
+                data: last7Days.map(d => d.total),
+                backgroundColor: last7Days.map(d => d.total > 60 ? '#EF4444' : d.total > 30 ? '#F59E0B' : '#10B981'),
+                borderRadius: 4
             }]
         };
     }
@@ -571,7 +617,7 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
 
         const problemMap = new Map<string, number>();
         this.downtimes.forEach(dt => {
-            const name = dt.problemName || 'Unknown';
+            const name = dt.problem_name || 'Unknown';
             problemMap.set(name, (problemMap.get(name) || 0) + 1);
         });
 

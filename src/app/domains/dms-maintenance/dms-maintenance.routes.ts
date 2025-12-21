@@ -47,18 +47,11 @@ export const DMS_MAINTENANCE_ROUTES: Routes = [
             import('./features/production-kpi/production-kpi.component').then(m => m.ProductionKpiComponent),
         title: 'Production KPI'
     },
-    // Legacy routes
     {
         path: 'tickets',
         loadComponent: () =>
             import('./features/tickets/tickets-list.component').then(m => m.TicketsListComponent),
         title: 'Maintenance Tickets'
-    },
-    {
-        path: 'legacy',
-        loadComponent: () =>
-            import('@features/maintenance/maintenance.component').then(m => m.MaintenanceComponent),
-        title: 'Maintenance (Legacy)'
     }
 ];
 

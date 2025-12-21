@@ -46,8 +46,23 @@ export interface Downtime {
     Comment_Downtime: string;
     Id_HourlyProd: number;
     Id_DowntimeProblems: number;
+    zone?: number;
+    zone_name?: string;
+    zone_code?: string;
     machine?: number;
     machine_name?: string;
+    machine_code?: string;
+    // Additional display fields
+    production_line_name?: string;
+    project_name?: string;
+    workstation_name?: string;
+    date?: string;
+    shift_name?: string;
+    hour?: number;
+    status?: string;
+    resolution?: string;
+    assigned_to?: string;
+    created_at?: string;
 }
 
 export interface DowntimeProblem {
@@ -96,6 +111,75 @@ export interface Shift {
     // Computed fields for frontend convenience
     startHour?: number;
     endHour?: number;
+}
+
+export interface ShiftType {
+    id: number;
+    name: string;
+    code: string;
+    target_percentage: number;  // 0-100: percentage of base target
+    description?: string;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export type ZoneType = 'production' | 'maintenance' | 'storage' | 'quality';
+
+export interface Zone {
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    project?: number;
+    project_name?: string;
+    zone_type: ZoneType;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface PartLineAssignment {
+    id: number;
+    part: number;
+    part_number?: string;
+    part_name?: string;
+    part_default_target?: number;
+    production_line: number;
+    line_name?: string;
+    line_code?: string;
+    project_name?: string;
+    specific_target?: number;
+    specific_efficiency?: number;
+    specific_cycle_time?: number;
+    effective_target?: number;
+    effective_efficiency?: number;
+    is_primary: boolean;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface HeadcountRequirement {
+    id?: number;
+    production_line: number;
+    line_name?: string;
+    line_code?: string;
+    project_name?: string;
+    part?: number;
+    part_number?: string;
+    part_name?: string;
+    shift_type?: number;
+    shift_type_name?: string;
+    shift_type_code?: string;
+    operators_required: number;
+    technicians_required: number;
+    quality_agents_required: number;
+    total_required?: number;
+    notes?: string;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface TeamAssignment {

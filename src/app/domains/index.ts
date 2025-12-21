@@ -29,3 +29,6 @@ export * from './dms-inventory';
 
 // DMS-Analytics
 export * from './dms-analytics';
+
+// DMS-Tech (Configuration)
+export * from './dms-tech';

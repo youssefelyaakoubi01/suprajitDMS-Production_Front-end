@@ -23,13 +23,6 @@ export const DMS_INVENTORY_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/parts/parts-list.component').then(m => m.PartsListComponent),
         title: 'Parts List'
-    },
-    // Legacy route - fallback to old component
-    {
-        path: 'legacy',
-        loadComponent: () =>
-            import('@features/inventory/inventory.component').then(m => m.InventoryComponent),
-        title: 'Inventory (Legacy)'
     }
 ];
 

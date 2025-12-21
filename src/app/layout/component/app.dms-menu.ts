@@ -58,6 +58,11 @@ export class AppDmsMenu {
                         label: 'Shifts',
                         icon: 'pi pi-fw pi-calendar',
                         routerLink: ['/dms-production/settings/shifts']
+                    },
+                    {
+                        label: 'Shift Types',
+                        icon: 'pi pi-fw pi-sliders-h',
+                        routerLink: ['/dms-production/settings/shift-types']
                     }
                 ]
             },

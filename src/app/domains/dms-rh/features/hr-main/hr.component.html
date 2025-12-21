@@ -1,0 +1,2298 @@
+<div class="hr-container">
+    <!-- Modern Header Toolbar - Responsive -->
+    <p-toolbar styleClass="mb-4 surface-ground border-round hr-header-toolbar">
+        <ng-template #start>
+            <div class="flex flex-column">
+                <h1 class="header-title m-0 text-color">DMS - Human Resources</h1>
+                <span class="header-subtitle text-color-secondary">Manage employees, formations, qualifications and teams</span>
+            </div>
+        </ng-template>
+        <ng-template #end>
+            <div class="header-actions">
+                <button pButton icon="pi pi-upload" class="p-button-secondary p-button-text action-btn"
+                    (click)="openImportDialog()" pTooltip="Import Excel">
+                    <span class="btn-label">Import</span>
+                </button>
+                <button pButton icon="pi pi-download" class="p-button-secondary p-button-text action-btn"
+                    (click)="exportEmployees()" pTooltip="Export Data">
+                    <span class="btn-label">Export</span>
+                </button>
+                <span class="header-divider"></span>
+                <button pButton icon="pi pi-plus" class="add-employee-btn"
+                    (click)="openNewEmployeeDialog()" pTooltip="Add Employee">
+                    <span class="btn-label">Add Employee</span>
+                </button>
+            </div>
+        </ng-template>
+    </p-toolbar>
+
+    <!-- Main Tabs -->
+    <p-tabs [value]="activeTab" (onChange)="onTabChange($event)">
+        <p-tablist>
+            <p-tab value="0"><i class="pi pi-chart-bar mr-2"></i>Dashboard</p-tab>
+            <p-tab value="1"><i class="pi pi-users mr-2"></i>Employees</p-tab>
+            <p-tab value="2"><i class="pi pi-book mr-2"></i>Formations</p-tab>
+            <p-tab value="3"><i class="pi pi-th-large mr-2"></i>Versatility Matrix</p-tab>
+            <p-tab value="4"><i class="pi pi-refresh mr-2"></i>Recyclage</p-tab>
+            <p-tab value="5"><i class="pi pi-sitemap mr-2"></i>Teams & Trainers</p-tab>
+            <p-tab value="6"><i class="pi pi-user-edit mr-2"></i>Users & Access</p-tab>
+            <p-tab value="7"><i class="pi pi-id-card mr-2"></i>Licenses Manager</p-tab>
+            <p-tab value="8"><i class="pi pi-desktop mr-2"></i>Workstations</p-tab>
+        </p-tablist>
+
+        <p-tabpanels>
+            <!-- TAB 0: Dashboard -->
+            <p-tabpanel value="0">
+                <!-- Loading Skeleton for KPI Cards -->
+                <div class="kpi-row" *ngIf="loadingStats">
+                    <div class="modern-kpi-card" *ngFor="let i of [1,2,3,4]">
+                        <div class="flex justify-content-between mb-3">
+                            <p-skeleton width="60%" height="1rem"></p-skeleton>
+                            <p-skeleton shape="circle" size="3rem"></p-skeleton>
+                        </div>
+                        <p-skeleton width="40%" height="2rem" styleClass="mb-2"></p-skeleton>
+                        <p-skeleton width="80%" height="0.5rem"></p-skeleton>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid" *ngIf="dashboardStats && !loadingStats">
+                    <!-- Modern KPI Cards with Trends -->
+                    <div class="kpi-row">
+                        <div class="modern-kpi-card" *ngFor="let kpi of kpiData">
+                            <div class="kpi-header">
+                                <span class="kpi-label">{{ kpi.label }}</span>
+                                <div class="kpi-icon-wrapper" [ngClass]="'bg-' + kpi.color + '-100'">
+                                    <i [ngClass]="kpi.icon + ' text-' + kpi.color + '-500'"></i>
+                                </div>
+                            </div>
+                            <div class="kpi-body">
+                                <span class="kpi-value">{{ kpi.value }}</span>
+                                <div class="kpi-trend" [class.positive]="kpi.trend > 0" [class.negative]="kpi.trend < 0">
+                                    <i [ngClass]="kpi.trend >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"></i>
+                                    <span>{{ kpi.trend }} {{ kpi.trendLabel || '' }}</span>
+                                </div>
+                            </div>
+                            <p-progressBar [value]="kpi.progress" [showValue]="false" styleClass="h-1 mt-3"></p-progressBar>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="charts-row" *ngIf="showCharts">
+                        <p-card header="Employees by Department">
+                            <div class="chart-container">
+                                <p-chart type="doughnut" [data]="employeesByDeptChart"
+                                    [options]="pieChartOptions"></p-chart>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Employees by Category">
+                            <div class="chart-container">
+                                <p-chart type="pie" [data]="employeesByCategoryChart"
+                                    [options]="pieChartOptions"></p-chart>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Employees by Status">
+                            <div class="chart-container">
+                                <p-chart type="doughnut" [data]="employeesByStatusChart"
+                                    [options]="pieChartOptions"></p-chart>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Formations by Type" *ngIf="formationStats">
+                            <div class="chart-container">
+                                <p-chart type="bar" [data]="formationsByTypeChart" [options]="barChartOptions"></p-chart>
+                            </div>
+                        </p-card>
+                    </div>
+
+                    <!-- Formation Stats -->
+                    <div class="stats-row" *ngIf="formationStats">
+                        <p-card header="Formation Overview">
+                            <div class="formation-stats">
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ formationStats.totalFormations }}</span>
+                                    <span class="stat-label">Total Formations</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value text-warning">{{ formationStats.plannedFormations }}</span>
+                                    <span class="stat-label">Planned</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value text-success">{{ formationStats.completedFormations
+                                        }}</span>
+                                    <span class="stat-label">Completed</span>
+                                </div>
+                            </div>
+                        </p-card>
+
+                        <p-card header="Versatility Score">
+                            <div class="versatility-score">
+                                <div class="score-circle">
+                                    <span class="score-value">{{ dashboardStats.averageVersatility | number:'1.1-1'
+                                        }}</span>
+                                    <span class="score-max">/ 4</span>
+                                </div>
+                                <p-progressBar [value]="(dashboardStats.averageVersatility / 4) * 100"
+                                    [showValue]="false"></p-progressBar>
+                                <span class="score-label">Average Versatility Level</span>
+                            </div>
+                        </p-card>
+                    </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 1: Employee Directory -->
+            <p-tabpanel value="1">
+                <!-- Modern Filter Toolbar -->
+                <p-toolbar styleClass="mb-3 surface-ground border-round">
+                    <ng-template #start>
+                        <p-iconfield iconPosition="left" class="toolbar-search">
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input pInputText [(ngModel)]="searchTerm" placeholder="Search employees..."
+                                   style="width: 280px" />
+                        </p-iconfield>
+                    </ng-template>
+
+                    <ng-template #center>
+                        <!-- Quick Filters -->
+                        <p-selectbutton [options]="quickFilterOptions" [(ngModel)]="selectedQuickFilter"
+                            optionLabel="label" optionValue="value" (onChange)="applyQuickFilter()">
+                        </p-selectbutton>
+                    </ng-template>
+
+                    <ng-template #end>
+                        <p-button icon="pi pi-sliders-h" [text]="true" [rounded]="true"
+                            (onClick)="showAdvancedFilters = !showAdvancedFilters"
+                            [badge]="activeFilterCount > 0 ? activeFilterCount.toString() : undefined"
+                            pTooltip="Advanced Filters">
+                        </p-button>
+                        <button pButton icon="pi pi-plus" label="Add Employee" class="ml-2"
+                            (click)="openNewEmployeeDialog()"></button>
+                    </ng-template>
+                </p-toolbar>
+
+                <!-- Advanced Filters Panel (collapsible) -->
+                <div class="advanced-filters" *ngIf="showAdvancedFilters" @slideDown>
+                    <div class="filter-grid">
+                        <p-select [options]="departmentEntities" [(ngModel)]="selectedDepartment" optionLabel="name"
+                            optionValue="name" placeholder="Department" [showClear]="true"
+                            (onChange)="applyFilters()"></p-select>
+                        <p-select [options]="categories" [(ngModel)]="selectedCategory" optionLabel="name"
+                            optionValue="name" placeholder="Category" [showClear]="true"
+                            (onChange)="applyFilters()"></p-select>
+                        <p-select [options]="statuses.length > 0 ? statuses : statusOptions" [(ngModel)]="selectedStatus"
+                            [optionLabel]="statuses.length > 0 ? 'name' : 'label'"
+                            [optionValue]="statuses.length > 0 ? 'name' : 'value'"
+                            placeholder="Status" [showClear]="true"
+                            (onChange)="applyFilters()"></p-select>
+                    </div>
+
+                    <!-- Active Filter Chips -->
+                    <div class="active-filters mt-3" *ngIf="hasActiveFilters()">
+                        <span class="text-sm text-color-secondary mr-2">Active filters:</span>
+                        <p-chip *ngFor="let filter of activeFilters" [label]="filter.label"
+                            [removable]="true" (onRemove)="removeFilter(filter)"></p-chip>
+                        <button pButton label="Clear all" class="p-button-text p-button-sm"
+                            icon="pi pi-times" (click)="clearAllFilters()"></button>
+                    </div>
+                </div>
+
+                <!-- Employee Table with Row Expansion -->
+                <p-table #employeeTable [value]="filteredEmployees" [paginator]="true" [rows]="10" [rowHover]="true"
+                    [loading]="loading" [expandedRowKeys]="expandedRows" dataKey="Id_Emp"
+                    [rowsPerPageOptions]="[10, 25, 50]"
+                    [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'BadgeNumber', 'Departement_Emp']">
+
+                    <!-- Table Caption with Counter -->
+                    <ng-template pTemplate="caption">
+                        <div class="flex justify-content-between align-items-center">
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-users mr-2"></i>Employees ({{ filteredEmployees.length }})
+                            </span>
+                        </div>
+                    </ng-template>
+
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th style="width: 3rem"></th>
+                            <th style="width: 60px">Photo</th>
+                            <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
+                            <th pSortableColumn="BadgeNumber">Badge <p-sortIcon field="BadgeNumber"></p-sortIcon></th>
+                            <th pSortableColumn="Departement_Emp">Department <p-sortIcon
+                                    field="Departement_Emp"></p-sortIcon></th>
+                            <th style="width: 100px">Status</th>
+                            <th style="width: 120px">Actions</th>
+                        </tr>
+                    </ng-template>
+
+                    <ng-template pTemplate="body" let-emp let-expanded="expanded">
+                        <tr>
+                            <td>
+                                <button pButton type="button" [pRowToggler]="emp" class="p-button-text p-button-rounded"
+                                    [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'">
+                                </button>
+                            </td>
+                            <td>
+                                <p-avatar *ngIf="emp.Picture" [image]="getEmployeePictureUrl(emp.Picture)" shape="circle"
+                                    size="large"></p-avatar>
+                                <p-avatar *ngIf="!emp.Picture" [label]="getInitials(emp)" shape="circle" size="large"
+                                    styleClass="bg-primary text-white"></p-avatar>
+                            </td>
+                            <td>
+                                <div class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</div>
+                                <div class="text-sm text-color-secondary">{{ emp.category_fk_detail?.name || emp.Categorie_Emp }}</div>
+                            </td>
+                            <td><code>{{ emp.BadgeNumber || emp.employee_id || '-' }}</code></td>
+                            <td>{{ emp.Departement_Emp }}</td>
+                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag></td>
+                            <td>
+                                <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text" (click)="editEmployee(emp)"
+                                    pTooltip="Edit"></button>
+                                <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                    (click)="deleteEmployee(emp)" pTooltip="Delete"></button>
+                            </td>
+                        </tr>
+                    </ng-template>
+
+                    <!-- Row Expansion - Inline Details -->
+                    <ng-template pTemplate="rowexpansion" let-emp>
+                        <tr>
+                            <td colspan="7">
+                                <div class="expanded-row-content">
+                                    <div class="grid">
+                                        <div class="col-12 md:col-4">
+                                            <h4><i class="pi pi-user mr-2"></i>Personal Information</h4>
+                                            <div class="field">
+                                                <label>Date of Birth</label>
+                                                <p>{{ emp.DateNaissance_Emp | date:'dd/MM/yyyy' }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Gender</label>
+                                                <p>{{ emp.Genre_Emp === 'M' ? 'Male' : 'Female' }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Category</label>
+                                                <p>{{ emp.category_fk_detail?.name || emp.Categorie_Emp }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 md:col-4">
+                                            <h4><i class="pi pi-briefcase mr-2"></i>Employment Details</h4>
+                                            <div class="field">
+                                                <label>Hire Date</label>
+                                                <p>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Team</label>
+                                                <p>{{ getTeamName(emp.team) }}</p>
+                                            </div>
+                                            <div class="field">
+                                                <label>Route (Trajet)</label>
+                                                <p>{{ getTrajetName(emp.trajet) }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 md:col-4">
+                                            <h4><i class="pi pi-bolt mr-2"></i>Quick Actions</h4>
+                                            <div class="flex flex-column gap-2">
+                                                <button pButton label="View Qualifications" icon="pi pi-list"
+                                                    class="p-button-outlined p-button-sm" (click)="viewEmployee(emp)"></button>
+                                                <button pButton label="Assign to Training" icon="pi pi-book"
+                                                    class="p-button-outlined p-button-sm" (click)="openNewQualificationDialog(); selectedEmployee = emp"></button>
+                                                <button pButton label="Edit Full Profile" icon="pi pi-user-edit"
+                                                    class="p-button-sm" (click)="editEmployee(emp)"></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+
+                    <!-- Improved Empty State -->
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="pi pi-users"></i>
+                                    <span class="empty-title">No employees found</span>
+                                    <span class="empty-subtitle">Try adjusting your filters or add a new employee</span>
+                                    <button pButton label="Add Employee" icon="pi pi-plus" (click)="openNewEmployeeDialog()"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </p-tabpanel>
+
+            <!-- TAB 2: Formations -->
+            <p-tabpanel value="2">
+                <div class="formations-tab">
+                    <!-- Stats Mini Cards Row - Responsive Grid -->
+                    <div class="stats-mini-grid">
+                        <!-- Total Formations -->
+                        <div class="stat-mini-card">
+                            <div class="stat-icon-container">
+                                <div class="stat-icon blue">
+                                    <i class="pi pi-book"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ formations.length }}</div>
+                            <div class="stat-label">Total Formations</div>
+                        </div>
+                        <!-- Active Trainers -->
+                        <div class="stat-mini-card">
+                            <div class="stat-icon-container">
+                                <div class="stat-icon green">
+                                    <i class="pi pi-user"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ activeTrainersCount }}</div>
+                            <div class="stat-label">Active Trainers</div>
+                        </div>
+                        <!-- Processes -->
+                        <div class="stat-mini-card">
+                            <div class="stat-icon-container">
+                                <div class="stat-icon purple">
+                                    <i class="pi pi-cog"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ processes.length }}</div>
+                            <div class="stat-label">Processes</div>
+                        </div>
+                        <!-- Planned Sessions -->
+                        <div class="stat-mini-card">
+                            <div class="stat-icon-container">
+                                <div class="stat-icon orange">
+                                    <i class="pi pi-calendar"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">{{ ongoingSessions }}</div>
+                            <div class="stat-label">Planned Sessions</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Content: Two Column Layout - Responsive -->
+                    <div class="two-column-layout">
+                        <!-- Left Column: Available Formations (70%) -->
+                        <div class="main-column">
+                            <p-card>
+                                <ng-template pTemplate="header">
+                                    <div class="card-header-icon">
+                                        <div class="header-content">
+                                            <div class="header-icon blue">
+                                                <i class="pi pi-book"></i>
+                                            </div>
+                                            <div class="header-text">
+                                                <h3>Available Formations</h3>
+                                                <span>Grouped by process</span>
+                                            </div>
+                                        </div>
+                                        <div class="header-actions">
+                                            <button pButton label="New Qualification" icon="pi pi-plus-circle"
+                                                class="p-button-secondary p-button-outlined p-button-sm" (click)="openNewQualificationDialog()"></button>
+                                            <button pButton label="New Formation" icon="pi pi-plus" class="p-button-sm"
+                                                (click)="openNewFormationDialog()"></button>
+                                        </div>
+                                    </div>
+                                </ng-template>
+
+                                <!-- Accordion grouped by Process -->
+                                <div class="p-3" *ngIf="formations.length > 0">
+                                    <p-accordion [multiple]="true" class="formation-accordion">
+                                        <p-accordionpanel *ngFor="let item of groupedFormations | keyvalue">
+                                            <p-accordionheader>
+                                                <div class="accordion-header-content">
+                                                    <div class="accordion-header-icon purple">
+                                                        <i class="pi pi-cog"></i>
+                                                    </div>
+                                                    <span class="accordion-header-title">{{ item.key }}</span>
+                                                    <p-badge [value]="item.value.length.toString()" severity="secondary"></p-badge>
+                                                </div>
+                                            </p-accordionheader>
+                                            <p-accordioncontent>
+                                                <div *ngFor="let formation of item.value" class="formation-row">
+                                                    <div class="formation-icon">
+                                                        <i class="pi pi-bookmark"></i>
+                                                    </div>
+                                                    <div class="formation-info">
+                                                        <div class="formation-name">{{ formation.name }}</div>
+                                                        <div class="formation-meta">
+                                                            <span class="flex align-items-center gap-1">
+                                                                <i class="pi pi-clock text-xs"></i>
+                                                                {{ formation.duration_hours || 0 }}h
+                                                            </span>
+                                                            <p-tag [value]="formation.type" size="small" [rounded]="true"></p-tag>
+                                                        </div>
+                                                    </div>
+                                                    <div class="formation-actions" (click)="$event.stopPropagation()">
+                                                        <button pButton icon="pi pi-pencil" class="p-button-text p-button-rounded p-button-sm"
+                                                            (click)="editFormation(formation)" pTooltip="Edit"></button>
+                                                        <button pButton icon="pi pi-trash" class="p-button-text p-button-rounded p-button-sm p-button-danger"
+                                                            (click)="deleteFormation(formation)" pTooltip="Delete"></button>
+                                                    </div>
+                                                </div>
+                                            </p-accordioncontent>
+                                        </p-accordionpanel>
+                                    </p-accordion>
+                                </div>
+
+                                <!-- Empty state if no formations -->
+                                <div *ngIf="formations.length === 0" class="empty-state-centered">
+                                    <i class="pi pi-book"></i>
+                                    <span class="empty-title">No formations available</span>
+                                    <span class="empty-subtitle">Create your first formation to get started</span>
+                                    <button pButton label="New Formation" icon="pi pi-plus" (click)="openNewFormationDialog()"></button>
+                                </div>
+                            </p-card>
+                        </div>
+
+                        <!-- Right Column: Trainers & Quick Actions (30%) -->
+                        <div class="side-column">
+                            <!-- Trainers Card -->
+                            <p-card>
+                                <ng-template pTemplate="header">
+                                    <div class="card-header-icon">
+                                        <div class="header-content">
+                                            <div class="header-icon purple">
+                                                <i class="pi pi-users"></i>
+                                            </div>
+                                            <div class="header-text">
+                                                <h3>Trainers</h3>
+                                                <span>{{ formateurs.length }} formateurs</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ng-template>
+
+                                <div class="p-3">
+                                    <div *ngFor="let trainer of formateurs" class="trainer-row">
+                                        <p-avatar [label]="(trainer.name || trainer.Name || '?').charAt(0)" shape="circle"
+                                            styleClass="bg-purple-500 text-white"></p-avatar>
+                                        <div class="trainer-info">
+                                            <div class="trainer-name">{{ trainer.name || trainer.Name }}</div>
+                                            <div class="trainer-email">{{ trainer.email || trainer.login || '-' }}</div>
+                                        </div>
+                                        <p-tag [value]="(trainer.is_active || trainer.Status === 'Active') ? 'Active' : 'Inactive'"
+                                            [severity]="(trainer.is_active || trainer.Status === 'Active') ? 'success' : 'danger'"
+                                            size="small" [rounded]="true"></p-tag>
+                                        <div class="trainer-actions">
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text p-button-sm"
+                                                (click)="editFormateur(trainer)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-sm p-button-danger"
+                                                (click)="deleteFormateur(trainer)" pTooltip="Delete"></button>
+                                        </div>
+                                    </div>
+
+                                    <div *ngIf="formateurs.length === 0" class="empty-state-centered p-4">
+                                        <i class="pi pi-users"></i>
+                                        <span>No trainers yet</span>
+                                    </div>
+
+                                    <!-- Add Trainer Button -->
+                                    <div (click)="openNewFormateurDialog()" class="add-trainer-btn">
+                                        <i class="pi pi-plus"></i>
+                                        <span>Add New Trainer</span>
+                                    </div>
+                                </div>
+                            </p-card>
+
+                            <!-- Quick Actions Card -->
+                            <p-card>
+                                <ng-template pTemplate="header">
+                                    <div class="card-header-icon">
+                                        <div class="header-content">
+                                            <div class="header-icon green">
+                                                <i class="pi pi-bolt"></i>
+                                            </div>
+                                            <div class="header-text">
+                                                <h3>Quick Actions</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ng-template>
+                                <div class="quick-actions">
+                                    <button pButton label="Schedule Training Session" icon="pi pi-calendar-plus"
+                                        class="p-button-outlined w-full justify-content-start" (click)="openNewQualificationDialog()"></button>
+                                    <button pButton label="View Training Reports" icon="pi pi-chart-bar"
+                                        class="p-button-outlined p-button-secondary w-full justify-content-start"></button>
+                                    <button pButton label="Manage Processes" icon="pi pi-cog"
+                                        class="p-button-outlined p-button-secondary w-full justify-content-start"></button>
+                                </div>
+                            </p-card>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process & Specialization Management - Side by Side Layout - Responsive -->
+                <div class="side-by-side-layout mt-4">
+                    <!-- Process Management Section (50%) -->
+                    <div class="column">
+                        <p-card>
+                            <ng-template pTemplate="header">
+                                <div class="card-header-icon compact">
+                                    <div class="header-content">
+                                        <div class="header-icon purple small">
+                                            <i class="pi pi-cog"></i>
+                                        </div>
+                                        <div class="header-text">
+                                            <h3>Process Management</h3>
+                                            <span>{{ processes.length }} processes</span>
+                                        </div>
+                                    </div>
+                                    <button pButton icon="pi pi-plus" class="p-button-rounded p-button-sm" (click)="openNewProcessDialog()" pTooltip="Add Process"></button>
+                                </div>
+                            </ng-template>
+                            <div class="scrollable-container">
+                                <div *ngFor="let process of processes" class="process-row">
+                                    <div class="process-info">
+                                        <div class="process-header">
+                                            <code class="process-code">{{ process.code }}</code>
+                                            <span class="process-name">{{ process.name }}</span>
+                                        </div>
+                                        <div class="process-description">
+                                            {{ process.description || 'No description' }}
+                                        </div>
+                                    </div>
+                                    <p-tag [value]="process.is_active ? 'Active' : 'Inactive'"
+                                        [severity]="process.is_active ? 'success' : 'danger'" size="small"></p-tag>
+                                    <div class="process-actions">
+                                        <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text p-button-sm"
+                                            (click)="editProcess(process)" pTooltip="Edit"></button>
+                                        <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-sm p-button-danger"
+                                            (click)="deleteProcess(process)" pTooltip="Delete"></button>
+                                    </div>
+                                </div>
+                                <div *ngIf="processes.length === 0" class="empty-state-centered p-4">
+                                    <i class="pi pi-cog"></i>
+                                    <span class="text-sm text-color-secondary">No processes found</span>
+                                    <button pButton label="Add Process" icon="pi pi-plus" class="p-button-text p-button-sm mt-2"
+                                        (click)="openNewProcessDialog()"></button>
+                                </div>
+                            </div>
+                        </p-card>
+                    </div>
+
+                    <!-- Specialization Management Section (50%) -->
+                    <div class="column">
+                        <p-card>
+                            <ng-template pTemplate="header">
+                                <div class="card-header-icon compact">
+                                    <div class="header-content">
+                                        <div class="header-icon orange small">
+                                            <i class="pi pi-star"></i>
+                                        </div>
+                                        <div class="header-text">
+                                            <h3>Specialization Management</h3>
+                                            <span>{{ specializations.length }} specializations</span>
+                                        </div>
+                                    </div>
+                                    <button pButton icon="pi pi-plus" class="p-button-rounded p-button-sm" (click)="openNewSpecializationDialog()" pTooltip="Add Specialization"></button>
+                                </div>
+                            </ng-template>
+                            <div class="scrollable-container">
+                                <div *ngFor="let spec of specializations" class="spec-row">
+                                    <div class="process-info">
+                                        <div class="process-name">{{ spec.name }}</div>
+                                        <div class="process-description">
+                                            {{ spec.description || 'No description' }}
+                                        </div>
+                                    </div>
+                                    <p-tag [value]="spec.is_active !== false ? 'Active' : 'Inactive'"
+                                        [severity]="spec.is_active !== false ? 'success' : 'danger'" size="small"></p-tag>
+                                    <div class="process-actions">
+                                        <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text p-button-sm"
+                                            (click)="editSpecialization(spec)" pTooltip="Edit"></button>
+                                        <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-sm p-button-danger"
+                                            (click)="deleteSpecialization(spec)" pTooltip="Delete"></button>
+                                    </div>
+                                </div>
+                                <div *ngIf="specializations.length === 0" class="empty-state-centered p-4">
+                                    <i class="pi pi-star"></i>
+                                    <span class="text-sm text-color-secondary">No specializations found</span>
+                                    <button pButton label="Add Specialization" icon="pi pi-plus" class="p-button-text p-button-sm mt-2"
+                                        (click)="openNewSpecializationDialog()"></button>
+                                </div>
+                            </div>
+                        </p-card>
+                    </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 3: Versatility Matrix -->
+            <p-tabpanel value="3">
+                <div class="tab-header">
+                    <h3>Versatility Matrix</h3>
+                    <div class="legend">
+                        <span *ngFor="let level of qualificationLevels" class="legend-item">
+                            <span class="legend-color" [style.background-color]="level.color"></span>
+                            {{ level.label }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="matrix-container" *ngIf="versatilityMatrix">
+                    <table class="versatility-table">
+                        <thead>
+                            <tr>
+                                <th class="employee-header">Employee</th>
+                                <th *ngFor="let ws of versatilityMatrix.workstations" class="ws-header">
+                                    {{ ws.desc_workstation }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let emp of versatilityMatrix.employees">
+                                <td class="employee-cell">
+                                    <div class="employee-info-mini">
+                                        <p-avatar [label]="getInitials(emp)" shape="circle"
+                                            styleClass="bg-primary text-white"></p-avatar>
+                                        <span>{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
+                                    </div>
+                                </td>
+                                <td *ngFor="let ws of versatilityMatrix.workstations" class="level-cell">
+                                    <div class="level-indicator"
+                                        [style.background-color]="getVersatilityColor(getVersatilityLevel(emp.Id_Emp, ws.id_workstation))"
+                                        [pTooltip]="qualificationLevels[getVersatilityLevel(emp.Id_Emp, ws.id_workstation)].label"
+                                        (click)="updateVersatility(emp.Id_Emp, ws.id_workstation, (getVersatilityLevel(emp.Id_Emp, ws.id_workstation) + 1) % 5)">
+                                        {{ getVersatilityLevel(emp.Id_Emp, ws.id_workstation) }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 4: Recyclage -->
+            <p-tabpanel value="4">
+                <!-- Section 1: All Employees - Select for Recyclage -->
+                <p-toolbar styleClass="mb-3 surface-ground border-round">
+                    <ng-template #start>
+                        <p-iconfield iconPosition="left">
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input pInputText [(ngModel)]="playlistSearchTerm" placeholder="Search employees..."
+                                (input)="filterEmployeePlaylist()" style="width: 280px" />
+                        </p-iconfield>
+                    </ng-template>
+
+                    <ng-template #center>
+                        <div class="flex align-items-center gap-2">
+                            <p-select [options]="departmentEntities" [(ngModel)]="playlistDeptFilter"
+                                optionLabel="name" optionValue="name" placeholder="Department"
+                                (onChange)="filterEmployeePlaylist()" [showClear]="true" [style]="{width: '150px'}">
+                            </p-select>
+                            <p-select [options]="categories" [(ngModel)]="playlistCategoryFilter"
+                                optionLabel="name" optionValue="name" placeholder="Category"
+                                (onChange)="filterEmployeePlaylist()" [showClear]="true" [style]="{width: '140px'}">
+                            </p-select>
+                        </div>
+                    </ng-template>
+
+                    <ng-template #end>
+                        <button pButton icon="pi pi-calendar-plus"
+                            [label]="'Plan Recyclage' + (selectedPlaylistEmployees.length > 0 ? ' (' + selectedPlaylistEmployees.length + ')' : '')"
+                            class="p-button-success" (click)="openBatchRecyclageDialog()"
+                            [disabled]="selectedPlaylistEmployees.length === 0">
+                        </button>
+                    </ng-template>
+                </p-toolbar>
+
+                <p-table #recyclageTable [value]="filteredEmployeePlaylist" [paginator]="true" [rows]="10"
+                    [rowHover]="true" [rowsPerPageOptions]="[10, 25, 50]" [(selection)]="selectedPlaylistEmployees"
+                    dataKey="Id_Emp" [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Id_Emp', 'BadgeNumber', 'Departement_Emp']">
+
+                    <ng-template pTemplate="caption">
+                        <div class="flex justify-content-between align-items-center">
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-users mr-2"></i>All Employees ({{ filteredEmployeePlaylist.length }})
+                            </span>
+                            <div class="flex align-items-center gap-3" *ngIf="selectedPlaylistEmployees.length > 0">
+                                <span class="text-primary font-medium">{{ selectedPlaylistEmployees.length }} selected</span>
+                                <button pButton label="Clear" icon="pi pi-times" class="p-button-text p-button-sm"
+                                    (click)="clearEmployeeSelection()"></button>
+                            </div>
+                        </div>
+                    </ng-template>
+
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th style="width: 3rem"><p-tableHeaderCheckbox></p-tableHeaderCheckbox></th>
+                            <th style="width: 60px">Photo</th>
+                            <th pSortableColumn="Nom_Emp">Name <p-sortIcon field="Nom_Emp"></p-sortIcon></th>
+                            <th pSortableColumn="BadgeNumber">Badge <p-sortIcon field="BadgeNumber"></p-sortIcon></th>
+                            <th pSortableColumn="Departement_Emp">Department <p-sortIcon field="Departement_Emp"></p-sortIcon></th>
+                            <th style="width: 100px">Status</th>
+                            <th style="width: 100px">Actions</th>
+                        </tr>
+                    </ng-template>
+
+                    <ng-template pTemplate="body" let-emp>
+                        <tr>
+                            <td><p-tableCheckbox [value]="emp"></p-tableCheckbox></td>
+                            <td>
+                                <p-avatar *ngIf="emp.Picture" [image]="getEmployeePictureUrl(emp.Picture)"
+                                    shape="circle" size="large"></p-avatar>
+                                <p-avatar *ngIf="!emp.Picture" [label]="getInitials(emp)" shape="circle"
+                                    size="large" styleClass="bg-primary text-white"></p-avatar>
+                            </td>
+                            <td>
+                                <div class="font-semibold">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</div>
+                                <div class="text-sm text-color-secondary">{{ emp.category_fk?.name || emp.Categorie_Emp }}</div>
+                            </td>
+                            <td><code>{{ emp.BadgeNumber || emp.Id_Emp || '-' }}</code></td>
+                            <td>{{ emp.Departement_Emp }}</td>
+                            <td><p-tag [value]="emp.EmpStatus" [severity]="getStatusSeverity(emp.EmpStatus)"></p-tag></td>
+                            <td>
+                                <button pButton icon="pi pi-calendar-plus" class="p-button-rounded p-button-text"
+                                    (click)="openSingleRecyclageFromPlaylist(emp)" pTooltip="Plan Recyclage"></button>
+                            </td>
+                        </tr>
+                    </ng-template>
+
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="7" class="text-center p-4">
+                                <i class="pi pi-search text-4xl text-color-secondary mb-3" style="display: block;"></i>
+                                <p class="text-lg font-medium">No employees found</p>
+                                <p class="text-color-secondary">Try adjusting your search or filters</p>
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+
+                <!-- Section 2: Employees Requiring Recyclage (Alert Section) -->
+                <div class="mt-4">
+                    <p-table [value]="recyclageEmployees" [rows]="5" [paginator]="true" [rowHover]="true">
+                        <ng-template pTemplate="caption">
+                            <div class="flex justify-content-between align-items-center">
+                                <span class="text-xl font-semibold">
+                                    <i class="pi pi-exclamation-triangle mr-2 text-orange-500"></i>
+                                    Employees Requiring Recyclage
+                                </span>
+                                <p-tag [value]="recyclageEmployees.length + ' employees'" severity="warn"></p-tag>
+                            </div>
+                        </ng-template>
+
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th style="width: 60px">Photo</th>
+                                <th>Name</th>
+                                <th>Hire Date</th>
+                                <th>Last Qualification</th>
+                                <th>Days Remaining</th>
+                                <th style="width: 100px">Status</th>
+                                <th style="width: 120px">Actions</th>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="body" let-rec>
+                            <tr [ngClass]="{'surface-100': rec.isOverdue}">
+                                <td>
+                                    <p-avatar *ngIf="rec.Employee?.Picture" [image]="rec.Employee.Picture"
+                                        shape="circle" size="large"></p-avatar>
+                                    <p-avatar *ngIf="!rec.Employee?.Picture" [label]="getInitials(rec.Employee)"
+                                        shape="circle" size="large" styleClass="bg-primary text-white"></p-avatar>
+                                </td>
+                                <td>
+                                    <div class="font-semibold">{{ rec.Employee?.Prenom_Emp }} {{ rec.Employee?.Nom_Emp }}</div>
+                                    <div class="text-sm text-color-secondary">{{ rec.Employee?.Categorie_Emp }}</div>
+                                </td>
+                                <td>{{ rec.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
+                                <td>
+                                    <span *ngIf="rec.lastQualificationDate">{{ rec.lastQualificationDate | date:'dd/MM/yyyy' }}</span>
+                                    <span *ngIf="!rec.lastQualificationDate" class="text-color-secondary">-</span>
+                                </td>
+                                <td>
+                                    <span [class]="rec.isOverdue ? 'text-red-600 font-bold' : (rec.daysUntilRecyclage <= 30 ? 'text-orange-600 font-bold' : '')">
+                                        {{ rec.isOverdue ? 'Overdue ' + getAbsValue(rec.daysUntilRecyclage) + 'd' : rec.daysUntilRecyclage + ' days' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <p-tag [severity]="getRecyclageSeverity(rec)"
+                                        [value]="rec.isOverdue ? 'OVERDUE' : (rec.daysUntilRecyclage <= 30 ? 'DUE SOON' : 'OK')"></p-tag>
+                                </td>
+                                <td>
+                                    <button pButton label="Plan" icon="pi pi-calendar" class="p-button-sm"
+                                        (click)="planRecyclage(rec)"></button>
+                                </td>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="emptymessage">
+                            <tr>
+                                <td colspan="7" class="text-center p-4">
+                                    <i class="pi pi-check-circle text-4xl text-green-500 mb-3" style="display: block;"></i>
+                                    <p class="font-medium text-green-600">All employees are up to date!</p>
+                                    <p class="text-color-secondary text-sm">No employees require recyclage</p>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </div>
+
+                <!-- Section 3: Planned Recyclages -->
+                <div class="mt-4">
+                    <p-toolbar styleClass="mb-3 surface-ground border-round">
+                        <ng-template #start>
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-calendar-clock mr-2 text-cyan-500"></i>Planned Recyclages
+                            </span>
+                            <div class="flex gap-2 ml-3">
+                                <p-tag [value]="getRecyclageCountByStatus('pending') + ' Pending'" severity="warn"></p-tag>
+                                <p-tag [value]="getRecyclageCountByStatus('in_progress') + ' In Progress'" severity="info"></p-tag>
+                            </div>
+                        </ng-template>
+
+                        <ng-template #end>
+                            <p-iconfield iconPosition="left" class="mr-2">
+                                <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                                <input pInputText [(ngModel)]="recyclageSearchTerm" placeholder="Search..."
+                                    (input)="filterRecyclages()" style="width: 180px" />
+                            </p-iconfield>
+                            <p-select [options]="recyclageStatusOptions" [(ngModel)]="recyclageStatusFilter"
+                                placeholder="Status" (onChange)="filterRecyclages()"
+                                [showClear]="true" [style]="{width: '130px'}">
+                            </p-select>
+                        </ng-template>
+                    </p-toolbar>
+
+                    <p-table [value]="filteredRecyclages" [rows]="10" [paginator]="true" [rowHover]="true"
+                        [globalFilterFields]="['employee_name', 'formation_name']">
+
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th style="width: 60px">Photo</th>
+                                <th>Employee</th>
+                                <th>Formation</th>
+                                <th>Trainer</th>
+                                <th>Planned Date</th>
+                                <th style="width: 90px">Time</th>
+                                <th style="width: 130px">Status</th>
+                                <th style="width: 120px" class="text-center">Actions</th>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="body" let-qual>
+                            <tr [ngClass]="{'surface-100': qual.test_result === 'passed', 'border-left-3 border-red-500': getDaysUntilDate(qual.start_date) < 0}">
+                                <td>
+                                    <p-avatar *ngIf="qual.employee_picture" [image]="qual.employee_picture"
+                                        shape="circle" size="large"></p-avatar>
+                                    <p-avatar *ngIf="!qual.employee_picture" [label]="qual.employee_name?.charAt(0)"
+                                        shape="circle" size="large" [style]="{'background-color': '#8B5CF6', 'color': 'white'}"></p-avatar>
+                                </td>
+                                <td>
+                                    <div class="font-semibold">{{ qual.employee_name }}</div>
+                                    <div class="text-sm text-color-secondary">ID: {{ qual.employee }}</div>
+                                </td>
+                                <td>
+                                    <div class="font-medium">{{ qual.formation_name }}</div>
+                                    <p-tag *ngIf="qual.formation_type" [value]="qual.formation_type"
+                                        [severity]="qual.formation_type === 'practical' ? 'success' : 'info'"
+                                        [style]="{fontSize: '0.65rem'}"></p-tag>
+                                </td>
+                                <td>
+                                    <span *ngIf="qual.trainer_name">{{ qual.trainer_name }}</span>
+                                    <span *ngIf="!qual.trainer_name" class="text-color-secondary">-</span>
+                                </td>
+                                <td>{{ qual.start_date | date:'dd/MM/yyyy' }}</td>
+                                <td>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) > 7"
+                                        [value]="getDaysUntilDate(qual.start_date) + 'd'" severity="success"></p-tag>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) <= 7 && getDaysUntilDate(qual.start_date) > 0"
+                                        [value]="getDaysUntilDate(qual.start_date) + 'd'" severity="warn"></p-tag>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) === 0" value="Today" severity="info"></p-tag>
+                                    <p-tag *ngIf="getDaysUntilDate(qual.start_date) < 0"
+                                        [value]="getAbsValue(getDaysUntilDate(qual.start_date)) + 'd late'" severity="danger"></p-tag>
+                                </td>
+                                <td>
+                                    <p-select [options]="[
+                                        {label: 'Pending', value: 'pending'},
+                                        {label: 'In Progress', value: 'in_progress'},
+                                        {label: 'Passed', value: 'passed'},
+                                        {label: 'Failed', value: 'failed'}
+                                    ]" [(ngModel)]="qual.test_result"
+                                        (onChange)="updateRecyclageStatus(qual, $event.value)"
+                                        optionLabel="label" optionValue="value" appendTo="body"
+                                        [style]="{width: '115px'}">
+                                    </p-select>
+                                </td>
+                                <td class="text-center">
+                                    <button pButton icon="pi pi-eye" class="p-button-rounded p-button-text p-button-info"
+                                        pTooltip="View" (click)="viewRecyclageDetails(qual)"></button>
+                                    <button pButton icon="pi pi-check" class="p-button-rounded p-button-text p-button-success"
+                                        pTooltip="Complete" (click)="completeRecyclage(qual)"
+                                        *ngIf="qual.test_result !== 'passed'"></button>
+                                    <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                        pTooltip="Delete" (click)="deleteQualification(qual)"></button>
+                                </td>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="emptymessage">
+                            <tr>
+                                <td colspan="8" class="text-center p-4">
+                                    <i class="pi pi-calendar text-4xl text-color-secondary mb-3" style="display: block;"></i>
+                                    <p class="text-lg font-medium">No planned recyclages</p>
+                                    <p class="text-color-secondary text-sm">Select employees above to plan recyclage</p>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </div>
+
+                <!-- Recyclage Details Dialog -->
+                <p-dialog [(visible)]="showRecyclageDetailsDialog" header="Recyclage Details" [modal]="true"
+                    [style]="{width: '500px'}" [draggable]="false" [resizable]="false">
+                    <div *ngIf="selectedRecyclageDetails" class="flex flex-column gap-3">
+                        <div class="flex align-items-center gap-3 p-3 surface-100 border-round">
+                            <p-avatar *ngIf="selectedRecyclageDetails.employee_picture"
+                                [image]="selectedRecyclageDetails.employee_picture" shape="circle" size="xlarge"></p-avatar>
+                            <p-avatar *ngIf="!selectedRecyclageDetails.employee_picture"
+                                [label]="selectedRecyclageDetails.employee_name?.charAt(0)" shape="circle" size="xlarge"
+                                [style]="{'background-color': '#8B5CF6', 'color': 'white'}"></p-avatar>
+                            <div>
+                                <div class="text-xl font-semibold">{{ selectedRecyclageDetails.employee_name }}</div>
+                                <div class="text-color-secondary">ID: {{ selectedRecyclageDetails.employee }}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid">
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Formation</label>
+                                <div class="font-medium">{{ selectedRecyclageDetails.formation_name }}</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Type</label>
+                                <p-tag [value]="selectedRecyclageDetails.formation_type || 'N/A'"
+                                    [severity]="selectedRecyclageDetails.formation_type === 'practical' ? 'success' : 'info'"></p-tag>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Trainer</label>
+                                <div class="font-medium">{{ selectedRecyclageDetails.trainer_name || '-' }}</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Status</label>
+                                <p-tag [value]="selectedRecyclageDetails.test_result"
+                                    [severity]="getQualificationStatusSeverity(selectedRecyclageDetails.test_result)"></p-tag>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">Planned Date</label>
+                                <div class="font-medium">{{ selectedRecyclageDetails.start_date | date:'dd/MM/yyyy' }}</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="text-color-secondary text-sm block mb-1">End Date</label>
+                                <div class="font-medium">{{ (selectedRecyclageDetails.end_date | date:'dd/MM/yyyy') || '-' }}</div>
+                            </div>
+                        </div>
+
+                        <div *ngIf="selectedRecyclageDetails.notes">
+                            <label class="text-color-secondary text-sm block mb-1">Notes</label>
+                            <div class="p-3 surface-100 border-round">{{ selectedRecyclageDetails.notes }}</div>
+                        </div>
+                    </div>
+                    <ng-template pTemplate="footer">
+                        <button pButton label="Close" icon="pi pi-times" class="p-button-text"
+                            (click)="showRecyclageDetailsDialog = false"></button>
+                        <button pButton label="Complete" icon="pi pi-check" class="p-button-success"
+                            (click)="completeRecyclage(selectedRecyclageDetails); showRecyclageDetailsDialog = false"
+                            *ngIf="selectedRecyclageDetails?.test_result !== 'passed'"></button>
+                    </ng-template>
+                </p-dialog>
+
+                <!-- Batch Recyclage Dialog -->
+                <p-dialog [(visible)]="showBatchRecyclageDialog" header="Plan Recyclage" [modal]="true"
+                    [style]="{width: '550px'}" [draggable]="false" [resizable]="false">
+                    <div class="flex flex-column gap-4">
+                        <div>
+                            <label class="text-color-secondary text-sm block mb-2">
+                                Selected Employees ({{ selectedPlaylistEmployees.length }})
+                            </label>
+                            <div class="flex flex-wrap gap-2 p-3 surface-100 border-round" style="max-height: 120px; overflow-y: auto;">
+                                <p-chip *ngFor="let emp of selectedPlaylistEmployees"
+                                    [label]="emp.Prenom_Emp + ' ' + emp.Nom_Emp"
+                                    [removable]="true" (onRemove)="toggleEmployeeSelection(emp)"></p-chip>
+                            </div>
+                        </div>
+
+                        <form [formGroup]="batchRecyclageForm" class="flex flex-column gap-3">
+                            <div class="field">
+                                <label class="block font-medium mb-2">Formation *</label>
+                                <p-select formControlName="formation_id" [options]="formations"
+                                    optionLabel="name" optionValue="id" placeholder="Select formation"
+                                    [style]="{width: '100%'}" [filter]="true" filterBy="name" appendTo="body"></p-select>
+                            </div>
+                            <div class="field">
+                                <label class="block font-medium mb-2">Trainer</label>
+                                <p-select formControlName="trainer_id" [options]="formateurs"
+                                    optionLabel="Name" optionValue="id" placeholder="Select trainer"
+                                    [style]="{width: '100%'}" [showClear]="true" appendTo="body"></p-select>
+                            </div>
+                            <div class="field">
+                                <label class="block font-medium mb-2">Planned Date *</label>
+                                <p-datepicker formControlName="planned_date" [style]="{width: '100%'}"
+                                    [showIcon]="true" dateFormat="dd/mm/yy" appendTo="body"></p-datepicker>
+                            </div>
+                            <div class="field">
+                                <label class="block font-medium mb-2">Notes</label>
+                                <textarea pInputTextarea formControlName="notes" rows="2"
+                                    placeholder="Optional notes..." [style]="{width: '100%'}"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <ng-template pTemplate="footer">
+                        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text"
+                            (click)="showBatchRecyclageDialog = false"></button>
+                        <button pButton label="Plan Recyclage" icon="pi pi-check" class="p-button-success"
+                            (click)="saveBatchRecyclage()" [disabled]="batchRecyclageForm.invalid"></button>
+                    </ng-template>
+                </p-dialog>
+            </p-tabpanel>
+
+            <!-- TAB 5: Teams & Trainers -->
+            <p-tabpanel value="5">
+                <div class="teams-trainers-grid">
+                    <!-- Teams -->
+                    <p-card header="Teams">
+                        <div class="team-list">
+                            <div class="team-card" *ngFor="let team of teams">
+                                <i class="pi pi-users team-icon"></i>
+                                <div class="team-info">
+                                    <span class="team-name">{{ team.name }}</span>
+                                    <span class="team-members">{{ getEmployeeCountByTeam(team.id) }} members</span>
+                                </div>
+                                <button pButton icon="pi pi-eye" class="p-button-rounded p-button-text"></button>
+                            </div>
+                        </div>
+                        <button pButton label="New Team" icon="pi pi-plus" class="p-button-text mt-3"
+                            (click)="openNewTeamDialog()"></button>
+                    </p-card>
+
+                    <!-- Categories -->
+                    <p-card>
+                        <ng-template pTemplate="header">
+                            <div class="card-header-with-action">
+                                <span>Employee Categories</span>
+                                <p-button icon="pi pi-plus" label="New Category" [text]="true" size="small"
+                                    (click)="openNewCategoryDialog()"></p-button>
+                            </div>
+                        </ng-template>
+                        <p-table [value]="categories" [rows]="5" [paginator]="categories.length > 5" [rowHover]="true" styleClass="p-datatable-sm">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th style="width: 80px">Employees</th>
+                                    <th style="width: 100px">Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-cat>
+                                <tr>
+                                    <td>
+                                        <span class="font-semibold">{{ cat.name }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-color-secondary text-sm">{{ cat.description || '-' }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <p-badge [value]="getEmployeeCountByCategory(cat.name)"></p-badge>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
+                                                pTooltip="Edit" (click)="editCategory(cat)"></p-button>
+                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                                pTooltip="Delete" (click)="deleteCategory(cat)"></p-button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td colspan="4" class="text-center text-color-secondary p-4">
+                                        <i class="pi pi-inbox text-2xl mb-2"></i>
+                                        <p>No categories defined. Click "New Category" to add one.</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </p-card>
+
+                    <!-- Employee Statuses -->
+                    <p-card>
+                        <ng-template pTemplate="header">
+                            <div class="card-header-with-action">
+                                <span>Employee Statuses</span>
+                                <p-button icon="pi pi-plus" label="New Status" [text]="true" size="small"
+                                    (click)="openNewStatusDialog()"></p-button>
+                            </div>
+                        </ng-template>
+                        <p-table [value]="statuses" [rows]="5" [paginator]="statuses.length > 5" [rowHover]="true" styleClass="p-datatable-sm">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Code</th>
+                                    <th>Color</th>
+                                    <th style="width: 100px">Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-status>
+                                <tr>
+                                    <td>
+                                        <span class="font-semibold">{{ status.name }}</span>
+                                    </td>
+                                    <td>
+                                        <code>{{ status.code }}</code>
+                                    </td>
+                                    <td>
+                                        <p-tag [value]="status.color || 'info'" [severity]="status.color || 'info'"></p-tag>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="info"
+                                                pTooltip="Edit" (click)="editStatus(status)"></p-button>
+                                            <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
+                                                pTooltip="Delete" (click)="deleteStatus(status)"></p-button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td colspan="4" class="text-center text-color-secondary p-4">
+                                        <i class="pi pi-inbox text-2xl mb-2"></i>
+                                        <p>No statuses defined. Click "New Status" to add one.</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </p-card>
+
+                    <!-- Departments -->
+                    <p-card header="Departments">
+                        <div class="department-list">
+                            <div class="department-item" *ngFor="let dept of departmentEntities">
+                                <span class="department-name">{{ dept.name }}</span>
+                                <p-badge [value]="getEmployeeCountByDepartment(dept.name)"
+                                    severity="info"></p-badge>
+                            </div>
+                            <p *ngIf="departmentEntities.length === 0" class="text-color-secondary text-center p-3">
+                                No departments. Go to "Users & Access" tab to create departments.
+                            </p>
+                        </div>
+                    </p-card>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 6: Users & Access -->
+            <p-tabpanel value="6">
+                <div class="users-access-container">
+                    <!-- Users Section -->
+                    <div class="tab-header">
+                        <h3>System Users</h3>
+                        <div class="tab-actions">
+                            <button pButton label="New Department" icon="pi pi-building" class="p-button-secondary"
+                                (click)="openNewDepartmentDialog()"></button>
+                            <button pButton label="New User" icon="pi pi-plus" (click)="openNewUserDialog()"></button>
+                        </div>
+                    </div>
+
+                    <div class="users-grid">
+                        <!-- Users Table -->
+                        <p-card header="Users" styleClass="users-card">
+                            <p-table [value]="users" [rows]="10" [paginator]="true" [rowHover]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Login</th>
+                                        <th>Position</th>
+                                        <th>Department</th>
+                                        <th>Status</th>
+                                        <th>Permissions</th>
+                                        <th>Last Login</th>
+                                        <th style="width: 120px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-user>
+                                    <tr>
+                                        <td>
+                                            <div class="user-name-cell">
+                                                <p-avatar [label]="user.name?.charAt(0)" shape="circle"
+                                                    styleClass="bg-primary text-white"></p-avatar>
+                                                <span class="font-semibold">{{ user.name }}</span>
+                                            </div>
+                                        </td>
+                                        <td><code>{{ user.login }}</code></td>
+                                        <td>{{ user.position_display || user.position }}</td>
+                                        <td>{{ user.department_name || '-' }}</td>
+                                        <td>
+                                            <p-tag [value]="user.status" [severity]="getUserStatusSeverity(user.status)"></p-tag>
+                                        </td>
+                                        <td>
+                                            <div class="permissions-badges">
+                                                <p-badge *ngIf="user.dms_hr" value="HR" severity="info" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_production" value="Prod" severity="success" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_quality" value="QC" severity="warn" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_maintenance" value="Maint" severity="secondary" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_kpi" value="KPI" severity="contrast" styleClass="mr-1"></p-badge>
+                                                <p-badge *ngIf="user.dms_ll" value="LL" styleClass="mr-1"></p-badge>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span *ngIf="user.last_login">{{ user.last_login | date:'dd/MM/yyyy HH:mm' }}</span>
+                                            <span *ngIf="!user.last_login" class="text-color-secondary">Never</span>
+                                        </td>
+                                        <td>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editUser(user)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteUser(user)" pTooltip="Delete"></button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="8" class="text-center p-4">
+                                            <i class="pi pi-users text-4xl text-color-secondary mb-3"></i>
+                                            <p>No users found. Click "New User" to create one.</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+
+                        <!-- Departments Management -->
+                        <p-card header="Departments Management" styleClass="departments-card">
+                            <p-table [value]="departmentEntities" [rows]="5" [paginator]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th style="width: 100px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-dept>
+                                    <tr>
+                                        <td class="font-semibold">{{ dept.name }}</td>
+                                        <td>{{ dept.description || '-' }}</td>
+                                        <td>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editDepartmentEntity(dept)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteDepartmentEntity(dept)" pTooltip="Delete"></button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="3" class="text-center p-4">
+                                            <i class="pi pi-building text-4xl text-color-secondary mb-3"></i>
+                                            <p>No departments found</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+                    </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 7: Licenses Manager -->
+            <p-tabpanel value="7">
+                <div class="licenses-container">
+                    <div class="tab-header">
+                        <h3>Licenses Manager</h3>
+                        <div class="tab-actions">
+                            <button pButton label="New License Type" icon="pi pi-plus-circle" class="p-button-secondary"
+                                (click)="openNewLicenseTypeDialog()"></button>
+                            <button pButton label="New License" icon="pi pi-plus" (click)="openNewLicenseDialog()"></button>
+                        </div>
+                    </div>
+
+                    <!-- License Stats Cards -->
+                    <div class="license-stats-row" *ngIf="licenseStats">
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-id-card stat-icon text-primary"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value">{{ licenseStats.total }}</span>
+                                    <span class="stat-label">Total Licenses</span>
+                                </div>
+                            </div>
+                        </p-card>
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-check-circle stat-icon text-success"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value text-success">{{ licenseStats.active }}</span>
+                                    <span class="stat-label">Active</span>
+                                </div>
+                            </div>
+                        </p-card>
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-exclamation-triangle stat-icon text-warning"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value text-warning">{{ licenseStats.expiring_soon }}</span>
+                                    <span class="stat-label">Expiring Soon</span>
+                                </div>
+                            </div>
+                        </p-card>
+                        <p-card styleClass="license-stat-card">
+                            <div class="stat-content">
+                                <i class="pi pi-times-circle stat-icon text-danger"></i>
+                                <div class="stat-info">
+                                    <span class="stat-value text-danger">{{ licenseStats.expired }}</span>
+                                    <span class="stat-label">Expired</span>
+                                </div>
+                            </div>
+                        </p-card>
+                    </div>
+
+                    <div class="licenses-grid">
+                        <!-- Licenses Table -->
+                        <p-card header="Employee Licenses" styleClass="licenses-card">
+                            <p-table [value]="licenses" [rows]="10" [paginator]="true" [rowHover]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>License Type</th>
+                                        <th>License Number</th>
+                                        <th>Issue Date</th>
+                                        <th>Expiry Date</th>
+                                        <th>Days Until Expiry</th>
+                                        <th>Status</th>
+                                        <th style="width: 120px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-license>
+                                    <tr>
+                                        <td>
+                                            <span class="font-semibold">{{ license.employee_name || 'Employee #' + license.employee }}</span>
+                                        </td>
+                                        <td>{{ license.license_type_name || 'Type #' + license.license_type }}</td>
+                                        <td><code class="font-semibold">{{ license.license_number }}</code></td>
+                                        <td>{{ license.issue_date | date:'dd/MM/yyyy' }}</td>
+                                        <td>{{ license.expiry_date | date:'dd/MM/yyyy' }}</td>
+                                        <td>
+                                            <span [class]="license.days_until_expiry < 0 ? 'text-danger font-bold' : (license.days_until_expiry <= 30 ? 'text-warning font-bold' : '')">
+                                                {{ license.days_until_expiry < 0 ? 'Expired ' + (-license.days_until_expiry) + ' days ago' : license.days_until_expiry + ' days' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <p-tag [value]="license.status" [severity]="getLicenseStatusSeverity(license.status)"></p-tag>
+                                        </td>
+                                        <td>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editLicense(license)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteLicense(license)" pTooltip="Delete"></button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="8" class="text-center p-4">
+                                            <i class="pi pi-id-card text-4xl text-color-secondary mb-3"></i>
+                                            <p>No licenses found. Click "New License" to create one.</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+
+                        <!-- License Types -->
+                        <p-card header="License Types" styleClass="license-types-card">
+                            <p-table [value]="licenseTypes" [rows]="5" [paginator]="true">
+                                <ng-template pTemplate="header">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Validity (Months)</th>
+                                        <th>Mandatory</th>
+                                        <th style="width: 100px">Actions</th>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="body" let-lt>
+                                    <tr>
+                                        <td class="font-semibold">{{ lt.name }}</td>
+                                        <td>{{ lt.validity_months }} months</td>
+                                        <td>
+                                            <p-tag [value]="lt.is_mandatory ? 'Required' : 'Optional'"
+                                                [severity]="lt.is_mandatory ? 'danger' : 'info'"></p-tag>
+                                        </td>
+                                        <td>
+                                            <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                                (click)="editLicenseType(lt)" pTooltip="Edit"></button>
+                                            <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                                (click)="deleteLicenseType(lt)" pTooltip="Delete"></button>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                                <ng-template pTemplate="emptymessage">
+                                    <tr>
+                                        <td colspan="4" class="text-center p-4">
+                                            <i class="pi pi-list text-4xl text-color-secondary mb-3"></i>
+                                            <p>No license types defined</p>
+                                        </td>
+                                    </tr>
+                                </ng-template>
+                            </p-table>
+                        </p-card>
+                    </div>
+                </div>
+            </p-tabpanel>
+
+            <!-- TAB 8: Workstations -->
+            <p-tabpanel value="8">
+                <div class="workstations-container">
+                    <div class="tab-header">
+                        <h3>Workstation Management</h3>
+                        <div class="tab-actions">
+                            <button pButton label="New Workstation" icon="pi pi-plus" (click)="openNewWorkstationDialog()"></button>
+                        </div>
+                    </div>
+
+                    <p-card>
+                        <p-table [value]="workstations" [rows]="10" [paginator]="true" [rowHover]="true">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th pSortableColumn="id">ID <p-sortIcon field="id"></p-sortIcon></th>
+                                    <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
+                                    <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
+                                    <th>Production Line</th>
+                                    <th>Process Mode</th>
+                                    <th>Typ Order</th>
+                                    <th>Cycle Time (s)</th>
+                                    <th>Max Operators</th>
+                                    <th>Critical</th>
+                                    <th style="width: 120px">Actions</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-ws>
+                                <tr>
+                                    <td><span class="font-mono font-semibold">{{ ws.id }}</span></td>
+                                    <td><code>{{ ws.code }}</code></td>
+                                    <td class="font-semibold">{{ ws.name }}</td>
+                                    <td>{{ ws.production_line_name || '-' }}</td>
+                                    <td>
+                                        <p-tag [value]="ws.process_mode || 'manual'" [severity]="getProcessModeSeverity(ws.process_mode || 'manual')"></p-tag>
+                                    </td>
+                                    <td>{{ ws.typ_order || '-' }}</td>
+                                    <td>{{ ws.cycle_time_seconds || 0 }}</td>
+                                    <td>{{ ws.max_operators || 1 }}</td>
+                                    <td>
+                                        <i *ngIf="ws.is_critical" class="pi pi-exclamation-triangle text-danger" pTooltip="Critical Workstation"></i>
+                                        <span *ngIf="!ws.is_critical" class="text-color-secondary">-</span>
+                                    </td>
+                                    <td>
+                                        <button pButton icon="pi pi-pencil" class="p-button-rounded p-button-text"
+                                            (click)="editWorkstation(ws)" pTooltip="Edit"></button>
+                                        <button pButton icon="pi pi-trash" class="p-button-rounded p-button-text p-button-danger"
+                                            (click)="deleteWorkstation(ws)" pTooltip="Delete"></button>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td colspan="10" class="text-center p-4">
+                                        <i class="pi pi-desktop text-4xl text-color-secondary mb-3"></i>
+                                        <p>No workstations found. Click "New Workstation" to create one.</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </p-card>
+                </div>
+            </p-tabpanel>
+        </p-tabpanels>
+    </p-tabs>
+</div>
+
+<!-- Employee Dialog -->
+<p-dialog [(visible)]="showEmployeeDialog" [header]="isEditMode ? 'Edit Employee' : 'New Employee'" [modal]="true"
+    [style]="{width: '650px'}" [closable]="true">
+    <form [formGroup]="employeeForm" class="employee-form">
+        <!-- Photo Upload Section -->
+        <div class="photo-upload-section" style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-ground); border-radius: 8px;">
+            <div class="photo-preview" style="flex-shrink: 0;">
+                <p-avatar *ngIf="employeePhotoPreview" [image]="employeePhotoPreview" shape="circle" size="xlarge"
+                    style="width: 80px; height: 80px;"></p-avatar>
+                <p-avatar *ngIf="!employeePhotoPreview" icon="pi pi-user" shape="circle" size="xlarge"
+                    style="width: 80px; height: 80px; background: var(--primary-color); color: white;"></p-avatar>
+            </div>
+            <div class="photo-actions" style="flex-grow: 1;">
+                <label for="photoUpload" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Employee Photo</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="file" id="photoUpload" accept="image/*" (change)="onPhotoSelect($event)"
+                        style="display: none;" #photoInput />
+                    <button pButton label="Choose Photo" icon="pi pi-upload" class="p-button-outlined p-button-sm"
+                        (click)="photoInput.click()"></button>
+                    <button pButton *ngIf="employeePhotoPreview" icon="pi pi-trash" class="p-button-outlined p-button-danger p-button-sm"
+                        (click)="removePhoto()"></button>
+                </div>
+                <small style="color: var(--text-color-secondary); margin-top: 0.25rem; display: block;">
+                    JPG, PNG or GIF. Max 2MB.
+                </small>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="prenom">First Name *</label>
+                <input pInputText id="prenom" formControlName="Prenom_Emp" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="nom">Last Name *</label>
+                <input pInputText id="nom" formControlName="Nom_Emp" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="dob">Date of Birth</label>
+                <p-datepicker id="dob" formControlName="DateNaissance_Emp" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="genre">Gender *</label>
+                <p-select id="genre" [options]="genderOptions" formControlName="Genre_Emp" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="category">Category *</label>
+                <p-select id="category" [options]="categories" formControlName="category_fk" optionLabel="name"
+                    optionValue="id" placeholder="Select category" [filter]="true" filterBy="name"
+                    class="w-full" appendTo="body">
+                    <ng-template pTemplate="empty">
+                        <div class="p-3 text-center">
+                            <p class="text-color-secondary mb-2">No categories found</p>
+                            <p-button label="Create Category" icon="pi pi-plus" size="small" [text]="true"
+                                (click)="openNewCategoryDialog()"></p-button>
+                        </div>
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="department">Department *</label>
+                <p-select id="department" [options]="departmentEntities" formControlName="Departement_Emp"
+                    optionLabel="name" optionValue="name" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="hiredate">Hire Date *</label>
+                <p-datepicker id="hiredate" formControlName="DateEmbauche_Emp" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="status">Status *</label>
+                <p-select id="status" [options]="statuses.length > 0 ? statuses : statusOptions" formControlName="EmpStatus"
+                    [optionLabel]="statuses.length > 0 ? 'name' : 'label'"
+                    [optionValue]="statuses.length > 0 ? 'name' : 'value'"
+                    class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="team">Team</label>
+                <p-select id="team" [options]="teams" formControlName="team" optionLabel="name" optionValue="id"
+                    [showClear]="true" placeholder="Select team" class="w-full" appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="trajet">Trajet</label>
+                <p-select id="trajet" [options]="trajets" formControlName="trajet" optionLabel="name" optionValue="id"
+                    [showClear]="true" placeholder="Select trajet" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="badge">Badge Number</label>
+                <input pInputText id="badge" formControlName="BadgeNumber" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="email">Email</label>
+                <input pInputText id="email" formControlName="email" type="email" class="w-full" placeholder="employee@company.com" />
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="phone">Phone</label>
+            <input pInputText id="phone" formControlName="phone" class="w-full" placeholder="+212 6XX XXX XXX" />
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showEmployeeDialog = false"></button>
+        <button pButton label="Save" icon="pi pi-check" (click)="saveEmployee()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Formation Dialog -->
+<p-dialog [(visible)]="showFormationDialog" [header]="isEditModeFormation ? 'Edit Formation' : 'New Formation'" [modal]="true"
+    [style]="{width: '550px'}">
+    <form [formGroup]="formationForm" class="formation-form">
+        <div class="form-field">
+            <label for="formationName">Formation Name *</label>
+            <input pInputText id="formationName" formControlName="name" class="w-full" />
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="formationType">Type *</label>
+                <p-select id="formationType"
+                    [options]="[{label: 'Initial Training', value: 'initial'}, {label: 'Refresher', value: 'refresher'}, {label: 'Certification', value: 'certification'}, {label: 'Safety', value: 'safety'}]"
+                    formControlName="type" optionLabel="label" optionValue="value" class="w-full"
+                    appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="process">Process *</label>
+                <p-select id="process" [options]="processes" formControlName="process" optionLabel="name"
+                    optionValue="id" class="w-full" appendTo="body" placeholder="Select a process"></p-select>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="duration">Duration (hours)</label>
+            <p-inputNumber id="duration" formControlName="duration_hours" [min]="0" [maxFractionDigits]="2"
+                [showButtons]="true" class="w-full" suffix=" hrs"></p-inputNumber>
+        </div>
+
+        <div class="form-field">
+            <label for="formationDesc">Description</label>
+            <textarea pInputTextarea id="formationDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe the formation content, objectives..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showFormationDialog = false"></button>
+        <button pButton label="Save" icon="pi pi-check" (click)="saveFormation()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Qualification Dialog -->
+<p-dialog [(visible)]="showQualificationDialog" [header]="isEditMode ? 'Edit Qualification' : 'New Qualification'" [modal]="true" [style]="{width: '650px'}">
+    <form [formGroup]="qualificationForm" class="qualification-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qEmployee">Employee *</label>
+                <p-select id="qEmployee" [options]="employees" formControlName="Id_Emp" optionLabel="Nom_Emp"
+                    optionValue="Id_Emp" [filter]="true" class="w-full" appendTo="body">
+                    <ng-template let-emp pTemplate="item">
+                        {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="qFormation">Formation *</label>
+                <p-select id="qFormation" [options]="formations" formControlName="id_formation" optionLabel="name"
+                    optionValue="id" class="w-full" appendTo="body" placeholder="Select a formation"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qTrainer">Trainer *</label>
+                <p-select id="qTrainer" [options]="formateurs" formControlName="Trainer" optionLabel="Name"
+                    optionValue="TrainerID" class="w-full" appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="qProdLine">Production Line</label>
+                <p-select id="qProdLine" [options]="productionLines" formControlName="prod_line" optionLabel="name"
+                    optionValue="name" [showClear]="true" placeholder="Select line" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qStartDate">Start Date *</label>
+                <p-datepicker id="qStartDate" formControlName="start_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="qEndDate">End Date</label>
+                <p-datepicker id="qEndDate" formControlName="end_qualif" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="qTest">Test Name</label>
+                <input pInputText id="qTest" formControlName="test" class="w-full" placeholder="e.g., Written Test, Practical Exam" />
+            </div>
+            <div class="form-field">
+                <label for="qResult">Test Result</label>
+                <p-select id="qResult"
+                    [options]="[{label: 'Pending', value: 'pending'}, {label: 'In Progress', value: 'in_progress'}, {label: 'Passed', value: 'passed'}, {label: 'Failed', value: 'failed'}]"
+                    formControlName="test_result" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="qScore">Score (%)</label>
+            <p-inputNumber id="qScore" formControlName="score" [min]="0" [max]="100" [showButtons]="true"
+                suffix="%" class="w-full"></p-inputNumber>
+        </div>
+
+        <div class="form-field">
+            <label for="qComment">Comment</label>
+            <textarea pInputTextarea id="qComment" formControlName="comment_qualif" rows="3" class="w-full"
+                placeholder="Additional notes about the qualification..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showQualificationDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveQualification()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Team Dialog -->
+<p-dialog [(visible)]="showTeamDialog" header="New Team" [modal]="true" [style]="{width: '400px'}">
+    <form [formGroup]="teamForm">
+        <div class="form-field">
+            <label for="teamName">Team Name *</label>
+            <input pInputText id="teamName" formControlName="teamName" class="w-full" />
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showTeamDialog = false"></button>
+        <button pButton label="Create" icon="pi pi-check" (click)="saveTeam()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Formateur Dialog -->
+<p-dialog [(visible)]="showFormateurDialog" [header]="isEditModeFormateur ? 'Edit Trainer' : 'New Trainer'" [modal]="true" [style]="{width: '500px'}">
+    <form [formGroup]="formateurForm">
+        <div class="form-field">
+            <label for="trainerName">Name *</label>
+            <input pInputText id="trainerName" formControlName="Name" class="w-full" placeholder="Enter trainer name" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerEmail">Email</label>
+            <input pInputText id="trainerEmail" formControlName="Email" type="email" class="w-full" placeholder="trainer@example.com" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerLogin">Login *</label>
+            <input pInputText id="trainerLogin" formControlName="login" class="w-full" placeholder="Enter login username" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerPhone">Phone</label>
+            <input pInputText id="trainerPhone" formControlName="phone" class="w-full" placeholder="+212 6XX XXX XXX" />
+        </div>
+
+        <div class="form-field">
+            <label for="trainerSpecialization">Specialization</label>
+            <p-select id="trainerSpecialization" [options]="specializationOptions" formControlName="specialization"
+                optionLabel="label" optionValue="value" class="w-full" appendTo="body"
+                placeholder="Select specialization" [showClear]="true"></p-select>
+        </div>
+
+        <div class="form-field">
+            <label for="trainerStatus">Status *</label>
+            <p-select id="trainerStatus" [options]="statusOptions" formControlName="Status" optionLabel="label"
+                optionValue="value" class="w-full" appendTo="body"></p-select>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showFormateurDialog = false"></button>
+        <button pButton [label]="isEditModeFormateur ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveFormateur()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- User Dialog -->
+<p-dialog [(visible)]="showUserDialog" [header]="isEditMode ? 'Edit User' : 'New User'" [modal]="true"
+    [style]="{width: '700px'}" [closable]="true">
+    <form [formGroup]="userForm" class="user-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userName">Name *</label>
+                <input pInputText id="userName" formControlName="name" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="userLogin">Login *</label>
+                <input pInputText id="userLogin" formControlName="login" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userPassword">Password {{ isEditMode ? '(leave empty to keep current)' : '*' }}</label>
+                <input pInputText id="userPassword" formControlName="password" type="password" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="userPosition">Position *</label>
+                <p-select id="userPosition" [options]="positionOptions" formControlName="position" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userEmployee">Linked Employee</label>
+                <p-select id="userEmployee" [options]="employees" formControlName="employee" optionLabel="Prenom_Emp"
+                    optionValue="Id_Emp" [filter]="true" [showClear]="true" placeholder="Select employee" class="w-full" appendTo="body">
+                    <ng-template let-emp pTemplate="item">
+                        {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="userDepartment">Department</label>
+                <p-select id="userDepartment" [options]="departmentEntities" formControlName="department" optionLabel="name"
+                    optionValue="id" [showClear]="true" placeholder="Select department" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="userStatus">Status *</label>
+                <p-select id="userStatus" [options]="userStatusOptions" formControlName="status" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <h4 class="mb-3">DMS Module Permissions</h4>
+        <div class="permissions-grid">
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_hr" [binary]="true" inputId="dms_hr"></p-checkbox>
+                <label for="dms_hr" class="ml-2">
+                    <i class="pi pi-users mr-1"></i> HR Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_production" [binary]="true" inputId="dms_production"></p-checkbox>
+                <label for="dms_production" class="ml-2">
+                    <i class="pi pi-bolt mr-1"></i> Production Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_quality" [binary]="true" inputId="dms_quality"></p-checkbox>
+                <label for="dms_quality" class="ml-2">
+                    <i class="pi pi-check-circle mr-1"></i> Quality Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_maintenance" [binary]="true" inputId="dms_maintenance"></p-checkbox>
+                <label for="dms_maintenance" class="ml-2">
+                    <i class="pi pi-wrench mr-1"></i> Maintenance Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_kpi" [binary]="true" inputId="dms_kpi"></p-checkbox>
+                <label for="dms_kpi" class="ml-2">
+                    <i class="pi pi-chart-bar mr-1"></i> KPI Module
+                </label>
+            </div>
+            <div class="permission-item">
+                <p-checkbox formControlName="dms_ll" [binary]="true" inputId="dms_ll"></p-checkbox>
+                <label for="dms_ll" class="ml-2">
+                    <i class="pi pi-book mr-1"></i> Lessons Learned
+                </label>
+            </div>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showUserDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveUser()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Department Dialog -->
+<p-dialog [(visible)]="showDepartmentDialog" [header]="isEditMode ? 'Edit Department' : 'New Department'" [modal]="true"
+    [style]="{width: '450px'}" [closable]="true">
+    <form [formGroup]="departmentForm" class="department-form">
+        <div class="form-field">
+            <label for="deptName">Department Name *</label>
+            <input pInputText id="deptName" formControlName="name" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="deptDescription">Description</label>
+            <textarea pInputTextarea id="deptDescription" formControlName="description" rows="3" class="w-full"></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showDepartmentDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveDepartment()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Import Dialog -->
+<p-dialog [(visible)]="showImportDialog" header="Import Employees from Excel" [modal]="true" [style]="{width: '500px'}">
+    <div class="import-container">
+        <p class="mb-3">Upload an Excel file (.xlsx) containing employee data.</p>
+        <p-fileUpload mode="advanced" name="file" accept=".xlsx,.xls" [maxFileSize]="10000000"
+            (onUpload)="onFileUpload($event)" chooseLabel="Choose File" uploadLabel="Import" cancelLabel="Cancel">
+            <ng-template pTemplate="empty">
+                <div class="upload-placeholder">
+                    <i class="pi pi-cloud-upload text-4xl text-color-secondary"></i>
+                    <p>Drag and drop file here or click to browse</p>
+                </div>
+            </ng-template>
+        </p-fileUpload>
+    </div>
+</p-dialog>
+
+<!-- License Dialog -->
+<p-dialog [(visible)]="showLicenseDialog" [header]="isEditMode ? 'Edit License' : 'New License'" [modal]="true"
+    [style]="{width: '600px'}" [closable]="true">
+    <form [formGroup]="licenseForm" class="license-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="licEmployee">Employee *</label>
+                <p-select id="licEmployee" [options]="employees" formControlName="employee" optionLabel="Prenom_Emp"
+                    optionValue="Id_Emp" [filter]="true" placeholder="Select employee" class="w-full" appendTo="body">
+                    <ng-template let-emp pTemplate="item">
+                        {{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}
+                    </ng-template>
+                </p-select>
+            </div>
+            <div class="form-field">
+                <label for="licType">License Type *</label>
+                <p-select id="licType" [options]="licenseTypes" formControlName="license_type" optionLabel="name"
+                    optionValue="id" placeholder="Select license type" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="licNumber">License Number *</label>
+                <input pInputText id="licNumber" formControlName="license_number" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="licAuthority">Issuing Authority *</label>
+                <input pInputText id="licAuthority" formControlName="issuing_authority" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="licIssueDate">Issue Date *</label>
+                <p-datepicker id="licIssueDate" formControlName="issue_date" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+            <div class="form-field">
+                <label for="licExpiryDate">Expiry Date *</label>
+                <p-datepicker id="licExpiryDate" formControlName="expiry_date" dateFormat="dd/mm/yy" [showIcon]="true"
+                    class="w-full" appendTo="body"></p-datepicker>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="licDocUrl">Document URL</label>
+            <input pInputText id="licDocUrl" formControlName="document_url" class="w-full" placeholder="https://..." />
+        </div>
+
+        <div class="form-field">
+            <label for="licNotes">Notes</label>
+            <textarea pInputTextarea id="licNotes" formControlName="notes" rows="3" class="w-full"></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showLicenseDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveLicense()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- License Type Dialog -->
+<p-dialog [(visible)]="showLicenseTypeDialog" [header]="isEditMode ? 'Edit License Type' : 'New License Type'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="licenseTypeForm" class="license-type-form">
+        <div class="form-field">
+            <label for="ltName">Name *</label>
+            <input pInputText id="ltName" formControlName="name" class="w-full" />
+        </div>
+
+        <div class="form-field">
+            <label for="ltDescription">Description</label>
+            <textarea pInputTextarea id="ltDescription" formControlName="description" rows="2" class="w-full"></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="ltValidity">Validity (Months) *</label>
+                <p-inputNumber id="ltValidity" formControlName="validity_months" [min]="1" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+            <div class="form-field">
+                <label for="ltRenewal">Renewal Advance (Days)</label>
+                <p-inputNumber id="ltRenewal" formControlName="renewal_advance_days" [min]="0" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_mandatory" [binary]="true" inputId="ltMandatory"></p-checkbox>
+            <label for="ltMandatory" class="ml-2">This license is mandatory</label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showLicenseTypeDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveLicenseType()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Workstation Dialog -->
+<p-dialog [(visible)]="showWorkstationDialog" [header]="isEditMode ? 'Edit Workstation' : 'New Workstation'" [modal]="true"
+    [style]="{width: '650px'}" [closable]="true">
+    <form [formGroup]="workstationForm" class="workstation-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsName">Name *</label>
+                <input pInputText id="wsName" formControlName="name" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="wsCode">Code *</label>
+                <input pInputText id="wsCode" formControlName="code" class="w-full" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsProdLine">Production Line *</label>
+                <p-select id="wsProdLine" [options]="productionLines" formControlName="production_line" optionLabel="name"
+                    optionValue="id" placeholder="Select production line" class="w-full" appendTo="body"></p-select>
+            </div>
+            <div class="form-field">
+                <label for="wsMode">Process Mode</label>
+                <p-select id="wsMode" [options]="processModeOptions" formControlName="process_mode" optionLabel="label"
+                    optionValue="value" class="w-full" appendTo="body"></p-select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsTypOrder">Typ Order</label>
+                <input pInputText id="wsTypOrder" formControlName="typ_order" class="w-full" />
+            </div>
+            <div class="form-field">
+                <label for="wsProcessOrder">Process Order</label>
+                <p-inputNumber id="wsProcessOrder" formControlName="process_order" [min]="0" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="wsCycle">Cycle Time (seconds)</label>
+                <p-inputNumber id="wsCycle" formControlName="cycle_time_seconds" [min]="0" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+            <div class="form-field">
+                <label for="wsOperators">Max Operators</label>
+                <p-inputNumber id="wsOperators" formControlName="max_operators" [min]="1" [showButtons]="true"
+                    class="w-full"></p-inputNumber>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="wsDescription">Description</label>
+            <textarea pInputTextarea id="wsDescription" formControlName="description" rows="2" class="w-full"></textarea>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_critical" [binary]="true" inputId="wsCritical"></p-checkbox>
+            <label for="wsCritical" class="ml-2">
+                <i class="pi pi-exclamation-triangle text-danger mr-1"></i>
+                Mark as critical workstation
+            </label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showWorkstationDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveWorkstation()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Process Dialog -->
+<p-dialog [(visible)]="showProcessDialog" [header]="isEditMode ? 'Edit Process' : 'New Process'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="processForm" class="process-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="processCode">Code *</label>
+                <input pInputText id="processCode" formControlName="code" class="w-full" placeholder="e.g., ASSY-01" />
+            </div>
+            <div class="form-field">
+                <label for="processName">Name *</label>
+                <input pInputText id="processName" formControlName="name" class="w-full" placeholder="e.g., Assembly Process" />
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="processDesc">Description</label>
+            <textarea pInputTextarea id="processDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe the manufacturing process..."></textarea>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_active" [binary]="true" inputId="processActive"></p-checkbox>
+            <label for="processActive" class="ml-2">Active</label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showProcessDialog = false"></button>
+        <button pButton [label]="isEditMode ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveProcess()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Specialization Dialog -->
+<p-dialog [(visible)]="showSpecializationDialog" [header]="isEditModeSpecialization ? 'Edit Specialization' : 'New Specialization'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="specializationForm" class="specialization-form">
+        <div class="form-field">
+            <label for="specName">Name *</label>
+            <input pInputText id="specName" formControlName="name" class="w-full" placeholder="e.g., Assembly, Quality Control" />
+        </div>
+
+        <div class="form-field">
+            <label for="specDesc">Description</label>
+            <textarea pInputTextarea id="specDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe this specialization..."></textarea>
+        </div>
+
+        <div class="form-field">
+            <p-checkbox formControlName="is_active" [binary]="true" inputId="specActive"></p-checkbox>
+            <label for="specActive" class="ml-2">Active</label>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showSpecializationDialog = false"></button>
+        <button pButton [label]="isEditModeSpecialization ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveSpecialization()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Category Dialog -->
+<p-dialog [(visible)]="showCategoryDialog" [header]="isEditModeCategory ? 'Edit Category' : 'New Category'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="categoryForm" class="category-form">
+        <div class="form-field">
+            <label for="catName">Category Name *</label>
+            <input pInputText id="catName" formControlName="name" class="w-full"
+                placeholder="e.g., Technician Maintenance, Operator, Team Leader" />
+            <small class="text-color-secondary">This name will appear in the employee form dropdown</small>
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="catDesc">Description</label>
+            <textarea pInputTextarea id="catDesc" formControlName="description" rows="3" class="w-full"
+                placeholder="Describe this employee category..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showCategoryDialog = false"></button>
+        <button pButton [label]="isEditModeCategory ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveCategory()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Status Dialog -->
+<p-dialog [(visible)]="showStatusDialog" [header]="isEditModeStatus ? 'Edit Status' : 'New Status'" [modal]="true"
+    [style]="{width: '500px'}" [closable]="true">
+    <form [formGroup]="statusForm" class="status-form">
+        <div class="form-field">
+            <label for="statusName">Status Name *</label>
+            <input pInputText id="statusName" formControlName="name" class="w-full"
+                placeholder="e.g., Active, Inactive, On Leave" />
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="statusCode">Code *</label>
+            <input pInputText id="statusCode" formControlName="code" class="w-full"
+                placeholder="e.g., active, inactive, on_leave" />
+            <small class="text-color-secondary">Used internally to match employee status</small>
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="statusColor">Color</label>
+            <p-select id="statusColor" formControlName="color" [options]="[
+                {label: 'Success (Green)', value: 'success'},
+                {label: 'Warning (Orange)', value: 'warning'},
+                {label: 'Danger (Red)', value: 'danger'},
+                {label: 'Info (Blue)', value: 'info'},
+                {label: 'Secondary (Gray)', value: 'secondary'}
+            ]" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></p-select>
+        </div>
+
+        <div class="form-field mt-3">
+            <label for="statusDesc">Description</label>
+            <textarea pInputTextarea id="statusDesc" formControlName="description" rows="2" class="w-full"
+                placeholder="Description of this status..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showStatusDialog = false"></button>
+        <button pButton [label]="isEditModeStatus ? 'Update' : 'Create'" icon="pi pi-check" (click)="saveStatus()"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Plan Recyclage Dialog -->
+<p-dialog [(visible)]="showRecyclageDialog" header="Plan Recyclage Training" [modal]="true"
+    [style]="{width: '550px'}" [closable]="true">
+    <form [formGroup]="recyclageForm" class="recyclage-form">
+        <div class="form-field mb-3">
+            <label for="employee_name" class="font-semibold">Employee</label>
+            <input pInputText id="employee_name" formControlName="employee_name" class="w-full" [readonly]="true" />
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="formation_id" class="font-semibold">Formation <span class="text-danger">*</span></label>
+            <p-select id="formation_id" [options]="formations" formControlName="formation_id"
+                optionLabel="name" optionValue="id" placeholder="Select formation"
+                class="w-full" appendTo="body" [filter]="true"></p-select>
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="trainer_id" class="font-semibold">Trainer <span class="text-danger">*</span></label>
+            <p-select id="trainer_id" [options]="formateurs" formControlName="trainer_id"
+                optionLabel="name" optionValue="id" placeholder="Select trainer"
+                class="w-full" appendTo="body" [filter]="true"></p-select>
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="planned_date" class="font-semibold">Planned Date <span class="text-danger">*</span></label>
+            <p-datepicker id="planned_date" formControlName="planned_date" [showIcon]="true"
+                dateFormat="yy-mm-dd" class="w-full" appendTo="body"></p-datepicker>
+        </div>
+
+        <div class="form-field mb-3">
+            <label for="notes" class="font-semibold">Notes</label>
+            <textarea pInputTextarea id="notes" formControlName="notes" rows="3" class="w-full"
+                placeholder="Additional notes..."></textarea>
+        </div>
+    </form>
+
+    <ng-template pTemplate="footer">
+        <button pButton label="Cancel" icon="pi pi-times" class="p-button-text" (click)="showRecyclageDialog = false"></button>
+        <button pButton label="Plan Training" icon="pi pi-calendar-plus" (click)="saveRecyclage()"
+            [disabled]="recyclageForm.invalid"></button>
+    </ng-template>
+</p-dialog>
+
+<!-- Confirm Dialog -->
+<p-confirmDialog></p-confirmDialog>
+
+<!-- Toast -->
+<p-toast position="top-right"></p-toast>

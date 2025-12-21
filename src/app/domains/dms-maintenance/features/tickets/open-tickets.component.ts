@@ -208,6 +208,12 @@ import { MaintenanceService } from '@core/services/maintenance.service';
                             <th pSortableColumn="AssignedTo" pReorderableColumn style="min-width: 150px">
                                 Assigned to <p-sortIcon field="AssignedTo"></p-sortIcon>
                             </th>
+                            <th pSortableColumn="ClosedAt" pReorderableColumn style="min-width: 160px">
+                                Closed at <p-sortIcon field="ClosedAt"></p-sortIcon>
+                            </th>
+                            <th style="min-width: 100px">Intervention</th>
+                            <th style="min-width: 100px">Reactivity</th>
+                            <th style="min-width: 100px">Waiting</th>
                         </tr>
                     </ng-template>
 
@@ -240,12 +246,31 @@ import { MaintenanceService } from '@core/services/maintenance.service';
                             <td>{{ ticket.DowntimeStartsAt | date:'dd/MM/yyyy HH:mm' }}</td>
                             <td>{{ ticket.CreatedOn | date:'dd/MM/yyyy HH:mm' }}</td>
                             <td>{{ ticket.AssignedTo || '-' }}</td>
+                            <td>{{ ticket.ClosedAt ? (ticket.ClosedAt | date:'dd/MM/yyyy HH:mm') : '-' }}</td>
+                            <td>
+                                <span *ngIf="ticket.InterventionTime" class="time-value">
+                                    {{ ticket.InterventionTime | number:'1.0-0' }} min
+                                </span>
+                                <span *ngIf="!ticket.InterventionTime">-</span>
+                            </td>
+                            <td>
+                                <span *ngIf="ticket.ReactivityTime" class="time-value">
+                                    {{ ticket.ReactivityTime | number:'1.0-0' }} min
+                                </span>
+                                <span *ngIf="!ticket.ReactivityTime">-</span>
+                            </td>
+                            <td>
+                                <span *ngIf="ticket.WaitingTime" class="time-value">
+                                    {{ ticket.WaitingTime | number:'1.0-0' }} min
+                                </span>
+                                <span *ngIf="!ticket.WaitingTime">-</span>
+                            </td>
                         </tr>
                     </ng-template>
 
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="11" class="text-center p-4">
+                            <td colspan="15" class="text-center p-4">
                                 <i class="pi pi-inbox text-4xl text-color-secondary mb-2"></i>
                                 <p class="font-semibold m-0">No Open Tickets</p>
                                 <p class="text-sm text-color-secondary m-0">
@@ -435,6 +460,16 @@ import { MaintenanceService } from '@core/services/maintenance.service';
             padding: 0.15rem 0.5rem;
             border-radius: 4px;
             font-size: 0.85rem;
+        }
+
+        .time-value {
+            font-family: monospace;
+            font-weight: 500;
+            color: var(--primary-color);
+            background: var(--primary-50);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
         }
 
         :host ::ng-deep .status-tag {

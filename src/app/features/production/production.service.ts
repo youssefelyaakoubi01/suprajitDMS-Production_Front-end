@@ -8,9 +8,11 @@ import {
     Workstation,
     Machine,
     Shift,
+    ShiftType,
     DowntimeProblem,
     HourlyProduction,
-    Downtime
+    Downtime,
+    Zone
 } from '../../core/models';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
 import { ProductionService as CoreProductionService } from '../../core/services/production.service';
@@ -54,6 +56,37 @@ export class ProductionService {
         if (!timeString) return 0;
         const parts = timeString.split(':');
         return parseInt(parts[0], 10);
+    }
+
+    getActiveShiftTypes(): Observable<ShiftType[]> {
+        return this.coreService.getActiveShiftTypes().pipe(
+            map((response: any) => {
+                const shiftTypes = response.results || response;
+                return shiftTypes.map((st: any) => ({
+                    id: st.id,
+                    name: st.name,
+                    code: st.code,
+                    target_percentage: st.target_percentage,
+                    description: st.description,
+                    is_active: st.is_active
+                }));
+            })
+        );
+    }
+
+    getActiveZones(): Observable<Zone[]> {
+        return this.coreService.getActiveZones().pipe(
+            map((response: any) => {
+                const zones = response.results || response;
+                return zones.map((z: any) => ({
+                    id: z.id,
+                    name: z.name,
+                    code: z.code,
+                    description: z.description,
+                    is_active: z.is_active
+                }));
+            })
+        );
     }
 
     getProjects(): Observable<Project[]> {

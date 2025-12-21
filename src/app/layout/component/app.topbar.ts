@@ -91,6 +91,7 @@ export class AppTopbar implements OnInit, OnDestroy {
 
     private moduleMap: { [key: string]: DmsModuleInfo } = {
         'dms-production': { title: 'DMS PRODUCTION', icon: 'pi pi-bolt', color: '#3B82F6' },
+        'dms-tech': { title: 'DMS TECH', icon: 'pi pi-cog', color: '#6366F1' },
         'dms-hr': { title: 'DMS HR', icon: 'pi pi-users', color: '#8B5CF6' },
         'dms-maintenance': { title: 'DMS MAINTENANCE', icon: 'pi pi-wrench', color: '#06B6D4' },
         'dms-inventory': { title: 'DMS INVENTORY', icon: 'pi pi-box', color: '#F59E0B' },

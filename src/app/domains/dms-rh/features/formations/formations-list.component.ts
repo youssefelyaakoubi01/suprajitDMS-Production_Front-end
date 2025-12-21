@@ -76,7 +76,8 @@ import { DmsFormationService, Formation, FormationPlan, Formateur } from '@domai
             </div>
 
             <!-- Grouped Formations by Type -->
-            <p-accordion *ngIf="!loading" [multiple]="true">
+            <div *ngIf="!loading" @.disabled>
+            <p-accordion [multiple]="true">
                 <p-accordionpanel *ngFor="let group of groupedFormations | keyvalue" [value]="group.key">
                     <ng-template pTemplate="header">
                         <div class="flex align-items-center gap-2">
@@ -135,6 +136,7 @@ import { DmsFormationService, Formation, FormationPlan, Formateur } from '@domai
                     </ng-template>
                 </p-accordionpanel>
             </p-accordion>
+            </div>
 
             <!-- Empty State -->
             <div *ngIf="!loading && formations.length === 0" class="empty-state">

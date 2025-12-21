@@ -153,9 +153,11 @@ export class DowntimeNotificationService implements OnDestroy {
     }
 
     private fetchAlerts(): void {
-        this.api.get<any[]>(`${this.endpoint}/declarations/alerts`).subscribe({
+        this.api.get<any>(`${this.endpoint}/declarations/alerts/`).subscribe({
             next: (data) => {
-                const alerts = this.mapAlertsFromApi(data);
+                // Handle both array and object response formats
+                const alertsData = Array.isArray(data) ? data : (data.alerts || []);
+                const alerts = this.mapAlertsFromApi(alertsData);
                 this.processNewAlerts(alerts);
             },
             error: (err) => {
@@ -201,19 +203,19 @@ export class DowntimeNotificationService implements OnDestroy {
         return (data || []).map(item => ({
             id: item.id?.toString() || `alert-${Date.now()}`,
             type: this.mapAlertType(item.type || item.status),
-            priority: item.priority || item.impact_level || 'medium',
-            status: item.read ? 'read' : 'unread',
+            priority: item.priority || item.impactLevel || item.impact_level || 'medium',
+            status: item.isNew ? 'unread' : (item.read ? 'read' : 'unread'),
             title: this.generateAlertTitle(item),
             message: item.message || item.reason || item.description || '',
-            declarationId: item.declaration_id || item.id,
-            ticketNumber: item.ticket_number,
-            workstation: item.workstation_name || item.workstation,
-            productionLine: item.production_line_name || item.production_line,
-            machine: item.machine_name || item.machine,
+            declarationId: item.declarationId || item.declaration_id || item.id,
+            ticketNumber: item.ticketNumber || item.ticket_number,
+            workstation: item.workstation || item.workstation_name,
+            productionLine: item.productionLine || item.production_line_name || item.production_line,
+            machine: item.machine || item.machine_name,
             zone: item.zone,
-            declaredBy: item.declared_by_name || item.declared_by,
-            assignedTechnician: item.assigned_technician_name,
-            createdAt: new Date(item.created_at || item.declared_at || Date.now()),
+            declaredBy: item.declaredBy || item.declared_by_name || item.declared_by,
+            assignedTechnician: item.assignedTechnician || item.assigned_technician_name,
+            createdAt: new Date(item.declaredAt || item.created_at || item.declared_at || Date.now()),
             readAt: item.read_at ? new Date(item.read_at) : undefined,
             metadata: item.metadata
         }));

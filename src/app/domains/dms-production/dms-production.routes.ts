@@ -3,7 +3,7 @@
  * Domain: Production Management
  *
  * These routes are designed to be lazy-loaded as children of the main layout.
- * Uses new standalone components from the domains structure.
+ * Uses standalone components from the domains structure.
  */
 import { Routes } from '@angular/router';
 
@@ -34,10 +34,9 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
     {
         path: 'downtime-list',
         loadComponent: () =>
-            import('@features/downtime-list/downtime-list.component').then(m => m.DowntimeListComponent),
+            import('./features/downtime/downtime-list.component').then(m => m.DowntimeListComponent),
         title: 'Downtime List'
     },
-    // Legacy routes - fallback to old components if needed
     {
         path: 'production',
         loadComponent: () =>
@@ -53,7 +52,7 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
     {
         path: 'downtime-declaration',
         loadComponent: () =>
-            import('@features/downtime-declaration/downtime-declaration.component').then(m => m.DowntimeDeclarationComponent),
+            import('./features/downtime/downtime-declaration.component').then(m => m.DowntimeDeclarationComponent),
         title: 'Downtime Declaration'
     },
     {
@@ -64,6 +63,12 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
                 loadComponent: () =>
                     import('@features/settings/shifts.component').then(m => m.ShiftsComponent),
                 title: 'Shift Settings'
+            },
+            {
+                path: 'shift-types',
+                loadComponent: () =>
+                    import('@features/settings/shift-types.component').then(m => m.ShiftTypesComponent),
+                title: 'Shift Type Settings'
             }
         ]
     }

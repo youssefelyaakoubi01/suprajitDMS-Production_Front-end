@@ -1,4 +1,4 @@
-import { Shift, Project, ProductionLine, Part, DowntimeProblem, Machine } from './production.model';
+import { Shift, Project, ProductionLine, Part, DowntimeProblem, Machine, Zone } from './production.model';
 import { EmployeeWithAssignment } from './employee.model';
 
 // Use existing Downtime interface from production.model.ts
@@ -59,6 +59,7 @@ export interface ShiftProductionSession {
     productionLine: ProductionLine | null;
     part: Part | null;
     machine: Machine | null;
+    zone: Zone | null;
 
     // Order Number
     orderNo: string;

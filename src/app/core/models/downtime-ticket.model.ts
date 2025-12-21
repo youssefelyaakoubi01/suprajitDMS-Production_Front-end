@@ -1,8 +1,11 @@
 export interface DowntimeTicket {
     Id_DowntimeTicket: number;
     TicketNo: string;
+    Type: string;                    // Assembly, Die Casting, Pressing, etc.
     Zone: string;
     ImpactedProject: string;
+    ProductionLine: string;          // Production line name
+    Workstation: string;             // Workstation name
     ImpactedMachine: string;
     Status: 'Open' | 'In Progress' | 'Closed';
     DowntimeStartsAt: Date;
@@ -17,7 +20,7 @@ export interface DowntimeTicket {
     Resolution: string | null;
 }
 
-export interface Zone {
+export interface DowntimeZone {
     Id_Zone: number;
     Name_Zone: string;
     Code_Zone: string;

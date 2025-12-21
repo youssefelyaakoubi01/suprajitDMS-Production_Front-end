@@ -30,8 +30,13 @@ import {
     HourlyProduction,
     ProductionLine,
     Part,
-    Project
+    Project,
+    PartLineAssignment,
+    HeadcountRequirement
 } from '@domains/dms-production';
+import { DowntimeDeclarationDialogComponent, DowntimeDeclarationData } from '../downtime/downtime-declaration-dialog.component';
+import { MessageService } from 'primeng/api';
+import { ToastModule } from 'primeng/toast';
 
 interface ShiftOption {
     label: string;
@@ -61,8 +66,11 @@ interface HourOption {
         TooltipModule,
         DialogModule,
         ProgressBarModule,
-        TextareaModule
+        TextareaModule,
+        ToastModule,
+        DowntimeDeclarationDialogComponent
     ],
+    providers: [MessageService],
     template: `
         <div class="production-tracking">
             <!-- Shift Selection Form -->
@@ -146,6 +154,21 @@ interface HourOption {
                         <span class="metric-value">{{ currentTarget }}</span>
                         <span class="metric-unit">pcs/h</span>
                     </div>
+                    <div class="target-hint" *ngIf="currentLineAssignment?.specific_target">
+                        <i class="pi pi-info-circle text-blue-500 mr-1"></i>
+                        <span class="text-xs text-blue-600">Line-specific target</span>
+                    </div>
+                </div>
+
+                <div class="metric-card headcount-card" *ngIf="recommendedHeadcount > 0">
+                    <div class="metric-header">
+                        <span class="metric-label">Recommended HC</span>
+                        <i class="pi pi-users metric-icon"></i>
+                    </div>
+                    <div class="metric-body">
+                        <span class="metric-value">{{ recommendedHeadcount }}</span>
+                        <span class="metric-unit">persons</span>
+                    </div>
                 </div>
 
                 <div class="metric-card efficiency-card" [ngClass]="getEfficiencyClass()">
@@ -161,47 +184,90 @@ interface HourOption {
                                    styleClass="h-1 mt-2"></p-progressBar>
                 </div>
 
-                <div class="metric-card downtime-card">
+                <div class="metric-card downtime-card" [class.has-downtime]="currentDowntime > 0">
                     <div class="metric-header">
-                        <span class="metric-label">Downtime (min)</span>
-                        <i class="pi pi-clock metric-icon"></i>
+                        <span class="metric-label">Downtime</span>
+                        <i class="pi pi-exclamation-triangle metric-icon"></i>
                     </div>
                     <div class="metric-body">
-                        <p-inputNumber [(ngModel)]="currentDowntime" [showButtons]="true"
-                                       [min]="0" [max]="60" styleClass="metric-input-sm">
-                        </p-inputNumber>
+                        <span class="metric-value" *ngIf="currentDowntime > 0">{{ currentDowntime }}</span>
+                        <span class="metric-value" *ngIf="currentDowntime === 0">--</span>
+                        <span class="metric-unit">min</span>
                     </div>
+                    <button pButton label="Declare Downtime" icon="pi pi-plus"
+                            class="p-button-warning p-button-sm mt-2 w-full"
+                            (click)="openDowntimeDeclaration()"
+                            [disabled]="!shiftForm.get('productionLineId')?.value">
+                    </button>
                 </div>
             </div>
 
-            <!-- Downtime Details (shown when downtime > 0) -->
-            <div class="downtime-details-card mb-4" *ngIf="currentDowntime > 0">
+            <!-- Active Downtime Declaration Preview -->
+            <div class="downtime-preview-card mb-4" *ngIf="currentDowntimeDeclaration">
                 <p-card styleClass="border-left-warning">
-                    <div class="grid p-fluid">
-                        <div class="col-12 md:col-6">
-                            <label class="block mb-2 font-medium">Problem Type</label>
-                            <p-select [options]="downtimeProblems" [(ngModel)]="selectedProblem"
-                                      optionLabel="Name_DowntimeProblems" optionValue="Id_DowntimeProblems"
-                                      placeholder="Select Problem Type" styleClass="w-full">
-                            </p-select>
+                    <div class="flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="flex align-items-center gap-2 mb-2">
+                                <p-tag [value]="currentDowntimeDeclaration.impactLevel | titlecase"
+                                       [severity]="getImpactSeverity(currentDowntimeDeclaration.impactLevel)">
+                                </p-tag>
+                                <p-tag [value]="currentDowntimeDeclaration.declarationType | titlecase"
+                                       severity="secondary">
+                                </p-tag>
+                                <span class="font-bold text-lg ml-2">{{ currentDowntimeDeclaration.duration }} min</span>
+                            </div>
+                            <div class="text-lg font-medium mb-1">{{ currentDowntimeDeclaration.reason }}</div>
+                            <div class="text-sm text-color-secondary" *ngIf="currentDowntimeDeclaration.description">
+                                {{ currentDowntimeDeclaration.description }}
+                            </div>
+                            <div class="flex align-items-center gap-3 mt-2 text-sm">
+                                <span *ngIf="getWorkstationName(currentDowntimeDeclaration.workstation)">
+                                    <i class="pi pi-sitemap mr-1"></i>
+                                    {{ getWorkstationName(currentDowntimeDeclaration.workstation) }}
+                                </span>
+                                <span *ngIf="getMachineName(currentDowntimeDeclaration.machine)">
+                                    <i class="pi pi-cog mr-1"></i>
+                                    {{ getMachineName(currentDowntimeDeclaration.machine) }}
+                                </span>
+                                <span *ngIf="currentDowntimeDeclaration.notifyMaintenance" class="text-orange-500">
+                                    <i class="pi pi-bell mr-1"></i>Maintenance notified
+                                </span>
+                            </div>
                         </div>
-                        <div class="col-12 md:col-6">
-                            <label class="block mb-2 font-medium">Comment (optional)</label>
-                            <input pInputText [(ngModel)]="downtimeComment" placeholder="Describe the issue..." class="w-full">
+                        <div class="flex gap-1">
+                            <button pButton icon="pi pi-pencil" class="p-button-text p-button-sm"
+                                    (click)="editDowntimeDeclaration()" pTooltip="Edit">
+                            </button>
+                            <button pButton icon="pi pi-times" class="p-button-text p-button-danger p-button-sm"
+                                    (click)="clearDowntimeDeclaration()" pTooltip="Remove">
+                            </button>
                         </div>
                     </div>
                 </p-card>
             </div>
 
+            <!-- Downtime Declaration Dialog -->
+            <app-downtime-declaration-dialog
+                [(visible)]="downtimeDialogVisible"
+                [productionLineId]="shiftForm.get('productionLineId')?.value"
+                [hourlyProductionId]="editingProductionId"
+                [editData]="editingDowntimeData"
+                (declared)="onDowntimeDeclared($event)"
+                (cancelled)="onDowntimeCancelled()">
+            </app-downtime-declaration-dialog>
+
+            <p-toast></p-toast>
+
             <!-- Save Button -->
             <div class="save-button-container mb-4">
                 <button pButton label="Save Production Data" icon="pi pi-save"
                         class="p-button-success p-button-lg"
-                        [disabled]="!shiftForm.valid || currentOutput === 0 || (currentDowntime > 0 && !selectedProblem)"
+                        [disabled]="!shiftForm.valid || currentOutput === 0"
                         (click)="saveOutput()">
                 </button>
-                <span class="save-hint" *ngIf="currentDowntime > 0 && !selectedProblem">
-                    <i class="pi pi-info-circle mr-1"></i>Please select a problem type for downtime
+                <span class="save-hint" *ngIf="currentDowntimeDeclaration">
+                    <i class="pi pi-check-circle mr-1 text-green-500"></i>
+                    Downtime of {{ currentDowntimeDeclaration.duration }} min will be recorded
                 </span>
             </div>
 
@@ -315,12 +381,8 @@ interface HourOption {
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
-
-            @media (max-width: 992px) {
-                grid-template-columns: repeat(2, 1fr);
-            }
 
             @media (max-width: 576px) {
                 grid-template-columns: 1fr;
@@ -381,6 +443,16 @@ interface HourOption {
 
         .target-card {
             border-left: 4px solid var(--purple-500);
+        }
+
+        .target-hint {
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .headcount-card {
+            border-left: 4px solid var(--cyan-500);
         }
 
         .efficiency-card {
@@ -484,6 +556,19 @@ interface HourOption {
 
         .downtime-card {
             border-left: 4px solid var(--orange-500);
+
+            &.has-downtime {
+                background: var(--orange-50);
+                border-left-color: var(--red-500);
+            }
+        }
+
+        .downtime-preview-card {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        :host ::ng-deep .downtime-preview-card .p-card {
+            background: var(--orange-50);
         }
 
         :host ::ng-deep .metric-input-sm .p-inputnumber-input {
@@ -558,7 +643,19 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
     currentEfficiency = 0;
     currentDowntime = 0;
 
-    // Downtime fields (inline with hourly production)
+    // Part-Line Assignment & Headcount tracking
+    currentLineAssignment: PartLineAssignment | null = null;
+    headcountRequirements: HeadcountRequirement[] = [];
+    recommendedHeadcount: number = 0;
+
+    // Enhanced Downtime Declaration
+    downtimeDialogVisible = false;
+    currentDowntimeDeclaration: DowntimeDeclarationData | null = null;
+    editingDowntimeData: DowntimeDeclarationData | null = null;
+    workstationsCache: Map<number, string> = new Map();
+    machinesCache: Map<number, string> = new Map();
+
+    // Legacy fields (kept for compatibility)
     selectedProblem: number | null = null;
     downtimeComment = '';
 
@@ -567,7 +664,8 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
 
     constructor(
         private fb: FormBuilder,
-        private productionService: DmsProductionService
+        private productionService: DmsProductionService,
+        private messageService: MessageService
     ) {}
 
     ngOnInit(): void {
@@ -629,13 +727,23 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
     }
 
     onLineChange(): void {
-        const projectId = this.shiftForm.get('projectId')?.value;
-        if (projectId) {
-            this.productionService.getPartsByProject(projectId)
+        const lineId = this.shiftForm.get('productionLineId')?.value;
+        if (lineId) {
+            // Use getPartsByProductionLine to get only parts assigned to this line
+            this.productionService.getPartsByProductionLine(lineId)
                 .pipe(takeUntil(this.destroy$))
                 .subscribe(parts => {
                     this.parts = parts;
                     this.shiftForm.patchValue({ partId: null });
+                    this.currentLineAssignment = null;
+                    this.recommendedHeadcount = 0;
+                });
+
+            // Load headcount requirements for this line
+            this.productionService.getHeadcountRequirements({ production_line: lineId })
+                .pipe(takeUntil(this.destroy$))
+                .subscribe(requirements => {
+                    this.headcountRequirements = requirements;
                 });
         }
         this.loadHourlyData();
@@ -643,10 +751,53 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
 
     onPartChange(): void {
         const partId = this.shiftForm.get('partId')?.value;
+        const lineId = this.shiftForm.get('productionLineId')?.value;
         const part = this.parts.find(p => p.Id_Part === partId);
-        if (part) {
+
+        if (part && lineId) {
+            // First, get line-specific target from PartLineAssignment
+            this.productionService.getPartLineAssignments({ part: partId, production_line: lineId })
+                .pipe(takeUntil(this.destroy$))
+                .subscribe({
+                    next: (assignments) => {
+                        if (assignments.length > 0) {
+                            this.currentLineAssignment = assignments[0];
+                            // Use effective_target (which is specific_target or part default)
+                            this.currentTarget = assignments[0].effective_target || part.ShiftTarget_Part || 0;
+                        } else {
+                            // Fallback to part's default target if no assignment found
+                            this.currentLineAssignment = null;
+                            this.currentTarget = part.ShiftTarget_Part || 0;
+                        }
+                        this.calculateEfficiency();
+                    },
+                    error: () => {
+                        // Fallback on error
+                        this.currentTarget = part.ShiftTarget_Part || 0;
+                        this.calculateEfficiency();
+                    }
+                });
+
+            // Calculate recommended headcount from HeadcountRequirements
+            this.calculateRecommendedHeadcount(partId);
+        } else if (part) {
             this.currentTarget = part.ShiftTarget_Part || 0;
             this.calculateEfficiency();
+        }
+    }
+
+    private calculateRecommendedHeadcount(partId: number): void {
+        // Find headcount requirement for this specific part, or fallback to line-level (part=null)
+        const specificReq = this.headcountRequirements.find(r => r.part === partId);
+        const lineReq = this.headcountRequirements.find(r => r.part === null);
+
+        const requirement = specificReq || lineReq;
+        if (requirement) {
+            this.recommendedHeadcount = (requirement.operators_required || 0)
+                + (requirement.technicians_required || 0)
+                + (requirement.quality_agents_required || 0);
+        } else {
+            this.recommendedHeadcount = 0;
         }
     }
 
@@ -722,22 +873,35 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
     }
 
     private saveDowntimeForProduction(hourlyProdId: number): void {
+        // Use enhanced declaration data if available
+        const declaration = this.currentDowntimeDeclaration;
+
         const downtime = {
-            Total_Downtime: this.currentDowntime,
-            Comment_Downtime: this.downtimeComment,
+            Total_Downtime: declaration?.duration || this.currentDowntime,
+            Comment_Downtime: declaration?.reason || this.downtimeComment,
             Id_HourlyProd: hourlyProdId,
-            Id_DowntimeProblems: this.selectedProblem
+            Id_DowntimeProblems: declaration?.problemType || this.selectedProblem,
+            machine: declaration?.machine || undefined
         };
 
         this.productionService.saveDowntime(downtime)
             .pipe(takeUntil(this.destroy$))
             .subscribe({
                 next: () => {
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Saved',
+                        detail: 'Production data and downtime saved successfully'
+                    });
                     this.resetForm();
                     this.loadHourlyData();
                 },
                 error: () => {
-                    // Even if downtime save fails, reset and reload
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Partial Save',
+                        detail: 'Production saved but downtime recording failed'
+                    });
                     this.resetForm();
                     this.loadHourlyData();
                 }
@@ -750,6 +914,10 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
         this.selectedProblem = null;
         this.downtimeComment = '';
         this.editingProductionId = null;
+        this.currentDowntimeDeclaration = null;
+        this.editingDowntimeData = null;
+        this.currentLineAssignment = null;
+        // Keep recommendedHeadcount as it's based on line selection
     }
 
     editProduction(prod: HourlyProduction): void {
@@ -848,5 +1016,95 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
         const totalTarget = this.getTotalTarget();
         if (totalTarget === 0) return 0;
         return Math.round((this.getTotalOutput() / totalTarget) * 100);
+    }
+
+    // ==================== Enhanced Downtime Declaration ====================
+
+    openDowntimeDeclaration(): void {
+        this.editingDowntimeData = null;
+        this.downtimeDialogVisible = true;
+    }
+
+    editDowntimeDeclaration(): void {
+        if (this.currentDowntimeDeclaration) {
+            this.editingDowntimeData = { ...this.currentDowntimeDeclaration };
+            this.downtimeDialogVisible = true;
+        }
+    }
+
+    clearDowntimeDeclaration(): void {
+        this.currentDowntimeDeclaration = null;
+        this.currentDowntime = 0;
+        this.selectedProblem = null;
+        this.downtimeComment = '';
+    }
+
+    onDowntimeDeclared(declaration: DowntimeDeclarationData): void {
+        this.currentDowntimeDeclaration = declaration;
+        this.currentDowntime = declaration.duration;
+        this.selectedProblem = declaration.problemType;
+        this.downtimeComment = declaration.reason;
+
+        // Cache workstation and machine names
+        if (declaration.workstation) {
+            this.loadWorkstationName(declaration.workstation);
+        }
+        if (declaration.machine) {
+            this.loadMachineName(declaration.machine);
+        }
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Downtime Declared',
+            detail: `${declaration.duration} min downtime recorded`
+        });
+    }
+
+    onDowntimeCancelled(): void {
+        this.editingDowntimeData = null;
+    }
+
+    getImpactSeverity(impact: string): 'success' | 'info' | 'warn' | 'danger' {
+        const map: Record<string, 'success' | 'info' | 'warn' | 'danger'> = {
+            'low': 'success',
+            'medium': 'info',
+            'high': 'warn',
+            'critical': 'danger'
+        };
+        return map[impact] || 'info';
+    }
+
+    getWorkstationName(id: number | null): string {
+        if (!id) return '';
+        return this.workstationsCache.get(id) || '';
+    }
+
+    getMachineName(id: number | null): string {
+        if (!id) return '';
+        return this.machinesCache.get(id) || '';
+    }
+
+    private loadWorkstationName(id: number): void {
+        if (this.workstationsCache.has(id)) return;
+
+        this.productionService.getWorkstations()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(workstations => {
+                workstations.forEach(ws => {
+                    this.workstationsCache.set(ws.Id_Workstation, ws.Name_Workstation);
+                });
+            });
+    }
+
+    private loadMachineName(id: number): void {
+        if (this.machinesCache.has(id)) return;
+
+        this.productionService.getMachines()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(machines => {
+                machines.forEach(m => {
+                    this.machinesCache.set(m.id, m.name);
+                });
+            });
     }
 }

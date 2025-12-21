@@ -23,13 +23,6 @@ export const DMS_QUALITY_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/defects/defects-list.component').then(m => m.DefectsListComponent),
         title: 'Defects List'
-    },
-    // Legacy route - fallback to old component
-    {
-        path: 'legacy',
-        loadComponent: () =>
-            import('@features/quality/quality.component').then(m => m.QualityComponent),
-        title: 'Quality (Legacy)'
     }
 ];
 

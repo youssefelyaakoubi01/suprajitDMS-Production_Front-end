@@ -133,3 +133,64 @@ export interface HourlyOutputData {
     target: number;
     efficiency: number;
 }
+
+// ==================== ZONE ====================
+export type ZoneType = 'production' | 'maintenance' | 'storage' | 'quality';
+
+export interface Zone {
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    project?: number;
+    project_name?: string;
+    zone_type: ZoneType;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// ==================== PART-LINE ASSIGNMENT ====================
+export interface PartLineAssignment {
+    id: number;
+    part: number;
+    part_number?: string;
+    part_name?: string;
+    part_default_target?: number;
+    production_line: number;
+    line_name?: string;
+    line_code?: string;
+    project_name?: string;
+    specific_target?: number;
+    specific_efficiency?: number;
+    specific_cycle_time?: number;
+    effective_target?: number;
+    effective_efficiency?: number;
+    is_primary: boolean;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// ==================== HEADCOUNT REQUIREMENT ====================
+export interface HeadcountRequirement {
+    id?: number;
+    production_line: number;
+    line_name?: string;
+    line_code?: string;
+    project_name?: string;
+    part?: number;
+    part_number?: string;
+    part_name?: string;
+    shift_type?: number;
+    shift_type_name?: string;
+    shift_type_code?: string;
+    operators_required: number;
+    technicians_required: number;
+    quality_agents_required: number;
+    total_required?: number;
+    notes?: string;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}

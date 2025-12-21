@@ -9,6 +9,7 @@ import { AppLayout } from './app/layout/component/app.layout';
 import { AppDmsLayout } from './app/layout/component/app.dms-layout';
 import { AppDmsHrLayout } from './app/layout/component/app.dms-hr-layout';
 import { AppDmsMaintenanceLayout } from './app/layout/component/app.dms-maintenance-layout';
+import { AppDmsTechLayout } from './app/layout/component/app.dms-tech-layout';
 
 export const appRoutes: Routes = [
     {
@@ -68,6 +69,13 @@ export const appRoutes: Routes = [
         component: AppDmsLayout,
         title: 'DMS Analytics',
         loadChildren: () => import('./app/domains/dms-analytics/dms-analytics.routes').then(m => m.DMS_ANALYTICS_ROUTES)
+    },
+    // ==================== DMS TECH (CONFIGURATION) ====================
+    {
+        path: 'dms-tech',
+        component: AppDmsTechLayout,
+        title: 'DMS Tech - Configuration',
+        loadChildren: () => import('./app/domains/dms-tech/dms-tech.routes').then(m => m.DMS_TECH_ROUTES)
     },
     // ==================== OTHER ====================
     {

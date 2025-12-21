@@ -15,7 +15,9 @@ import {
     HourlyProduction,
     TeamAssignment,
     ProductionDashboardStats,
-    HourlyOutputData
+    HourlyOutputData,
+    PartLineAssignment,
+    HeadcountRequirement
 } from '../models';
 
 @Injectable({
@@ -245,5 +247,66 @@ export class DmsProductionService {
 
     deleteDowntime(id: number): Observable<void> {
         return this.api.delete<void>(`${this.endpoint}/downtimes/${id}`);
+    }
+
+    // ==================== PARTS BY PRODUCTION LINE ====================
+    /**
+     * Get parts assigned to a specific production line via PartLineAssignment
+     * Falls back to project-based filtering if no assignments exist
+     */
+    getPartsByProductionLine(lineId: number): Observable<Part[]> {
+        return this.api.get<Part[]>(`${this.endpoint}/parts/by_production_line`, { line_id: lineId });
+    }
+
+    // ==================== PART-LINE ASSIGNMENTS ====================
+    getPartLineAssignments(params?: {
+        part?: number;
+        production_line?: number;
+        is_active?: boolean;
+        is_primary?: boolean;
+    }): Observable<PartLineAssignment[]> {
+        return this.api.get<PartLineAssignment[]>(`${this.endpoint}/part-line-assignments`, params);
+    }
+
+    getPartLineAssignment(id: number): Observable<PartLineAssignment> {
+        return this.api.get<PartLineAssignment>(`${this.endpoint}/part-line-assignments/${id}`);
+    }
+
+    createPartLineAssignment(assignment: Partial<PartLineAssignment>): Observable<PartLineAssignment> {
+        return this.api.post<PartLineAssignment>(`${this.endpoint}/part-line-assignments`, assignment);
+    }
+
+    updatePartLineAssignment(id: number, assignment: Partial<PartLineAssignment>): Observable<PartLineAssignment> {
+        return this.api.patch<PartLineAssignment>(`${this.endpoint}/part-line-assignments/${id}`, assignment);
+    }
+
+    deletePartLineAssignment(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/part-line-assignments/${id}`);
+    }
+
+    // ==================== HEADCOUNT REQUIREMENTS ====================
+    getHeadcountRequirements(params?: {
+        production_line?: number;
+        part?: number;
+        shift_type?: number;
+        is_active?: boolean;
+    }): Observable<HeadcountRequirement[]> {
+        return this.api.get<HeadcountRequirement[]>(`${this.endpoint}/headcount-requirements`, params);
+    }
+
+    getHeadcountRequirement(id: number): Observable<HeadcountRequirement> {
+        return this.api.get<HeadcountRequirement>(`${this.endpoint}/headcount-requirements/${id}`);
+    }
+
+    createHeadcountRequirement(requirement: Partial<HeadcountRequirement>): Observable<HeadcountRequirement> {
+        return this.api.post<HeadcountRequirement>(`${this.endpoint}/headcount-requirements`, requirement);
+    }
+
+    updateHeadcountRequirement(id: number, requirement: Partial<HeadcountRequirement>): Observable<HeadcountRequirement> {
+        return this.api.patch<HeadcountRequirement>(`${this.endpoint}/headcount-requirements/${id}`, requirement);
+    }
+
+    deleteHeadcountRequirement(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/headcount-requirements/${id}`);
     }
 }

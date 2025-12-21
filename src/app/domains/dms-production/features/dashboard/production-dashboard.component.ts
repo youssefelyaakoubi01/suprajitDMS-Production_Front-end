@@ -28,12 +28,12 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 
 // Services
-import { DashboardService, DashboardResponse } from '@features/dashboard/dashboard.service';
+import { DashboardService, DashboardResponse } from '../../services/dashboard.service';
 import { ProductionService } from '@core/services/production.service';
 
 // Components
-import { KpiCardComponent } from '@features/dashboard/components/kpi-card/kpi-card.component';
-import { ProductionLineCardComponent } from '@features/dashboard/components/production-line-card/production-line-card.component';
+import { KpiCardComponent } from './components/kpi-card/kpi-card.component';
+import { ProductionLineCardComponent } from './components/production-line-card/production-line-card.component';
 
 // Models
 import { KPI, ProductionLine, Project } from '@core/models';
