@@ -324,6 +324,15 @@ export interface FormationStats {
     upcomingFormations: FormationPlan[];
 }
 
+// ==================== PRODUCTION ROLE TYPES ====================
+export type ProductionRole = 'operator' | 'line_leader' | 'quality_agent' | 'maintenance_tech' | 'pqc';
+
+export interface ProductionRoleOption {
+    label: string;
+    value: ProductionRole;
+    icon: string;
+}
+
 // ==================== EXTENDED INTERFACES ====================
 export interface EmployeeWithAssignment extends Employee {
     workstation?: string;
@@ -332,6 +341,7 @@ export interface EmployeeWithAssignment extends Employee {
     machineId?: number;
     qualification?: string;
     qualificationLevel?: number;
+    role?: ProductionRole;
     team?: Team;
     category?: EmployeeCategory;
 }

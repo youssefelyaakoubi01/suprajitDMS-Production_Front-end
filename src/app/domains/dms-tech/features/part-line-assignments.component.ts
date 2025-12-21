@@ -220,7 +220,6 @@ interface Project {
             [modal]="true"
             styleClass="p-fluid form-dialog">
 
-            <ng-template pTemplate="content">
                 <div class="form-grid">
                     <div class="form-field">
                         <label for="part">Part <span class="required">*</span></label>
@@ -320,7 +319,6 @@ interface Project {
                         <label for="isActive" class="mb-0">Active assignment</label>
                     </div>
                 </div>
-            </ng-template>
 
             <ng-template pTemplate="footer">
                 <p-button label="Cancel" icon="pi pi-times" styleClass="p-button-text" (onClick)="hideDialog()"></p-button>
@@ -336,7 +334,6 @@ interface Project {
             [modal]="true"
             styleClass="p-fluid form-dialog">
 
-            <ng-template pTemplate="content">
                 <div class="form-field">
                     <label for="bulkLine">Production Line <span class="required">*</span></label>
                     <p-select
@@ -383,7 +380,6 @@ interface Project {
                     <i class="pi pi-info-circle mr-2"></i>
                     {{ bulkPartIds.length }} part(s) will be assigned to the selected production line.
                 </div>
-            </ng-template>
 
             <ng-template pTemplate="footer">
                 <p-button label="Cancel" icon="pi pi-times" styleClass="p-button-text" (onClick)="bulkDialog = false"></p-button>
@@ -553,7 +549,20 @@ export class PartLineAssignmentsComponent implements OnInit {
                     this.hideDialog();
                 },
                 error: (error) => {
-                    this.messageService.add({ severity: 'error', summary: 'Error', detail: error.error?.detail || 'Failed to create assignment' });
+                    let errorMsg = 'Failed to create assignment';
+                    if (error.error) {
+                        if (error.error.detail) {
+                            errorMsg = error.error.detail;
+                        } else if (error.error.non_field_errors) {
+                            errorMsg = error.error.non_field_errors.join(', ');
+                        } else if (typeof error.error === 'object') {
+                            const messages = Object.entries(error.error)
+                                .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
+                                .join('; ');
+                            errorMsg = messages || errorMsg;
+                        }
+                    }
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: errorMsg });
                 }
             });
         }

@@ -43,7 +43,7 @@ import {
     HourStatus,
     HourType
 } from '../../core/models/production-session.model';
-import { EmployeeWithAssignment } from '../../core/models/employee.model';
+import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '../../core/models/employee.model';
 import { environment } from '../../../environments/environment';
 
 @Component({
@@ -88,10 +88,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
         orderNo: '',
         team: [],
         actors: {
-            lineLeader: '',
-            qualityAgent: '',
-            maintenanceTech: '',
-            pqc: ''
+            lineLeader: { badgeId: '', name: '', qualification: '' },
+            qualityAgent: { badgeId: '', name: '', qualification: '' },
+            maintenanceTech: { badgeId: '', name: '', qualification: '' },
+            pqc: { badgeId: '', name: '', qualification: '' }
         },
         hours: [],
         isSetupComplete: false,
@@ -122,6 +122,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
     selectedWorkstation: Workstation | null = null;
     selectedMachineForAssignment: Machine | null = null;
     filteredMachinesForAssignment: Machine[] = [];
+    selectedRole: ProductionRole = 'operator';
+    roleOptions: ProductionRoleOption[] = [
+        { label: 'Operator', value: 'operator', icon: 'pi pi-user' },
+        { label: 'Line Leader', value: 'line_leader', icon: 'pi pi-star' },
+        { label: 'Quality Agent', value: 'quality_agent', icon: 'pi pi-check-circle' },
+        { label: 'Maintenance Tech', value: 'maintenance_tech', icon: 'pi pi-wrench' },
+        { label: 'PQC', value: 'pqc', icon: 'pi pi-shield' }
+    ];
 
     // Hour Production Dialog
     showHourDialog = false;
@@ -453,8 +461,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                     Picture: this.getEmployeePictureUrl(employee.picture || employee.Picture),
                                     EmpStatus: employee.status || employee.EmpStatus || 'active',
                                     workstation: workstation?.Name_Workstation || 'Unknown',
-                                    qualification: this.getCategoryQualification(employee.category || employee.Categorie_Emp || ''),
-                                    qualificationLevel: this.getCategoryLevel(employee.category || employee.Categorie_Emp || '')
+                                    qualification: employee.current_qualification || 'Not Qualified',
+                                    qualificationLevel: employee.current_qualification ? 1 : 0
                                 };
 
                                 // Avoid duplicates
@@ -519,8 +527,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                         Picture: this.getEmployeePictureUrl(employee.picture || employee.Picture),
                                         EmpStatus: employee.status || employee.EmpStatus || 'active',
                                         workstation: workstation?.Name_Workstation || 'Unknown',
-                                        qualification: this.getCategoryQualification(employee.category || employee.Categorie_Emp || ''),
-                                        qualificationLevel: this.getCategoryLevel(employee.category || employee.Categorie_Emp || '')
+                                        qualification: employee.current_qualification || 'Not Qualified',
+                                        qualificationLevel: employee.current_qualification ? 1 : 0
                                     };
 
                                     // Avoid duplicates in session team
@@ -939,16 +947,52 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     workstationId: this.selectedWorkstation!.Id_Workstation,
                     machine: this.selectedMachineForAssignment?.name,
                     machineId: this.selectedMachineForAssignment?.id,
-                    qualification: this.getCategoryQualification(employee.category),
-                    qualificationLevel: this.getCategoryLevel(employee.category)
+                    qualification: employee.current_qualification || 'Not Qualified',
+                    qualificationLevel: employee.current_qualification ? 1 : 0,
+                    role: this.selectedRole
                 };
 
                 this.session.team.push(newAssignment);
 
+                // Update actors based on role
+                const fullName = `${employee.first_name} ${employee.last_name}`;
+                const qualification = employee.current_qualification || 'Not Qualified';
+
+                if (this.selectedRole === 'line_leader') {
+                    this.session.actors.lineLeader = {
+                        badgeId: cleanBadgeId,
+                        name: fullName,
+                        qualification: qualification,
+                        employeeId: employee.id
+                    };
+                } else if (this.selectedRole === 'quality_agent') {
+                    this.session.actors.qualityAgent = {
+                        badgeId: cleanBadgeId,
+                        name: fullName,
+                        qualification: qualification,
+                        employeeId: employee.id
+                    };
+                } else if (this.selectedRole === 'maintenance_tech') {
+                    this.session.actors.maintenanceTech = {
+                        badgeId: cleanBadgeId,
+                        name: fullName,
+                        qualification: qualification,
+                        employeeId: employee.id
+                    };
+                } else if (this.selectedRole === 'pqc') {
+                    this.session.actors.pqc = {
+                        badgeId: cleanBadgeId,
+                        name: fullName,
+                        qualification: qualification,
+                        employeeId: employee.id
+                    };
+                }
+
+                const roleLabel = this.getRoleLabel(this.selectedRole);
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Success',
-                    detail: `${employee.first_name} ${employee.last_name} assigned to ${this.selectedWorkstation!.Name_Workstation}${this.selectedMachineForAssignment ? ' - ' + this.selectedMachineForAssignment.name : ''}`
+                    detail: `${fullName} assigned as ${roleLabel} to ${this.selectedWorkstation!.Name_Workstation}${this.selectedMachineForAssignment ? ' - ' + this.selectedMachineForAssignment.name : ''}`
                 });
 
                 // Save session to localStorage
@@ -956,6 +1000,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
                 this.employeeIdScan = '';
                 this.selectedMachineForAssignment = null;
+                this.selectedRole = 'operator'; // Reset to default role
             },
             error: (error) => {
                 this.messageService.add({
@@ -965,6 +1010,22 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 });
             }
         });
+    }
+
+    getRoleLabel(role: ProductionRole): string {
+        const roleOption = this.roleOptions.find(r => r.value === role);
+        return roleOption?.label || role;
+    }
+
+    getRoleSeverity(role: ProductionRole | undefined): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+        if (!role) return 'secondary';
+        switch (role) {
+            case 'line_leader': return 'warn';
+            case 'quality_agent': return 'success';
+            case 'maintenance_tech': return 'info';
+            case 'pqc': return 'danger';
+            default: return 'secondary';
+        }
     }
 
     removeEmployee(employee: EmployeeWithAssignment): void {
@@ -1040,6 +1101,48 @@ export class ProductionComponent implements OnInit, OnDestroy {
     onActorChange(): void {
         // Save session to localStorage when actors are modified
         this.saveSessionToStorage();
+    }
+
+    lookupActor(actorType: 'lineLeader' | 'qualityAgent' | 'maintenanceTech' | 'pqc'): void {
+        const actor = this.session.actors[actorType];
+        const badgeId = actor.badgeId?.trim();
+
+        if (!badgeId) {
+            // Clear the actor info if badge is empty
+            actor.name = '';
+            actor.qualification = '';
+            actor.employeeId = undefined;
+            this.saveSessionToStorage();
+            return;
+        }
+
+        this.employeeService.getEmployeeByBadge(badgeId).subscribe({
+            next: (employee: any) => {
+                actor.name = `${employee.first_name} ${employee.last_name}`;
+                actor.qualification = employee.current_qualification || 'Not Qualified';
+                actor.employeeId = employee.id;
+                this.saveSessionToStorage();
+
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Employee Found',
+                    detail: `${actor.name} - ${actor.qualification}`,
+                    life: 2000
+                });
+            },
+            error: () => {
+                actor.name = '';
+                actor.qualification = '';
+                actor.employeeId = undefined;
+                this.saveSessionToStorage();
+
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Not Found',
+                    detail: `Employee with badge ${badgeId} not found`
+                });
+            }
+        });
     }
 
     onOrderNoChange(): void {
@@ -1187,11 +1290,15 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Mark hour as in progress
         hour.status = 'in_progress';
 
+        // Find the ShiftType ID based on the hour_type code
+        const shiftType = this.shiftTypes.find(st => st.code === (hour.hourType || 'normal'));
+
         const productionData: any = {
             date: this.session.date,
             shift: this.session.shift.id,
             hour: hour.hour,
             hour_type: hour.hourType || 'normal',
+            shift_type: shiftType?.id || null,
             part: this.session.part.Id_Part,
             result: this.hourProductionInput.output,
             target: hour.target,
@@ -1202,10 +1309,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
             // Order Number
             order_no: this.session.orderNo || '',
             // Production Supervisors & Key Personnel
-            line_leader: this.session.actors.lineLeader || '',
-            quality_agent: this.session.actors.qualityAgent || '',
-            maintenance_tech: this.session.actors.maintenanceTech || '',
-            pqc: this.session.actors.pqc || ''
+            line_leader: this.session.actors.lineLeader.badgeId || '',
+            quality_agent: this.session.actors.qualityAgent.badgeId || '',
+            maintenance_tech: this.session.actors.maintenanceTech.badgeId || '',
+            pqc: this.session.actors.pqc.badgeId || ''
         };
 
         console.log('Sending production data:', productionData);
@@ -1273,10 +1380,28 @@ export class ProductionComponent implements OnInit, OnDestroy {
             },
             error: (error) => {
                 hour.status = 'not_started';
+                console.error('Error saving hourly production:', error);
+                // Extract detailed error message from DRF response
+                let errorMessage = 'Failed to save production';
+                if (error.error) {
+                    if (typeof error.error === 'string') {
+                        errorMessage = error.error;
+                    } else if (error.error.detail) {
+                        errorMessage = error.error.detail;
+                    } else {
+                        // DRF returns field errors as object { field: [errors] }
+                        const fieldErrors = Object.entries(error.error)
+                            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                            .join('; ');
+                        if (fieldErrors) {
+                            errorMessage = fieldErrors;
+                        }
+                    }
+                }
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
-                    detail: error.error?.detail || 'Failed to save production'
+                    detail: errorMessage
                 });
             }
         });
@@ -1772,10 +1897,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
             orderNo: '',
             team: [],
             actors: {
-                lineLeader: '',
-                qualityAgent: '',
-                maintenanceTech: '',
-                pqc: ''
+                lineLeader: { badgeId: '', name: '', qualification: '' },
+                qualityAgent: { badgeId: '', name: '', qualification: '' },
+                maintenanceTech: { badgeId: '', name: '', qualification: '' },
+                pqc: { badgeId: '', name: '', qualification: '' }
             },
             hours: [],
             isSetupComplete: false,

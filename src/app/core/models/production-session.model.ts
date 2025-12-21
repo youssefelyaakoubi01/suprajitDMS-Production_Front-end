@@ -44,11 +44,18 @@ export const HOUR_TYPE_TARGET_PERCENTAGE: Record<HourType, number> = {
     'extra_hour_break': 50  // 50% of target for extra hour break
 };
 
+export interface ActorInfo {
+    badgeId: string;
+    name: string;
+    qualification: string;
+    employeeId?: number;
+}
+
 export interface ProductionActors {
-    lineLeader: string;
-    qualityAgent: string;
-    maintenanceTech: string;
-    pqc: string;
+    lineLeader: ActorInfo;
+    qualityAgent: ActorInfo;
+    maintenanceTech: ActorInfo;
+    pqc: ActorInfo;
 }
 
 export interface ShiftProductionSession {
