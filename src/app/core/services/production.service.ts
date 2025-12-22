@@ -284,6 +284,18 @@ export class ProductionService {
         return this.api.get<DowntimeProblem[]>(`${this.endpoint}/downtime-problems`);
     }
 
+    createDowntimeProblem(data: Partial<DowntimeProblem>): Observable<DowntimeProblem> {
+        return this.api.post<DowntimeProblem>(`${this.endpoint}/downtime-problems/`, data);
+    }
+
+    updateDowntimeProblem(id: number, data: Partial<DowntimeProblem>): Observable<DowntimeProblem> {
+        return this.api.put<DowntimeProblem>(`${this.endpoint}/downtime-problems/${id}/`, data);
+    }
+
+    deleteDowntimeProblem(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/downtime-problems/${id}/`);
+    }
+
     // Team Assignments
     getTeamAssignments(hourlyProdId?: number): Observable<TeamAssignment[]> {
         const params = hourlyProdId ? { hourly_production: hourlyProdId } : undefined;

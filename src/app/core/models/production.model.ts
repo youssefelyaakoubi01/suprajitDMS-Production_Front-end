@@ -66,8 +66,15 @@ export interface Downtime {
 }
 
 export interface DowntimeProblem {
-    Id_DowntimeProblems: number;
-    Name_DowntimeProblems: string;
+    id?: number;
+    name: string;
+    code: string;
+    category: 'mechanical' | 'electrical' | 'quality' | 'material' | 'manpower' | 'other';
+    description?: string;
+    is_active: boolean;
+    // Legacy fields for backward compatibility
+    Id_DowntimeProblems?: number;
+    Name_DowntimeProblems?: string;
     Category_DowntimeProblems?: string;
 }
 

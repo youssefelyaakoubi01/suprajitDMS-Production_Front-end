@@ -97,6 +97,7 @@ export class AppTopbar implements OnInit, OnDestroy {
         'dms-inventory': { title: 'DMS INVENTORY', icon: 'pi pi-box', color: '#F59E0B' },
         'dms-quality': { title: 'DMS QUALITY', icon: 'pi pi-check-circle', color: '#EF4444' },
         'analytics': { title: 'ANALYTICS', icon: 'pi pi-chart-bar', color: '#EC4899' },
+        'dms-admin': { title: 'DMS ADMIN', icon: 'pi pi-shield', color: '#DC2626' },
         'dms-home': { title: 'DMS HOME', icon: 'pi pi-home', color: '#10B981' }
     };
 

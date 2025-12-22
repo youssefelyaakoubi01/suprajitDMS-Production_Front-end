@@ -26,6 +26,9 @@ import { MessageService } from 'primeng/api';
 import { AvatarModule } from 'primeng/avatar';
 import { ChipModule } from 'primeng/chip';
 import { MessageModule } from 'primeng/message';
+import { TextareaModule } from 'primeng/textarea';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { TimelineModule } from 'primeng/timeline';
 
 import {
     DowntimeNotificationService,
@@ -33,6 +36,8 @@ import {
     AlertType,
     AlertPriority
 } from '@core/services/downtime-notification.service';
+import { MaintenanceService, DowntimeDeclaration } from '@core/services/maintenance.service';
+import { EmployeeService } from '@core/services/employee.service';
 
 @Component({
     selector: 'app-alert-panel',
@@ -54,7 +59,10 @@ import {
         ToastModule,
         AvatarModule,
         ChipModule,
-        MessageModule
+        MessageModule,
+        TextareaModule,
+        ProgressSpinnerModule,
+        TimelineModule
     ],
     providers: [MessageService],
     templateUrl: './alert-panel.component.html',
@@ -82,6 +90,16 @@ export class AlertPanelComponent implements OnInit, OnDestroy {
 
     // UI State
     showSettings = false;
+    showDetailsDialog = false;
+    selectedAlert: DowntimeAlert | null = null;
+    selectedDeclaration: DowntimeDeclaration | null = null;
+    loadingDetails = false;
+
+    // Technician selection
+    technicians: any[] = [];
+    selectedTechnician: any = null;
+    resolutionNotes = '';
+    savingAction = false;
 
     // Preferences
     preferences = {
@@ -117,6 +135,8 @@ export class AlertPanelComponent implements OnInit, OnDestroy {
 
     constructor(
         private notificationService: DowntimeNotificationService,
+        private maintenanceService: MaintenanceService,
+        private employeeService: EmployeeService,
         private messageService: MessageService
     ) {}
 
@@ -337,5 +357,275 @@ export class AlertPanelComponent implements OnInit, OnDestroy {
 
     savePreferences(): void {
         this.notificationService.updatePreferences(this.preferences);
+    }
+
+    // ==================== Details Dialog ====================
+
+    openDetailsDialog(alert: DowntimeAlert): void {
+        this.selectedAlert = alert;
+        this.loadingDetails = true;
+        this.showDetailsDialog = true;
+        this.selectedTechnician = null;
+        this.resolutionNotes = '';
+
+        // Load technicians if not loaded
+        if (this.technicians.length === 0) {
+            this.loadTechnicians();
+        }
+
+        // Load declaration details
+        if (alert.declarationId) {
+            this.maintenanceService.getDeclaration(alert.declarationId).subscribe({
+                next: (declaration) => {
+                    this.selectedDeclaration = declaration;
+                    this.loadingDetails = false;
+
+                    // Pre-select assigned technician if any
+                    if (declaration.assigned_technician) {
+                        this.selectedTechnician = this.technicians.find(
+                            t => t.id === declaration.assigned_technician
+                        );
+                    }
+                },
+                error: (err) => {
+                    console.error('Error loading declaration:', err);
+                    this.loadingDetails = false;
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Error',
+                        detail: 'Failed to load declaration details'
+                    });
+                }
+            });
+        } else {
+            this.loadingDetails = false;
+        }
+    }
+
+    closeDetailsDialog(): void {
+        this.showDetailsDialog = false;
+        this.selectedAlert = null;
+        this.selectedDeclaration = null;
+    }
+
+    loadTechnicians(): void {
+        this.employeeService.getEmployees({ category: 'technician' }).subscribe({
+            next: (response: any) => {
+                const employees = Array.isArray(response) ? response : response.results || [];
+                if (employees.length > 0) {
+                    this.technicians = employees.map((e: any) => ({
+                        id: e.id,
+                        name: `${e.first_name} ${e.last_name}`,
+                        department: e.department
+                    }));
+                } else {
+                    // Fallback: load from Maintenance department
+                    this.employeeService.getEmployees({ department: 'Maintenance' }).subscribe({
+                        next: (resp: any) => {
+                            const emps = Array.isArray(resp) ? resp : resp.results || [];
+                            this.technicians = emps.map((e: any) => ({
+                                id: e.id,
+                                name: `${e.first_name} ${e.last_name}`,
+                                department: e.department
+                            }));
+                        }
+                    });
+                }
+            },
+            error: () => {
+                // Fallback: load all active employees
+                this.employeeService.getEmployees({ status: 'active' }).subscribe({
+                    next: (resp: any) => {
+                        const emps = Array.isArray(resp) ? resp : resp.results || [];
+                        this.technicians = emps.map((e: any) => ({
+                            id: e.id,
+                            name: `${e.first_name} ${e.last_name}`,
+                            department: e.department
+                        }));
+                    }
+                });
+            }
+        });
+    }
+
+    // ==================== Actions ====================
+
+    acknowledgeDeclaration(): void {
+        if (!this.selectedDeclaration) return;
+
+        this.savingAction = true;
+        this.maintenanceService.acknowledgeDeclaration(this.selectedDeclaration.id, {
+            acknowledged_by: 1, // TODO: Get current user ID
+            assigned_technician: this.selectedTechnician?.id
+        }).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Acknowledged',
+                    detail: `Declaration ${this.selectedDeclaration?.ticket_number} acknowledged`
+                });
+                this.savingAction = false;
+                this.refreshDeclarationDetails();
+            },
+            error: (err) => {
+                this.savingAction = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: err.error?.error || 'Failed to acknowledge'
+                });
+            }
+        });
+    }
+
+    assignTechnician(): void {
+        if (!this.selectedDeclaration || !this.selectedTechnician) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please select a technician'
+            });
+            return;
+        }
+
+        this.savingAction = true;
+        this.maintenanceService.startWorkOnDeclaration(
+            this.selectedDeclaration.id,
+            this.selectedTechnician.id
+        ).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Assigned',
+                    detail: `${this.selectedTechnician.name} assigned to ticket`
+                });
+                this.savingAction = false;
+                this.refreshDeclarationDetails();
+            },
+            error: (err) => {
+                this.savingAction = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: err.error?.error || 'Failed to assign technician'
+                });
+            }
+        });
+    }
+
+    resolveDeclaration(): void {
+        if (!this.selectedDeclaration) return;
+
+        if (!this.resolutionNotes.trim()) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please enter resolution notes'
+            });
+            return;
+        }
+
+        this.savingAction = true;
+        this.maintenanceService.resolveDeclaration(
+            this.selectedDeclaration.id,
+            this.resolutionNotes
+        ).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Resolved',
+                    detail: `Declaration ${this.selectedDeclaration?.ticket_number} resolved`
+                });
+                this.savingAction = false;
+                this.closeDetailsDialog();
+                this.refresh();
+            },
+            error: (err) => {
+                this.savingAction = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: err.error?.error || 'Failed to resolve'
+                });
+            }
+        });
+    }
+
+    refreshDeclarationDetails(): void {
+        if (this.selectedDeclaration) {
+            this.maintenanceService.getDeclaration(this.selectedDeclaration.id).subscribe({
+                next: (declaration) => {
+                    this.selectedDeclaration = declaration;
+                }
+            });
+        }
+    }
+
+    // ==================== Time Calculations ====================
+
+    getWaitingTime(): string {
+        if (!this.selectedDeclaration) return '-';
+        const declared = new Date(this.selectedDeclaration.declared_at);
+        const start = this.selectedDeclaration.actual_start
+            ? new Date(this.selectedDeclaration.actual_start)
+            : new Date();
+        return this.formatDuration(start.getTime() - declared.getTime());
+    }
+
+    getInterventionTime(): string {
+        if (!this.selectedDeclaration?.actual_start) return '-';
+        const start = new Date(this.selectedDeclaration.actual_start);
+        const end = this.selectedDeclaration.actual_end
+            ? new Date(this.selectedDeclaration.actual_end)
+            : new Date();
+        return this.formatDuration(end.getTime() - start.getTime());
+    }
+
+    getTotalDowntime(): string {
+        if (!this.selectedDeclaration) return '-';
+        const declared = new Date(this.selectedDeclaration.declared_at);
+        const end = this.selectedDeclaration.actual_end
+            ? new Date(this.selectedDeclaration.actual_end)
+            : new Date();
+        return this.formatDuration(end.getTime() - declared.getTime());
+    }
+
+    private formatDuration(ms: number): string {
+        if (ms < 0) return '-';
+        const minutes = Math.floor(ms / 60000);
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+
+        if (hours > 0) {
+            return `${hours}h ${remainingMinutes}min`;
+        }
+        return `${minutes}min`;
+    }
+
+    formatDateTime(dateStr: string | undefined): string {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleString();
+    }
+
+    getStatusLabel(status: string): string {
+        const labels: Record<string, string> = {
+            'declared': 'Declared',
+            'acknowledged': 'Acknowledged',
+            'in_progress': 'In Progress',
+            'resolved': 'Resolved',
+            'cancelled': 'Cancelled'
+        };
+        return labels[status] || status;
+    }
+
+    getStatusDetailSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+        const map: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary'> = {
+            'declared': 'warn',
+            'acknowledged': 'info',
+            'in_progress': 'info',
+            'resolved': 'success',
+            'cancelled': 'secondary'
+        };
+        return map[status] || 'info';
     }
 }

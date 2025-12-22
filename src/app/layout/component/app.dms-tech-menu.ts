@@ -81,6 +81,11 @@ export class AppDmsTechMenu {
                         routerLink: ['/dms-tech/headcount-config']
                     },
                     {
+                        label: 'Problem Types',
+                        icon: 'pi pi-fw pi-exclamation-triangle',
+                        routerLink: ['/dms-tech/problem-types']
+                    },
+                    {
                         label: 'Targets',
                         icon: 'pi pi-fw pi-chart-bar',
                         routerLink: ['/dms-tech/targets']

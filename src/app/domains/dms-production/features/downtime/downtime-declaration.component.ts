@@ -155,13 +155,11 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             cancel_reason: ['']
         });
 
-        // Watch zone changes to filter production lines
+        // Watch zone changes to enable production line selection
         this.declarationForm.get('zone')?.valueChanges.subscribe((zone: Zone) => {
             if (zone) {
-                // Filter production lines by zone
-                this.productionLines = this.allProductionLines.filter(
-                    (line: any) => line.zone === zone.id || line.zone_id === zone.id
-                );
+                // Show all production lines (ProductionLine model doesn't have zone field)
+                this.productionLines = [...this.allProductionLines];
                 this.declarationForm.get('production_line')?.enable();
                 this.declarationForm.get('production_line')?.reset();
                 // Reset dependent fields

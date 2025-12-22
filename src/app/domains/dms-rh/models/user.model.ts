@@ -9,10 +9,11 @@ export interface DMSUser {
     name: string;
     login: string;
     password?: string;
-    position: 'admin' | 'rh_manager' | 'team_leader' | 'supervisor' | 'operator' | 'formateur';
+    position: 'admin' | 'rh_manager' | 'team_leader' | 'supervisor' | 'operator' | 'formateur' | 'manager' | 'technician' | 'viewer';
     position_display?: string;
     employee?: number;
     employee_name?: string;
+    employee_photo?: string;
     department?: number;
     department_name?: string;
     status: 'active' | 'inactive' | 'suspended';
@@ -24,6 +25,10 @@ export interface DMSUser {
     dms_production: boolean;
     dms_quality: boolean;
     dms_maintenance: boolean;
+    dms_inventory: boolean;
+    dms_analytics: boolean;
+    dms_tech: boolean;
+    dms_admin: boolean;
     last_login?: Date;
     created_at?: Date;
     updated_at?: Date;
@@ -42,23 +47,27 @@ export interface DMSUser {
 
 // ==================== DMS USER CREATE ====================
 export interface DMSUserCreate {
-    name: string;
+    name?: string;
     login: string;
-    password: string;
-    position: string;
+    password?: string;
+    position: 'admin' | 'rh_manager' | 'team_leader' | 'supervisor' | 'operator' | 'formateur' | 'manager' | 'technician' | 'viewer';
     employee?: number;
     department?: number;
-    status?: string;
+    status?: 'active' | 'inactive' | 'suspended';
     dms_ll?: boolean;
     dms_kpi?: boolean;
     dms_hr?: boolean;
     dms_production?: boolean;
     dms_quality?: boolean;
     dms_maintenance?: boolean;
+    dms_inventory?: boolean;
+    dms_analytics?: boolean;
+    dms_tech?: boolean;
+    dms_admin?: boolean;
 }
 
 // ==================== USER POSITION ====================
-export type UserPosition = 'admin' | 'rh_manager' | 'team_leader' | 'supervisor' | 'operator' | 'formateur';
+export type UserPosition = 'admin' | 'rh_manager' | 'team_leader' | 'supervisor' | 'operator' | 'formateur' | 'manager' | 'technician' | 'viewer';
 
 export const UserPositionLabels: Record<UserPosition, string> = {
     admin: 'Administrateur',
@@ -66,7 +75,10 @@ export const UserPositionLabels: Record<UserPosition, string> = {
     team_leader: 'Chef d\'équipe',
     supervisor: 'Superviseur',
     operator: 'Opérateur',
-    formateur: 'Formateur'
+    formateur: 'Formateur',
+    manager: 'Manager',
+    technician: 'Technicien',
+    viewer: 'Visiteur'
 };
 
 // ==================== USER STATUS ====================

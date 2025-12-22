@@ -10,6 +10,8 @@ import { AppDmsLayout } from './app/layout/component/app.dms-layout';
 import { AppDmsHrLayout } from './app/layout/component/app.dms-hr-layout';
 import { AppDmsMaintenanceLayout } from './app/layout/component/app.dms-maintenance-layout';
 import { AppDmsTechLayout } from './app/layout/component/app.dms-tech-layout';
+import { AppDmsAdminLayout } from './app/layout/component/app.dms-admin-layout';
+import { adminGuard } from './app/core/guards/admin.guard';
 
 export const appRoutes: Routes = [
     {
@@ -76,6 +78,14 @@ export const appRoutes: Routes = [
         component: AppDmsTechLayout,
         title: 'DMS Tech - Configuration',
         loadChildren: () => import('./app/domains/dms-tech/dms-tech.routes').then(m => m.DMS_TECH_ROUTES)
+    },
+    // ==================== DMS ADMIN ====================
+    {
+        path: 'dms-admin',
+        component: AppDmsAdminLayout,
+        title: 'DMS Admin',
+        canActivate: [adminGuard],
+        loadChildren: () => import('./app/domains/dms-admin/dms-admin.routes').then(m => m.DMS_ADMIN_ROUTES)
     },
     // ==================== OTHER ====================
     {

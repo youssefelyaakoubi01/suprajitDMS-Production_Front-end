@@ -172,6 +172,11 @@
                             icon="pi pi-cog"
                             styleClass="chip-location">
                     </p-chip>
+                    <p-chip *ngIf="alert.zone"
+                            [label]="alert.zone"
+                            icon="pi pi-map"
+                            styleClass="chip-location">
+                    </p-chip>
                     <p-chip *ngIf="alert.declaredBy"
                             [label]="alert.declaredBy"
                             icon="pi pi-user"
@@ -182,6 +187,13 @@
                 <!-- Actions Footer -->
                 <ng-template pTemplate="footer">
                     <div class="flex gap-2 flex-wrap" (click)="$event.stopPropagation()">
+                        <p-button label="Details"
+                                  icon="pi pi-info-circle"
+                                  size="small"
+                                  severity="info"
+                                  [outlined]="true"
+                                  (onClick)="openDetailsDialog(alert)">
+                        </p-button>
                         <p-button *ngIf="alert.type === 'new_downtime'"
                                   label="Acknowledge"
                                   icon="pi pi-check"
@@ -316,6 +328,228 @@
                       [text]="true"
                       (onClick)="showSettings = false">
             </p-button>
+        </ng-template>
+    </p-dialog>
+
+    <!-- Details Dialog -->
+    <p-dialog header="Declaration Details"
+              [(visible)]="showDetailsDialog"
+              [modal]="true"
+              [style]="{ width: '700px' }"
+              [draggable]="false"
+              [resizable]="false"
+              (onHide)="closeDetailsDialog()">
+
+        <!-- Loading State -->
+        <div *ngIf="loadingDetails" class="flex justify-content-center align-items-center p-5">
+            <p-progressSpinner strokeWidth="4" animationDuration="1s"></p-progressSpinner>
+        </div>
+
+        <!-- Content -->
+        <div *ngIf="!loadingDetails && selectedDeclaration" class="details-content">
+            <!-- Header Info -->
+            <div class="flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 class="m-0 mb-1">{{ selectedDeclaration.ticket_number }}</h3>
+                    <span class="text-color-secondary">{{ formatDateTime(selectedDeclaration.declared_at) }}</span>
+                </div>
+                <p-tag [value]="getStatusLabel(selectedDeclaration.status)"
+                       [severity]="getStatusDetailSeverity(selectedDeclaration.status)"
+                       styleClass="text-lg">
+                </p-tag>
+            </div>
+
+            <p-divider></p-divider>
+
+            <!-- Location & Problem Info -->
+            <div class="grid mb-4">
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-sitemap mr-2"></i>Production Line</label>
+                        <span class="info-value">{{ selectedDeclaration.production_line_name || '-' }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-desktop mr-2"></i>Workstation</label>
+                        <span class="info-value">{{ selectedDeclaration.workstation_name || '-' }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-cog mr-2"></i>Machine</label>
+                        <span class="info-value">{{ selectedDeclaration.machine_name || '-' }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-exclamation-triangle mr-2"></i>Impact</label>
+                        <p-tag [value]="selectedDeclaration.impact_level | titlecase"
+                               [severity]="getPrioritySeverity(selectedDeclaration.impact_level)">
+                        </p-tag>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reason -->
+            <div class="info-group mb-4">
+                <label class="info-label"><i class="pi pi-file-edit mr-2"></i>Reason</label>
+                <p class="info-value m-0 surface-ground p-3 border-round">{{ selectedDeclaration.reason }}</p>
+            </div>
+
+            <p-divider></p-divider>
+
+            <!-- Time Metrics -->
+            <h4 class="mb-3"><i class="pi pi-clock mr-2"></i>Time Metrics</h4>
+            <div class="grid mb-4">
+                <div class="col-4">
+                    <div class="metric-card surface-ground p-3 border-round text-center">
+                        <div class="text-color-secondary text-sm mb-1">Waiting Time</div>
+                        <div class="text-2xl font-bold text-orange-500">{{ getWaitingTime() }}</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="metric-card surface-ground p-3 border-round text-center">
+                        <div class="text-color-secondary text-sm mb-1">Intervention Time</div>
+                        <div class="text-2xl font-bold text-blue-500">{{ getInterventionTime() }}</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="metric-card surface-ground p-3 border-round text-center">
+                        <div class="text-color-secondary text-sm mb-1">Total Downtime</div>
+                        <div class="text-2xl font-bold text-red-500">{{ getTotalDowntime() }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="grid mb-4">
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label">Declared At</label>
+                        <span class="info-value">{{ formatDateTime(selectedDeclaration.declared_at) }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label">Acknowledged At</label>
+                        <span class="info-value">{{ formatDateTime(selectedDeclaration.acknowledged_at) }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label">Work Started</label>
+                        <span class="info-value">{{ formatDateTime(selectedDeclaration.actual_start) }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label">Resolved At</label>
+                        <span class="info-value">{{ formatDateTime(selectedDeclaration.actual_end) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- People -->
+            <div class="grid mb-4">
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-user mr-2"></i>Declared By</label>
+                        <span class="info-value">{{ selectedDeclaration.declared_by_name || '-' }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-wrench mr-2"></i>Assigned Technician</label>
+                        <span class="info-value">{{ selectedDeclaration.assigned_technician_name || 'Not assigned' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <p-divider></p-divider>
+
+            <!-- Actions Section -->
+            <h4 class="mb-3"><i class="pi pi-bolt mr-2"></i>Actions</h4>
+
+            <!-- Technician Selection -->
+            <div class="info-group mb-3" *ngIf="selectedDeclaration.status !== 'resolved' && selectedDeclaration.status !== 'cancelled'">
+                <label class="info-label">Assign Technician</label>
+                <p-select [options]="technicians"
+                          [(ngModel)]="selectedTechnician"
+                          optionLabel="name"
+                          placeholder="Select Technician"
+                          [style]="{ width: '100%' }"
+                          [showClear]="true">
+                    <ng-template pTemplate="selectedItem" let-selected>
+                        <div class="flex align-items-center gap-2" *ngIf="selected">
+                            <i class="pi pi-user"></i>
+                            <span>{{ selected.name }}</span>
+                            <span class="text-color-secondary text-sm">({{ selected.department }})</span>
+                        </div>
+                    </ng-template>
+                    <ng-template pTemplate="item" let-tech>
+                        <div class="flex align-items-center gap-2">
+                            <i class="pi pi-user"></i>
+                            <span>{{ tech.name }}</span>
+                            <span class="text-color-secondary text-sm">({{ tech.department }})</span>
+                        </div>
+                    </ng-template>
+                </p-select>
+            </div>
+
+            <!-- Resolution Notes -->
+            <div class="info-group mb-3" *ngIf="selectedDeclaration.status === 'in_progress'">
+                <label class="info-label">Resolution Notes</label>
+                <textarea pInputTextarea
+                          [(ngModel)]="resolutionNotes"
+                          rows="3"
+                          [style]="{ width: '100%' }"
+                          placeholder="Enter resolution details...">
+                </textarea>
+            </div>
+
+            <!-- Display existing resolution notes if resolved -->
+            <div class="info-group mb-3" *ngIf="selectedDeclaration.resolution_notes">
+                <label class="info-label"><i class="pi pi-check-circle mr-2"></i>Resolution Notes</label>
+                <p class="info-value m-0 surface-ground p-3 border-round">{{ selectedDeclaration.resolution_notes }}</p>
+            </div>
+        </div>
+
+        <ng-template pTemplate="footer">
+            <div class="flex gap-2 justify-content-between w-full">
+                <p-button label="Close"
+                          icon="pi pi-times"
+                          [text]="true"
+                          (onClick)="closeDetailsDialog()">
+                </p-button>
+                <div class="flex gap-2">
+                    <!-- Acknowledge Button -->
+                    <p-button *ngIf="selectedDeclaration?.status === 'declared'"
+                              label="Acknowledge"
+                              icon="pi pi-check"
+                              [outlined]="true"
+                              [loading]="savingAction"
+                              (onClick)="acknowledgeDeclaration()">
+                    </p-button>
+                    <!-- Assign & Start Work Button -->
+                    <p-button *ngIf="selectedDeclaration?.status === 'declared' || selectedDeclaration?.status === 'acknowledged'"
+                              label="Assign & Start Work"
+                              icon="pi pi-play"
+                              severity="success"
+                              [loading]="savingAction"
+                              [disabled]="!selectedTechnician"
+                              (onClick)="assignTechnician()">
+                    </p-button>
+                    <!-- Resolve Button -->
+                    <p-button *ngIf="selectedDeclaration?.status === 'in_progress'"
+                              label="Resolve"
+                              icon="pi pi-check-circle"
+                              severity="success"
+                              [loading]="savingAction"
+                              (onClick)="resolveDeclaration()">
+                    </p-button>
+                </div>
+            </div>
         </ng-template>
     </p-dialog>
 </div>

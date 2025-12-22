@@ -120,6 +120,18 @@ export class DmsSelectorComponent {
             route: '/dms-tech/dashboard',
             features: ['Projects', 'Production Lines', 'Parts & Machines', 'Targets & Headcount'],
             isActive: true
+        },
+        {
+            id: 'admin',
+            title: 'DMS Admin',
+            subtitle: 'User Management',
+            description: 'Manage user accounts, permissions, module access and activity logs. Administrator access only.',
+            icon: 'pi pi-shield',
+            color: '#DC2626',
+            gradient: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+            route: '/dms-admin/dashboard',
+            features: ['User Accounts', 'Permissions', 'Module Access', 'Activity Logs'],
+            isActive: true
         }
     ];
 

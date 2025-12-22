@@ -1290,14 +1290,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Mark hour as in progress
         hour.status = 'in_progress';
 
-        // Find the ShiftType ID based on the hour_type code
+        // Find the ShiftType based on the hour_type code
         const shiftType = this.shiftTypes.find(st => st.code === (hour.hourType || 'normal'));
+
+        // Validate hour_type - must be one of the valid choices in the backend model
+        const validHourTypes = ['normal', 'setup', 'break', 'extra_hour_break'];
+        const hourTypeToSend = validHourTypes.includes(hour.hourType) ? hour.hourType : 'normal';
 
         const productionData: any = {
             date: this.session.date,
             shift: this.session.shift.id,
             hour: hour.hour,
-            hour_type: hour.hourType || 'normal',
+            hour_type: hourTypeToSend,
             shift_type: shiftType?.id || null,
             part: this.session.part.Id_Part,
             result: this.hourProductionInput.output,

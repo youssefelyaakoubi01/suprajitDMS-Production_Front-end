@@ -9,8 +9,8 @@
  * 4. Issue resolved → All parties notified
  */
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, Subject, interval, Subscription } from 'rxjs';
-import { takeUntil, filter, map } from 'rxjs/operators';
+import { BehaviorSubject, Observable, Subject, interval, Subscription, of } from 'rxjs';
+import { takeUntil, filter, map, catchError } from 'rxjs/operators';
 import { ApiService } from './api.service';
 
 // Alert types
@@ -99,6 +99,7 @@ export class DowntimeNotificationService implements OnDestroy {
     // Audio for alerts
     private alertSound?: HTMLAudioElement;
     private criticalSound?: HTMLAudioElement;
+    private soundsAvailable = false;
 
     constructor(private api: ApiService) {
         this.initializeSounds();
@@ -115,12 +116,43 @@ export class DowntimeNotificationService implements OnDestroy {
 
     private initializeSounds(): void {
         try {
-            this.alertSound = new Audio('assets/sounds/alert.mp3');
+            // Create audio elements
+            this.alertSound = new Audio();
             this.alertSound.volume = 0.5;
-            this.criticalSound = new Audio('assets/sounds/critical.mp3');
+            this.criticalSound = new Audio();
             this.criticalSound.volume = 0.8;
+
+            // Track successful loads
+            let loadedCount = 0;
+            const onLoad = () => {
+                loadedCount++;
+                if (loadedCount === 2) {
+                    this.soundsAvailable = true;
+                }
+            };
+
+            // Handle load errors gracefully
+            const onError = (e: Event) => {
+                console.warn('Alert sound file not available, audio notifications disabled');
+                this.soundsAvailable = false;
+            };
+
+            // Set up event listeners before setting src
+            this.alertSound.addEventListener('canplaythrough', onLoad, { once: true });
+            this.alertSound.addEventListener('error', onError, { once: true });
+            this.criticalSound.addEventListener('canplaythrough', onLoad, { once: true });
+            this.criticalSound.addEventListener('error', onError, { once: true });
+
+            // Set source (this triggers the load)
+            this.alertSound.src = 'assets/sounds/alert.mp3';
+            this.criticalSound.src = 'assets/sounds/critical.mp3';
+
+            // Preload
+            this.alertSound.load();
+            this.criticalSound.load();
         } catch (e) {
-            console.warn('Could not initialize alert sounds');
+            console.warn('Could not initialize alert sounds:', e);
+            this.soundsAvailable = false;
         }
     }
 
@@ -265,16 +297,18 @@ export class DowntimeNotificationService implements OnDestroy {
 
     private playAlertSound(alert: DowntimeAlert): void {
         if (!this.preferences.enableSound) return;
+        if (!this.soundsAvailable) return;
 
-        try {
-            if (alert.priority === 'critical') {
-                this.criticalSound?.play();
-            } else {
-                this.alertSound?.play();
-            }
-        } catch (e) {
-            // Ignore audio play errors (user interaction required)
-        }
+        const sound = alert.priority === 'critical' ? this.criticalSound : this.alertSound;
+        if (!sound) return;
+
+        // Reset to start if already playing
+        sound.currentTime = 0;
+
+        // Play returns a promise - catch rejection silently
+        sound.play().catch(() => {
+            // Ignore play errors (user interaction required, autoplay blocked, etc.)
+        });
     }
 
     private showDesktopNotification(alert: DowntimeAlert): void {
@@ -403,13 +437,18 @@ export class DowntimeNotificationService implements OnDestroy {
         // Save locally
         this.saveToLocalStorage();
 
-        // Send to backend for distribution to maintenance
-        return this.api.post<any>(`${this.endpoint}/declarations/send-alert`, {
+        // Send to backend for distribution to maintenance (optional - may not be implemented)
+        return this.api.post<any>(`${this.endpoint}/declarations/send-alert/`, {
             declaration_id: declaration.id,
             alert_type: alert.type,
             priority: alert.priority
         }).pipe(
-            map(() => alert)
+            map(() => alert),
+            catchError((error) => {
+                // If endpoint doesn't exist, just return the alert (local notification still works)
+                console.warn('Alert endpoint not available, using local notifications only:', error.status);
+                return of(alert);
+            })
         );
     }
 

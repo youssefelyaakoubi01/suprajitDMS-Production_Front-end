@@ -77,6 +77,12 @@ export const DMS_TECH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/headcount-config.component').then(m => m.HeadcountConfigComponent),
         title: 'Headcount Configuration'
+    },
+    {
+        path: 'problem-types',
+        loadComponent: () =>
+            import('./features/problem-types.component').then(m => m.ProblemTypesComponent),
+        title: 'Problem Types Management'
     }
 ];
 
