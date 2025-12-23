@@ -484,9 +484,15 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this.destroy$))
             .subscribe({
                 next: (data) => {
-                    // Parse dates and enrich data
+                    // Parse dates and map backend field names to frontend field names
                     this.downtimes = data.map(dt => ({
                         ...dt,
+                        // Map backend fields to frontend expected fields
+                        Id_Downtime: dt.id ?? dt.Id_Downtime,
+                        Total_Downtime: dt.duration ?? dt.Total_Downtime ?? 0,
+                        Comment_Downtime: dt.comment ?? dt.Comment_Downtime ?? '',
+                        Id_DowntimeProblems: dt.problem ?? dt.Id_DowntimeProblems,
+                        Id_HourlyProd: dt.hourly_production_id ?? dt.Id_HourlyProd,
                         dateObj: dt.date ? new Date(dt.date) : undefined
                     }));
                     this.filteredDowntimes = [...this.downtimes];

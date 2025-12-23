@@ -1,10 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { RippleModule } from 'primeng/ripple';
 import { TooltipModule } from 'primeng/tooltip';
+import { AvatarModule } from 'primeng/avatar';
+import { MenuModule } from 'primeng/menu';
+import { MenuItem } from 'primeng/api';
+import { AuthService } from '@core/services/auth.service';
+import { Subscription } from 'rxjs';
 
 interface DMSModule {
     id: string;
@@ -15,6 +20,7 @@ interface DMSModule {
     color: string;
     gradient: string;
     route: string;
+    loginRoute?: string;
     features: string[];
     isActive: boolean;
 }
@@ -28,13 +34,18 @@ interface DMSModule {
         ButtonModule,
         CardModule,
         RippleModule,
-        TooltipModule
+        TooltipModule,
+        AvatarModule,
+        MenuModule
     ],
     templateUrl: './dms-selector.component.html',
     styleUrls: ['./dms-selector.component.scss']
 })
-export class DmsSelectorComponent {
+export class DmsSelectorComponent implements OnInit, OnDestroy {
     currentYear = new Date().getFullYear();
+    currentUser: any = null;
+    userMenuItems: MenuItem[] = [];
+    private authSubscription!: Subscription;
 
     dmsModules: DMSModule[] = [
         {
@@ -46,6 +57,7 @@ export class DmsSelectorComponent {
             color: '#3B82F6',
             gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
             route: '/dms-production/dashboard',
+            loginRoute: '/dms-production-login',
             features: ['Production Tracking', 'Downtime Analysis', 'Output Metrics', 'Shift Management'],
             isActive: true
         },
@@ -86,30 +98,6 @@ export class DmsSelectorComponent {
             isActive: true
         },
         {
-            id: 'quality',
-            title: 'DMS Quality',
-            subtitle: 'Quality Assurance',
-            description: 'Defect tracking, quality control inspections, non-conformity reports and corrective actions.',
-            icon: 'pi pi-shield',
-            color: '#10B981',
-            gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-            route: '/dms-quality/dashboard',
-            features: ['Defect Tracking', 'Quality Inspections', 'NCR Management', '8D Reports'],
-            isActive: true
-        },
-        {
-            id: 'analytics',
-            title: 'DMS Analytics',
-            subtitle: 'Business Intelligence',
-            description: 'KPI dashboards, performance indicators, lessons learned and continuous improvement.',
-            icon: 'pi pi-chart-bar',
-            color: '#EC4899',
-            gradient: 'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)',
-            route: '/analytics/kpi',
-            features: ['KPI Dashboards', 'Performance Reports', 'Lessons Learned', 'Trend Analysis'],
-            isActive: true
-        },
-        {
             id: 'tech',
             title: 'DMS Tech',
             subtitle: 'Configuration',
@@ -135,15 +123,107 @@ export class DmsSelectorComponent {
         }
     ];
 
-    constructor(private router: Router) {}
+    constructor(
+        private router: Router,
+        private authService: AuthService
+    ) {}
+
+    ngOnInit(): void {
+        // Subscribe to auth state
+        this.authSubscription = this.authService.getAuthState().subscribe(state => {
+            this.currentUser = state.user;
+            this.updateUserMenu();
+        });
+
+        // Get current user
+        this.currentUser = this.authService.getCurrentUser();
+        this.updateUserMenu();
+    }
+
+    ngOnDestroy(): void {
+        if (this.authSubscription) {
+            this.authSubscription.unsubscribe();
+        }
+    }
+
+    private updateUserMenu(): void {
+        this.userMenuItems = [
+            {
+                label: this.getUserDisplayName(),
+                items: [
+                    {
+                        label: 'Mon Profil',
+                        icon: 'pi pi-user',
+                        command: () => {}
+                    },
+                    {
+                        separator: true
+                    },
+                    {
+                        label: 'Déconnexion',
+                        icon: 'pi pi-sign-out',
+                        command: () => this.logout()
+                    }
+                ]
+            }
+        ];
+    }
 
     navigateToModule(module: DMSModule): void {
         if (module.isActive) {
-            this.router.navigate([module.route]);
+            // Check if user is authenticated for modules that require login
+            if (module.loginRoute && !this.authService.isAuthenticated()) {
+                this.router.navigate([module.loginRoute]);
+            } else {
+                this.router.navigate([module.route]);
+            }
+        }
+    }
+
+    goToLogin(module: DMSModule, event: Event): void {
+        event.stopPropagation();
+        if (module.loginRoute) {
+            this.router.navigate([module.loginRoute]);
+        } else {
+            this.router.navigate(['/dms-login'], {
+                queryParams: { returnUrl: module.route }
+            });
         }
     }
 
     getModuleStatus(module: DMSModule): string {
         return module.isActive ? 'Active' : 'Coming Soon';
+    }
+
+    isAuthenticated(): boolean {
+        return this.authService.isAuthenticated();
+    }
+
+    getUserDisplayName(): string {
+        if (!this.currentUser) return 'Utilisateur';
+
+        if (this.currentUser.first_name && this.currentUser.last_name) {
+            return `${this.currentUser.first_name} ${this.currentUser.last_name}`;
+        }
+        if (this.currentUser.name) return this.currentUser.name;
+        if (this.currentUser.first_name) return this.currentUser.first_name;
+        if (this.currentUser.username) return this.currentUser.username;
+        return 'Utilisateur';
+    }
+
+    getUserInitials(): string {
+        const name = this.getUserDisplayName();
+        if (!name || name === 'Utilisateur') return 'U';
+
+        const parts = name.split(' ');
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+    }
+
+    logout(): void {
+        this.authService.logout();
+        this.currentUser = null;
     }
 }

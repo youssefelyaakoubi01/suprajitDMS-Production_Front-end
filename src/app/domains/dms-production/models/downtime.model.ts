@@ -13,6 +13,12 @@ export interface Downtime {
     machine?: number;
     machine_name?: string;
     machine_code?: string;
+    // Fields from backend serializer (actual field names from API)
+    id?: number;              // Backend uses 'id' instead of 'Id_Downtime'
+    duration?: number;        // Backend uses 'duration' instead of 'Total_Downtime'
+    comment?: string;         // Backend uses 'comment' instead of 'Comment_Downtime'
+    problem?: number;         // Backend uses 'problem' instead of 'Id_DowntimeProblems'
+    hourly_production_id?: number; // Backend uses 'hourly_production_id'
     // Fields from backend serializer (via HourlyProduction)
     date?: string;
     hour?: number;

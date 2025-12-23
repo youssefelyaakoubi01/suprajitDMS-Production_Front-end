@@ -425,7 +425,11 @@ export class ProductionService {
                     shiftName: p.shift_name,
                     projectName: p.project_name,
                     lineName: p.line_name,
-                    partNumber: p.part_number
+                    partNumber: p.part_number,
+                    // Shift type info for hour type persistence
+                    shift_type: p.shift_type,
+                    shift_type_code: p.shift_type_code,
+                    hour_type: p.hour_type
                 }));
             })
         );
@@ -459,6 +463,10 @@ export class ProductionService {
 
     deleteTeamAssignment(id: number): Observable<void> {
         return this.coreService.deleteTeamAssignment(id);
+    }
+
+    patchHourlyProductionShiftType(hourlyProductionId: number, shiftTypeId: number): Observable<HourlyProduction> {
+        return this.coreService.patchHourlyProductionShiftType(hourlyProductionId, shiftTypeId);
     }
 
     /**

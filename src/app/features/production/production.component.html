@@ -460,15 +460,9 @@
                             (ngModelChange)="onHourTypeChange(i, $event)"
                             optionLabel="label"
                             optionValue="value"
-                            [style]="{ width: '130px' }"
+                            [style]="{ width: '140px' }"
+                            placeholder="Select type"
                             appendTo="body">
-                            <ng-template pTemplate="selectedItem" let-selected>
-                                <p-tag
-                                    *ngIf="selected"
-                                    [value]="selected.label"
-                                    [severity]="getHourTypeSeverity(selected.value)">
-                                </p-tag>
-                            </ng-template>
                             <ng-template pTemplate="item" let-option>
                                 <p-tag
                                     [value]="option.label"

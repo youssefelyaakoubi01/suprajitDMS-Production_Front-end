@@ -6,13 +6,45 @@
     <div class="content-wrapper">
         <!-- Header Section -->
         <header class="header-section">
-            <div class="logo-container">
-                <div class="logo-icon">
-                    <i class="pi pi-cog"></i>
+            <div class="header-top">
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <i class="pi pi-cog"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>Suprajit DMS</h1>
+                        <span class="tagline">Digital Manufacturing System</span>
+                    </div>
                 </div>
-                <div class="logo-text">
-                    <h1>Suprajit DMS</h1>
-                    <span class="tagline">Digital Manufacturing System</span>
+
+                <!-- User Section -->
+                <div class="user-section">
+                    <ng-container *ngIf="currentUser; else loginButton">
+                        <div class="user-info" pRipple>
+                            <p-avatar
+                                [label]="getUserInitials()"
+                                shape="circle"
+                                [style]="{'background': '#3B82F6', 'color': '#fff', 'font-weight': '600'}">
+                            </p-avatar>
+                            <div class="user-details">
+                                <span class="user-name">{{ getUserDisplayName() }}</span>
+                                <span class="user-role">{{ currentUser?.position || 'Utilisateur' }}</span>
+                            </div>
+                            <button pButton pRipple icon="pi pi-sign-out"
+                                    class="p-button-rounded p-button-text p-button-danger"
+                                    (click)="logout()"
+                                    pTooltip="Déconnexion" tooltipPosition="bottom">
+                            </button>
+                        </div>
+                    </ng-container>
+                    <ng-template #loginButton>
+                        <button pButton pRipple
+                                label="Connexion"
+                                icon="pi pi-sign-in"
+                                class="p-button-outlined"
+                                routerLink="/dms-production-login">
+                        </button>
+                    </ng-template>
                 </div>
             </div>
             <p class="welcome-text">Select a module to get started</p>
@@ -56,15 +88,29 @@
 
                 <!-- Action Button -->
                 <div class="module-action">
-                    <button
-                        pButton
-                        pRipple
-                        [label]="module.isActive ? 'Launch Module' : 'Coming Soon'"
-                        [icon]="module.isActive ? 'pi pi-arrow-right' : 'pi pi-clock'"
-                        [disabled]="!module.isActive"
-                        class="action-button"
-                        iconPos="right">
-                    </button>
+                    <!-- Show login button if module has loginRoute and user not authenticated -->
+                    <ng-container *ngIf="module.loginRoute && !isAuthenticated(); else launchButton">
+                        <button
+                            pButton
+                            pRipple
+                            label="Se connecter"
+                            icon="pi pi-sign-in"
+                            class="action-button login-button"
+                            iconPos="right"
+                            (click)="goToLogin(module, $event)">
+                        </button>
+                    </ng-container>
+                    <ng-template #launchButton>
+                        <button
+                            pButton
+                            pRipple
+                            [label]="module.isActive ? 'Launch Module' : 'Coming Soon'"
+                            [icon]="module.isActive ? 'pi pi-arrow-right' : 'pi pi-clock'"
+                            [disabled]="!module.isActive"
+                            class="action-button"
+                            iconPos="right">
+                        </button>
+                    </ng-template>
                 </div>
 
                 <!-- Decorative Corner -->

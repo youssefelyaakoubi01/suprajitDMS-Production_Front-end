@@ -131,8 +131,8 @@ interface StatCard {
                                 </div>
                                 <span class="font-semibold text-900">Utilisateurs par Rôle</span>
                             </div>
-                            <p-tag value="Total" [severity]="'info'"
-                                   [value]="stats?.total_users + ' users'" *ngIf="stats"></p-tag>
+                            <p-tag [severity]="'info'"
+                                   [value]="stats.total_users + ' users'" *ngIf="stats"></p-tag>
                         </div>
                         <div class="p-4">
                             <div style="height: 280px;" *ngIf="!loading && roleChartData">

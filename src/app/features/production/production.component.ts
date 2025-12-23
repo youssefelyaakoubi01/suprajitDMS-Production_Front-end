@@ -114,7 +114,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
     shiftTypes: ShiftType[] = [];
     zones: Zone[] = [];
 
-    // Hour Type Options - loaded from database, empty by default
+    // Hour Type Options - loaded from database
     hourTypeOptions: { label: string; value: string }[] = [];
 
     // Team Assignment
@@ -376,6 +376,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                 ? Math.round((prod.Result_HourlyProdPN / prod.Target_HourlyProdPN) * 100)
                                 : 0;
                         this.session.hours[hourIndex].hourlyProductionId = prod.Id_HourlyProd;
+
+                        // Map shift_type_code from backend to hourType
+                        // Use shift_type_code if available, otherwise use hour_type or default
+                        const backendHourType = (prod as any).shift_type_code || (prod as any).hour_type;
+                        if (backendHourType && this.isHourTypeInOptions(backendHourType)) {
+                            this.session.hours[hourIndex].hourType = backendHourType as HourType;
+                        }
 
                         // Load downtimes for this hour
                         this.loadDowntimesForHour(hourIndex, prod.Id_HourlyProd);
@@ -727,6 +734,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         value: st.code
                     }));
                     console.log('Updated hourTypeOptions:', this.hourTypeOptions);
+
+                    // Synchronize existing hours with valid shift type codes (with delay to ensure hours are loaded)
+                    setTimeout(() => this.syncHoursWithShiftTypes(), 100);
                 }
             },
             error: (err) => {
@@ -832,6 +842,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Generate hours for the shift
         this.session.hours = this.generateShiftHours(formValue.shift, formValue.partNumber);
 
+        // Sync hours with valid shift type codes (in case shiftTypes are loaded)
+        this.syncHoursWithShiftTypes();
+
         // Save session to localStorage
         this.saveSessionToStorage();
 
@@ -871,7 +884,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 startTime: this.formatHour(startHour),
                 endTime: this.formatHour(endHour),
                 isOvertime: false,
-                hourType: 'normal' as HourType, // Default to normal
+                hourType: this.getDefaultHourType(), // Use first available ShiftType code
                 status: 'not_started',
                 output: null,
                 scrap: null,
@@ -1151,10 +1164,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     onHourTypeChange(hourIndex: number, newType: HourType): void {
+        console.log(`onHourTypeChange called: hourIndex=${hourIndex}, newType=${newType}`);
+
         const hour = this.session.hours[hourIndex];
         const baseTarget = this.getBaseHourlyTarget();
 
         hour.hourType = newType;
+        console.log(`Hour ${hour.hour} type set to: ${hour.hourType}`);
+
         // Recalculate target based on hour type using dynamic ShiftType percentage
         const shiftType = this.shiftTypes.find(st => st.code === newType);
         const targetPercentage = shiftType?.target_percentage ?? 100;
@@ -1165,7 +1182,36 @@ export class ProductionComponent implements OnInit, OnDestroy {
             hour.efficiency = Math.round((hour.output / hour.target) * 100);
         }
 
+        // Save to backend if hourlyProductionId exists
+        if (hour.hourlyProductionId && shiftType) {
+            this.updateHourTypeInBackend(hour.hourlyProductionId, shiftType.id, newType);
+        }
+
         this.saveSessionToStorage();
+        console.log('Session saved after hour type change');
+    }
+
+    updateHourTypeInBackend(hourlyProductionId: number, shiftTypeId: number, hourType: string): void {
+        // Update only the shift_type field in the backend
+        this.productionService.patchHourlyProductionShiftType(hourlyProductionId, shiftTypeId).subscribe({
+            next: () => {
+                console.log(`Shift type updated in backend for production ${hourlyProductionId}`);
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Type Updated',
+                    detail: 'Hour type saved successfully',
+                    life: 2000
+                });
+            },
+            error: (error: Error) => {
+                console.error('Error updating shift type in backend:', error);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to save hour type'
+                });
+            }
+        });
     }
 
     getBaseHourlyTarget(): number {
@@ -1182,11 +1228,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     getHourTypeLabel(type: HourType): string {
+        // First try to find in loaded shiftTypes
         const shiftType = this.shiftTypes.find(st => st.code === type);
         if (shiftType) {
             return `${shiftType.name} (${shiftType.target_percentage}%)`;
         }
-        return type || '';
+        // Fallback to hourTypeOptions (includes defaults)
+        const option = this.hourTypeOptions.find(opt => opt.value === type);
+        if (option) {
+            return option.label;
+        }
+        // Last resort: capitalize the type code
+        return type ? type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ') : '';
     }
 
     getHourTypeSeverity(type: HourType): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
@@ -1199,6 +1252,71 @@ export class ProductionComponent implements OnInit, OnDestroy {
             return 'secondary'; // 0% target (break)
         }
         return 'secondary';
+    }
+
+    getHourTypeOption(value: string): { label: string; value: string } | undefined {
+        return this.hourTypeOptions.find(opt => opt.value === value);
+    }
+
+    isHourTypeInOptions(value: string): boolean {
+        return this.hourTypeOptions.some(opt => opt.value === value);
+    }
+
+    getDefaultHourType(): HourType {
+        // Return the code of the first ShiftType with 100% target, or the first available
+        const normalType = this.shiftTypes.find(st => st.target_percentage === 100);
+        if (normalType) {
+            return normalType.code as HourType;
+        }
+        // Fallback to first available ShiftType
+        if (this.shiftTypes.length > 0) {
+            return this.shiftTypes[0].code as HourType;
+        }
+        // Last fallback
+        return 'normal' as HourType;
+    }
+
+    syncHoursWithShiftTypes(): void {
+        // Only sync if session has hours but no shiftTypes loaded yet should not reset
+        if (!this.session.hours || this.session.hours.length === 0) return;
+        if (this.shiftTypes.length === 0) return; // Don't sync if no shift types loaded
+
+        const validCodes = this.shiftTypes.map(st => st.code);
+        const defaultType = this.getDefaultHourType();
+
+        console.log('Valid shift type codes:', validCodes);
+        console.log('Current hour types:', this.session.hours.map(h => h.hourType));
+
+        let updated = false;
+        this.session.hours.forEach(hour => {
+            // Only update if hourType is empty/undefined, don't overwrite existing valid values
+            if (!hour.hourType) {
+                hour.hourType = defaultType;
+                updated = true;
+                console.log(`Hour ${hour.hour}: Set default type ${defaultType}`);
+            } else if (!validCodes.includes(hour.hourType)) {
+                console.log(`Hour ${hour.hour}: Invalid type "${hour.hourType}", setting to ${defaultType}`);
+                hour.hourType = defaultType;
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            console.log('Hours synchronized with valid shift type codes');
+            this.saveSessionToStorage();
+        }
+    }
+
+    getHourTypeOptionsWithCurrent(currentValue: HourType): { label: string; value: string }[] {
+        // If current value is already in options, return options as-is
+        if (!currentValue || this.hourTypeOptions.some(opt => opt.value === currentValue)) {
+            return this.hourTypeOptions;
+        }
+        // Otherwise, add the current value as an option at the beginning
+        return [
+            { label: this.getHourTypeLabel(currentValue), value: currentValue },
+            ...this.hourTypeOptions
+        ];
     }
 
     // ==================== HOUR PRODUCTION ====================
@@ -1941,7 +2059,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 timestamp: new Date().toISOString()
             };
             localStorage.setItem(this.SESSION_STORAGE_KEY, JSON.stringify(sessionData));
-            console.log('Session saved to localStorage');
+            console.log('Session saved to localStorage. Hour types:', this.session.hours.map(h => ({ hour: h.hour, type: h.hourType })));
         } catch (error) {
             console.error('Error saving session:', error);
         }
@@ -1968,6 +2086,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             }
 
             // Restore session
+            console.log('Restoring session. Saved hour types:', parsed.session.hours?.map((h: any) => ({ hour: h.hour, type: h.hourType })));
+
             this.session = {
                 ...parsed.session,
                 date: new Date(parsed.session.date),
@@ -1975,7 +2095,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 hours: (parsed.session.hours || []).map((h: any) => ({
                     ...h,
                     downtimes: h.downtimes || [],
-                    totalDowntime: h.totalDowntime || 0
+                    totalDowntime: h.totalDowntime || 0,
+                    hourType: h.hourType // Preserve hour type from saved session (will be synced after shiftTypes load)
                 }))
             };
 
@@ -2052,11 +2173,17 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                         newHour.downtimes = oldHour.downtimes || [];
                                         newHour.totalDowntime = oldHour.totalDowntime || 0;
                                         newHour.hourlyProductionId = oldHour.hourlyProductionId;
+                                        // Preserve hour type (shift type) from saved session
+                                        newHour.hourType = oldHour.hourType || this.getDefaultHourType();
                                     }
                                 });
 
                                 this.session.hours = newHours;
                                 this.session.shift = shift; // Update with fresh shift data
+                                console.log('Hours regenerated. Hour types after restore:', newHours.map(h => ({ hour: h.hour, type: h.hourType })));
+
+                                // Sync hours with valid shift type codes
+                                this.syncHoursWithShiftTypes();
                             }
                         }, 500);
                     }

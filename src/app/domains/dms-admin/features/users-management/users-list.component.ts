@@ -383,6 +383,19 @@ interface PositionOption {
                     </div>
 
                     <div class="grid">
+                        <div class="col-12">
+                            <label for="name" class="block font-medium text-900 mb-2">Nom complet <span class="text-red-500">*</span></label>
+                            <p-inputGroup>
+                                <p-inputGroupAddon><i class="pi pi-user"></i></p-inputGroupAddon>
+                                <input pInputText id="name" [(ngModel)]="editingUser.name"
+                                       [ngClass]="{'ng-invalid ng-dirty': submitted && !editingUser.name}"
+                                       placeholder="Prénom et nom de l'utilisateur" />
+                            </p-inputGroup>
+                            <small class="p-error block mt-1" *ngIf="submitted && !editingUser.name">
+                                Le nom est requis
+                            </small>
+                        </div>
+
                         <div class="col-12 md:col-6">
                             <label for="login" class="block font-medium text-900 mb-2">Login <span class="text-red-500">*</span></label>
                             <p-inputGroup>
@@ -777,6 +790,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
         this.isEditMode = false;
         this.submitted = false;
         this.editingUser = {
+            name: '',
             login: '',
             password: '',
             employee: null,
@@ -827,7 +841,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
     saveUser(): void {
         this.submitted = true;
 
-        if (!this.editingUser.login) {
+        if (!this.editingUser.name || !this.editingUser.login) {
             return;
         }
 
@@ -838,6 +852,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
         this.saving = true;
 
         const userData: DMSUserCreate = {
+            name: this.editingUser.name,
             login: this.editingUser.login,
             password: this.editingUser.password,
             employee: this.editingUser.employee,

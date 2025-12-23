@@ -12,6 +12,7 @@ import { AppDmsMaintenanceLayout } from './app/layout/component/app.dms-maintena
 import { AppDmsTechLayout } from './app/layout/component/app.dms-tech-layout';
 import { AppDmsAdminLayout } from './app/layout/component/app.dms-admin-layout';
 import { adminGuard } from './app/core/guards/admin.guard';
+import { productionGuard } from './app/core/guards/module-access.guard';
 
 export const appRoutes: Routes = [
     {
@@ -30,11 +31,18 @@ export const appRoutes: Routes = [
         loadComponent: () => import('./app/features/dms-login/dms-login.component').then(m => m.DmsLoginComponent),
         title: 'DMS - Login'
     },
+    // ==================== DMS PRODUCTION LOGIN ====================
+    {
+        path: 'dms-production-login',
+        loadComponent: () => import('./app/domains/dms-production/features/login/production-login.component').then(m => m.ProductionLoginComponent),
+        title: 'DMS Production - Connexion'
+    },
     // ==================== DMS PRODUCTION ====================
     {
         path: 'dms-production',
         component: AppDmsLayout,
         title: 'DMS Production',
+        canActivate: [productionGuard],
         loadChildren: () => import('./app/domains/dms-production/dms-production.routes').then(m => m.DMS_PRODUCTION_ROUTES)
     },
     // ==================== DMS HR ====================
