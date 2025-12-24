@@ -4,6 +4,7 @@
  */
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from '@core/services/api.service';
 import {
     Project,
@@ -131,11 +132,35 @@ export class DmsProductionService {
 
     // ==================== SHIFTS ====================
     getShifts(): Observable<Shift[]> {
-        return this.api.get<Shift[]>(`${this.endpoint}/shifts`);
+        return this.api.get<any[]>(`${this.endpoint}/shifts`).pipe(
+            map((response: any) => {
+                const shifts = response.results || response;
+                return shifts.map((shift: any) => ({
+                    ...shift,
+                    startHour: this.parseTimeToHour(shift.start_time),
+                    endHour: this.parseTimeToHour(shift.end_time)
+                }));
+            })
+        );
     }
 
     getShiftsByProductionLine(productionLineId: number): Observable<Shift[]> {
-        return this.api.get<Shift[]>(`${this.endpoint}/shifts/by_production_line`, { production_line: productionLineId });
+        return this.api.get<any[]>(`${this.endpoint}/shifts/by_production_line`, { production_line: productionLineId }).pipe(
+            map((response: any) => {
+                const shifts = response.results || response;
+                return shifts.map((shift: any) => ({
+                    ...shift,
+                    startHour: this.parseTimeToHour(shift.start_time),
+                    endHour: this.parseTimeToHour(shift.end_time)
+                }));
+            })
+        );
+    }
+
+    private parseTimeToHour(timeString: string): number {
+        if (!timeString) return 0;
+        const parts = timeString.split(':');
+        return parseInt(parts[0], 10);
     }
 
     getShift(id: number): Observable<Shift> {

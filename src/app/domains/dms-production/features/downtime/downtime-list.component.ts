@@ -24,6 +24,7 @@ import { DialogModule } from 'primeng/dialog';
 
 // Domain imports
 import { DmsProductionService, Downtime, DowntimeProblem } from '@domains/dms-production';
+import { Shift } from '@core/models';
 
 // Extended interface for internal use (Date object instead of string)
 interface DowntimeWithDetails extends Downtime {
@@ -182,7 +183,7 @@ interface DowntimeWithDetails extends Downtime {
                             </td>
                             <td>
                                 <span class="text-color-secondary">
-                                    {{ formatHour(dt.hour) }}
+                                    {{ formatHour(dt.hour, dt.shift_name) }}
                                 </span>
                             </td>
                             <td>
@@ -242,7 +243,7 @@ interface DowntimeWithDetails extends Downtime {
                     <div class="detail-row">
                         <span class="detail-label">Date & Time:</span>
                         <span class="detail-value">
-                            {{ selectedDowntime.date | date:'dd/MM/yyyy' }} at {{ formatHour(selectedDowntime.hour) }}
+                            {{ selectedDowntime.date | date:'dd/MM/yyyy' }} at {{ formatHour(selectedDowntime.hour, selectedDowntime.shift_name) }}
                         </span>
                     </div>
                     <div class="detail-row">
@@ -438,6 +439,7 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     private destroy$ = new Subject<void>();
 
     filteredDowntimes: DowntimeWithDetails[] = [];
+    shifts: Shift[] = [];
     filterDate: Date[] | null = null;
     filterProblem: number | null = null;
 
@@ -461,6 +463,9 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     constructor(private productionService: DmsProductionService) {}
 
     ngOnInit(): void {
+        // Load shifts for hour formatting
+        this.loadShifts();
+
         if (this.downtimes.length === 0) {
             this.loadDowntimes();
         } else {
@@ -509,6 +514,12 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
         this.productionService.getDowntimeProblems()
             .pipe(takeUntil(this.destroy$))
             .subscribe(problems => this.problems = problems);
+    }
+
+    loadShifts(): void {
+        this.productionService.getShifts()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(shifts => this.shifts = shifts);
     }
 
     onDateFilter(): void {
@@ -639,9 +650,54 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
         return topProblem;
     }
 
-    formatHour(hour: number | undefined): string {
-        if (hour === undefined) return '-';
-        return `${hour.toString().padStart(2, '0')}:00`;
+    formatHour(hour: number | undefined, shiftName?: string): string {
+        if (hour === undefined || hour === null) return '-';
+
+        // Get shift start hour based on shift name
+        const shiftStartHour = this.getShiftStartHour(shiftName);
+
+        // Calculate actual start and end hours based on shift start + hour offset
+        // hour is 1-based (H1, H2, etc.), so we use (hour - 1) for the offset
+        const actualStartHour = (shiftStartHour + hour - 1) % 24;
+        const actualEndHour = (shiftStartHour + hour) % 24;
+
+        return `${actualStartHour.toString().padStart(2, '0')}:00 - ${actualEndHour.toString().padStart(2, '0')}:00`;
+    }
+
+    getShiftStartHour(shiftName?: string): number {
+        if (!shiftName) return 6; // Default to morning shift
+
+        // Find shift from loaded shifts by name (case-insensitive)
+        const shift = this.shifts.find(s =>
+            s.name.toLowerCase() === shiftName.toLowerCase()
+        );
+
+        if (shift?.startHour !== undefined) {
+            return shift.startHour;
+        }
+
+        // Fallback to default shift hours based on common naming patterns
+        const shiftMap: Record<string, number> = {
+            'morning': 6,
+            'matin': 6,
+            'jour': 6,
+            'day': 6,
+            'afternoon': 14,
+            'après-midi': 14,
+            'soir': 14,
+            'evening': 14,
+            'night': 22,
+            'nuit': 22
+        };
+
+        const normalizedName = shiftName.toLowerCase();
+        for (const [key, hour] of Object.entries(shiftMap)) {
+            if (normalizedName.includes(key)) {
+                return hour;
+            }
+        }
+
+        return 6; // Default fallback
     }
 
     truncateComment(comment: string | undefined): string {
