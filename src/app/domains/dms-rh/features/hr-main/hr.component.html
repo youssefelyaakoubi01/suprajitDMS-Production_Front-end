@@ -636,7 +636,7 @@
                         <thead>
                             <tr>
                                 <th class="employee-header">Employee</th>
-                                <th *ngFor="let ws of versatilityMatrix.workstations" class="ws-header">
+                                <th *ngFor="let ws of uniqueVersatilityWorkstations" class="ws-header">
                                     {{ ws.desc_workstation }}
                                 </th>
                             </tr>
@@ -650,7 +650,7 @@
                                         <span>{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span>
                                     </div>
                                 </td>
-                                <td *ngFor="let ws of versatilityMatrix.workstations" class="level-cell">
+                                <td *ngFor="let ws of uniqueVersatilityWorkstations" class="level-cell">
                                     <div class="level-indicator"
                                         [style.background-color]="getVersatilityColor(getVersatilityLevel(emp.Id_Emp, ws.id_workstation))"
                                         [pTooltip]="qualificationLevels[getVersatilityLevel(emp.Id_Emp, ws.id_workstation)].label"

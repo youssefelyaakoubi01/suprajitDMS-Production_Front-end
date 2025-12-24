@@ -20,6 +20,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { AvatarModule } from 'primeng/avatar';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 
 // Domain imports
 import {
@@ -47,7 +48,8 @@ import {
         TooltipModule,
         SkeletonModule,
         TagModule,
-        AvatarModule
+        AvatarModule,
+        ProgressSpinnerModule
     ],
     template: `
         <div class="versatility-matrix">
@@ -100,7 +102,10 @@ import {
 
             <!-- Loading State -->
             <div *ngIf="loading" class="matrix-loading">
-                <p-skeleton height="400px"></p-skeleton>
+                <div class="loading-overlay">
+                    <p-progressSpinner strokeWidth="4" animationDuration=".5s"></p-progressSpinner>
+                    <span class="loading-text">Loading Versatility Matrix...</span>
+                </div>
             </div>
 
             <!-- Matrix Table -->
@@ -116,7 +121,7 @@ import {
                             <th class="frozen-col employee-header" style="width: 200px; min-width: 200px">
                                 Employee
                             </th>
-                            <th *ngFor="let ws of matrix.workstations"
+                            <th *ngFor="let ws of uniqueWorkstations"
                                 class="workstation-header"
                                 [pTooltip]="ws.desc_workstation"
                                 style="width: 80px; min-width: 80px; text-align: center">
@@ -140,7 +145,7 @@ import {
                                     </div>
                                 </div>
                             </td>
-                            <td *ngFor="let ws of matrix.workstations"
+                            <td *ngFor="let ws of uniqueWorkstations"
                                 class="level-cell"
                                 (click)="onCellClick(employee, ws)"
                                 [pTooltip]="getCellTooltip(employee, ws)">
@@ -159,7 +164,7 @@ import {
                     <ng-template pTemplate="footer">
                         <tr>
                             <td class="frozen-col font-bold">Workstation Average</td>
-                            <td *ngFor="let ws of matrix.workstations" class="text-center font-bold">
+                            <td *ngFor="let ws of uniqueWorkstations" class="text-center font-bold">
                                 {{ getWorkstationAverage(ws) | number:'1.1-1' }}
                             </td>
                             <td class="text-center font-bold">
@@ -309,7 +314,24 @@ import {
         }
 
         .matrix-loading {
-            padding: 1rem;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+
+        .loading-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            color: var(--text-color-secondary);
+            font-weight: 500;
         }
     `]
 })
@@ -338,6 +360,19 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
     ];
 
     private cellMap: Map<string, VersatilityCell> = new Map();
+
+    get uniqueWorkstations(): HRWorkstation[] {
+        if (!this.matrix) return [];
+        const seen = new Set<string>();
+        return this.matrix.workstations.filter(ws => {
+            const name = ws.desc_workstation?.toLowerCase().trim() || '';
+            if (seen.has(name)) {
+                return false;
+            }
+            seen.add(name);
+            return true;
+        });
+    }
 
     constructor(private qualificationService: DmsQualificationService) {}
 
@@ -418,7 +453,7 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
         let total = 0;
         let count = 0;
 
-        this.matrix.workstations.forEach(ws => {
+        this.uniqueWorkstations.forEach(ws => {
             const level = this.getCellLevel(employee, ws);
             total += level;
             count++;
@@ -449,7 +484,7 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
         let count = 0;
 
         this.matrix.employees.forEach(emp => {
-            this.matrix!.workstations.forEach(ws => {
+            this.uniqueWorkstations.forEach(ws => {
                 total += this.getCellLevel(emp, ws);
                 count++;
             });

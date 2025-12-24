@@ -36,6 +36,13 @@ export const DMS_RH_ROUTES: Routes = [
         title: 'Formations'
     },
     {
+        path: 'qualifications',
+        loadComponent: () =>
+            import('./features/hr-main/hr.component').then(m => m.HrComponent),
+        data: { tab: 'qualifications' },
+        title: 'Qualifications'
+    },
+    {
         path: 'versatility',
         loadComponent: () =>
             import('./features/hr-main/hr.component').then(m => m.HrComponent),

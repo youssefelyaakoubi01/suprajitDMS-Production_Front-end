@@ -72,22 +72,6 @@ export class AppDmsHrMenu {
             },
             { separator: true },
             {
-                label: 'Attendance',
-                items: [
-                    {
-                        label: 'Daily Attendance',
-                        icon: 'pi pi-fw pi-calendar-clock',
-                        routerLink: ['/dms-hr/attendance']
-                    },
-                    {
-                        label: 'Transport Planning',
-                        icon: 'pi pi-fw pi-car',
-                        routerLink: ['/dms-hr/transport']
-                    }
-                ]
-            },
-            { separator: true },
-            {
                 label: 'Navigation',
                 items: [
                     {

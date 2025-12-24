@@ -146,6 +146,20 @@ export class HrComponent implements OnInit, OnDestroy {
     recyclageEmployees: RecyclageEmployee[] = [];
     plannedRecyclages: any[] = [];
     versatilityMatrix: VersatilityMatrix | null = null;
+
+    get uniqueVersatilityWorkstations(): HRWorkstation[] {
+        if (!this.versatilityMatrix) return [];
+        const seen = new Set<string>();
+        return this.versatilityMatrix.workstations.filter(ws => {
+            const name = ws.desc_workstation?.toLowerCase().trim() || '';
+            if (seen.has(name)) {
+                return false;
+            }
+            seen.add(name);
+            return true;
+        });
+    }
+
     workstations: HRWorkstation[] = [];
     processes: HRProcess[] = [];
     specializations: TrainerSpecialization[] = [];
