@@ -449,7 +449,7 @@ export class ProductionDashboardComponent implements OnInit, OnDestroy {
 
     onLineClick(line: ProductionLine): void {
         this.lineClicked.emit(line);
-        this.router.navigate(['/production'], { queryParams: { lineId: line.id } });
+        this.router.navigate(['/dms-production/production'], { queryParams: { lineId: line.id } });
     }
 
     private formatDate(date: Date): string {

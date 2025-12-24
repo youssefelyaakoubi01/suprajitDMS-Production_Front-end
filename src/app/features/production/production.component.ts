@@ -258,11 +258,65 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 }
             }
 
-            // If we have params, load production data after reference data is loaded
+            // If we have all params, load production data after reference data is loaded
             if (params['shift'] && params['date'] && params['line'] && params['part']) {
                 this.loadProductionFromParams(params);
             }
+            // If only lineId is provided (from dashboard click), pre-select the line
+            else if (params['lineId']) {
+                this.preSelectProductionLine(+params['lineId']);
+            }
         });
+    }
+
+    /**
+     * Pre-select production line when coming from dashboard
+     */
+    preSelectProductionLine(lineId: number): void {
+        // Wait for reference data to load
+        setTimeout(() => {
+            this.productionService.getProductionLines().subscribe(lines => {
+                const line = lines.find(l => l.id === lineId);
+                if (!line) {
+                    console.warn('Production line not found:', lineId);
+                    return;
+                }
+
+                // Find the project for this line
+                const project = this.projects.find(p => p.Id_Project === line.projectId);
+                if (!project) {
+                    console.warn('Project not found for line:', line);
+                    return;
+                }
+
+                // Set today's date
+                this.shiftSetupForm.patchValue({ date: new Date() });
+
+                // Pre-select project
+                this.shiftSetupForm.patchValue({ project: project });
+                this.session.project = project;
+
+                // Load and set production lines for this project
+                this.productionLines = lines.filter(l => l.projectId === project.Id_Project);
+
+                // Pre-select the production line
+                this.shiftSetupForm.patchValue({ productionLine: line });
+                this.session.productionLine = line;
+
+                // Load related data
+                this.loadParts(project.Id_Project);
+                this.loadWorkstations(line.id);
+                this.loadMachines(line.id);
+                this.loadShiftsForProductionLine(line.id);
+
+                this.messageService.add({
+                    severity: 'info',
+                    summary: 'Production Line Selected',
+                    detail: `Pre-selected "${line.name}" from ${project.Name_Project}. Please complete the setup.`,
+                    life: 5000
+                });
+            });
+        }, 800);
     }
 
     loadProductionFromParams(params: any): void {
