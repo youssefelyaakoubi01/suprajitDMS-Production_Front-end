@@ -13,8 +13,9 @@
                     (click)="openImportDialog()" pTooltip="Import Excel">
                     <span class="btn-label">Import</span>
                 </button>
+                <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
                 <button pButton icon="pi pi-download" class="p-button-secondary p-button-text action-btn"
-                    (click)="exportEmployees()" pTooltip="Export Data">
+                    (click)="exportMenu.toggle($event)" pTooltip="Export Data">
                     <span class="btn-label">Export</span>
                 </button>
                 <span class="header-divider"></span>

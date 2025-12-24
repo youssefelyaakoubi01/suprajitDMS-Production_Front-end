@@ -21,9 +21,12 @@ import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { ToolbarModule } from 'primeng/toolbar';
 import { SelectModule } from 'primeng/select';
+import { MenuModule } from 'primeng/menu';
+import { ToastModule } from 'primeng/toast';
+import { MessageService, MenuItem } from 'primeng/api';
 
 // Domain imports
-import { DmsFormationService, Formation, FormationPlan, Formateur } from '@domains/dms-rh';
+import { DmsFormationService, DmsExportService, Formation, FormationPlan, Formateur } from '@domains/dms-rh';
 
 @Component({
     selector: 'app-formations-list',
@@ -40,8 +43,11 @@ import { DmsFormationService, Formation, FormationPlan, Formateur } from '@domai
         TooltipModule,
         SkeletonModule,
         ToolbarModule,
-        SelectModule
+        SelectModule,
+        MenuModule,
+        ToastModule
     ],
+    providers: [MessageService],
     template: `
         <div class="formations-list">
             <!-- Toolbar -->
@@ -58,6 +64,12 @@ import { DmsFormationService, Formation, FormationPlan, Formateur } from '@domai
                               [showClear]="true"
                               styleClass="mr-2">
                     </p-select>
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <button pButton icon="pi pi-download"
+                            class="p-button-success p-button-outlined mr-2"
+                            (click)="exportMenu.toggle($event)"
+                            pTooltip="Export data">
+                    </button>
                     <button pButton icon="pi pi-plus" label="Add Formation"
                             (click)="onAddFormation()">
                     </button>
@@ -145,6 +157,8 @@ import { DmsFormationService, Formation, FormationPlan, Formateur } from '@domai
                 <p class="text-color-secondary">Start by adding your first formation</p>
                 <button pButton label="Add Formation" icon="pi pi-plus" (click)="onAddFormation()"></button>
             </div>
+
+            <p-toast></p-toast>
         </div>
     `,
     styles: [`
@@ -228,7 +242,25 @@ export class FormationsListComponent implements OnInit, OnDestroy {
         { label: 'Certification', value: 'certification' }
     ];
 
-    constructor(private formationService: DmsFormationService) {}
+    // Export menu items
+    exportMenuItems: MenuItem[] = [
+        {
+            label: 'Export to Excel',
+            icon: 'pi pi-file-excel',
+            command: () => this.exportToExcel()
+        },
+        {
+            label: 'Export to CSV',
+            icon: 'pi pi-file',
+            command: () => this.exportToCsv()
+        }
+    ];
+
+    constructor(
+        private formationService: DmsFormationService,
+        private exportService: DmsExportService,
+        private messageService: MessageService
+    ) {}
 
     ngOnInit(): void {
         if (this.formations.length === 0) {
@@ -301,5 +333,41 @@ export class FormationsListComponent implements OnInit, OnDestroy {
 
     onViewParticipants(formation: Formation): void {
         this.viewParticipants.emit(formation);
+    }
+
+    exportToExcel(): void {
+        if (this.formations.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No formations to export'
+            });
+            return;
+        }
+
+        this.exportService.exportFormations(this.formations);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.formations.length} formations exported to Excel`
+        });
+    }
+
+    exportToCsv(): void {
+        if (this.formations.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No formations to export'
+            });
+            return;
+        }
+
+        this.exportService.exportFormationsToCsv(this.formations);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.formations.length} formations exported to CSV`
+        });
     }
 }

@@ -19,9 +19,12 @@ import { AvatarGroupModule } from 'primeng/avatargroup';
 import { TooltipModule } from 'primeng/tooltip';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TabsModule } from 'primeng/tabs';
+import { MenuModule } from 'primeng/menu';
+import { ToastModule } from 'primeng/toast';
+import { MessageService, MenuItem } from 'primeng/api';
 
 // Domain imports
-import { DmsTeamService, Team, Formateur } from '@domains/dms-rh';
+import { DmsTeamService, DmsExportService, Team, Formateur } from '@domains/dms-rh';
 
 @Component({
     selector: 'app-teams-list',
@@ -36,8 +39,11 @@ import { DmsTeamService, Team, Formateur } from '@domains/dms-rh';
         AvatarGroupModule,
         TooltipModule,
         ToolbarModule,
-        TabsModule
+        TabsModule,
+        MenuModule,
+        ToastModule
     ],
+    providers: [MessageService],
     template: `
         <div class="teams-list">
             <p-tabs [value]="activeTab">
@@ -54,6 +60,12 @@ import { DmsTeamService, Team, Formateur } from '@domains/dms-rh';
                                 <span class="text-xl font-semibold">Teams</span>
                             </ng-template>
                             <ng-template #end>
+                                <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                                <button pButton icon="pi pi-download"
+                                        class="p-button-success p-button-outlined mr-2"
+                                        (click)="exportMenu.toggle($event)"
+                                        pTooltip="Export data">
+                                </button>
                                 <button pButton icon="pi pi-plus" label="Add Team"
                                         (click)="onAddTeam()">
                                 </button>
@@ -164,6 +176,7 @@ import { DmsTeamService, Team, Formateur } from '@domains/dms-rh';
                     </p-tabpanel>
                 </p-tabpanels>
             </p-tabs>
+            <p-toast></p-toast>
         </div>
     `,
     styles: [`
@@ -220,7 +233,25 @@ export class TeamsListComponent implements OnInit, OnDestroy {
 
     activeTab = 'teams';
 
-    constructor(private teamService: DmsTeamService) {}
+    // Export menu items
+    exportMenuItems: MenuItem[] = [
+        {
+            label: 'Export to Excel',
+            icon: 'pi pi-file-excel',
+            command: () => this.exportTeamsToExcel()
+        },
+        {
+            label: 'Export to CSV',
+            icon: 'pi pi-file',
+            command: () => this.exportTeamsToCsv()
+        }
+    ];
+
+    constructor(
+        private teamService: DmsTeamService,
+        private exportService: DmsExportService,
+        private messageService: MessageService
+    ) {}
 
     ngOnInit(): void {
         if (this.teams.length === 0) {
@@ -274,5 +305,41 @@ export class TeamsListComponent implements OnInit, OnDestroy {
 
     onDeleteTrainer(trainer: Formateur): void {
         this.deleteTrainer.emit(trainer);
+    }
+
+    exportTeamsToExcel(): void {
+        if (this.teams.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No teams to export'
+            });
+            return;
+        }
+
+        this.exportService.exportTeams(this.teams);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.teams.length} teams exported to Excel`
+        });
+    }
+
+    exportTeamsToCsv(): void {
+        if (this.teams.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No teams to export'
+            });
+            return;
+        }
+
+        this.exportService.exportTeamsToCsv(this.teams);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.teams.length} teams exported to CSV`
+        });
     }
 }

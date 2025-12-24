@@ -23,9 +23,12 @@ import { InputIconModule } from 'primeng/inputicon';
 import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
 import { SelectButtonModule } from 'primeng/selectbutton';
+import { ToastModule } from 'primeng/toast';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, MenuItem } from 'primeng/api';
 
 // Domain imports
-import { DmsEmployeeService, Employee, Department, EmployeeCategory } from '@domains/dms-rh';
+import { DmsEmployeeService, DmsExportService, Employee, Department, EmployeeCategory } from '@domains/dms-rh';
 import { environment } from '../../../../../environments/environment';
 
 @Component({
@@ -45,8 +48,11 @@ import { environment } from '../../../../../environments/environment';
         InputIconModule,
         TooltipModule,
         SkeletonModule,
-        SelectButtonModule
+        SelectButtonModule,
+        ToastModule,
+        MenuModule
     ],
+    providers: [MessageService],
     template: `
         <div class="employees-list">
             <!-- Filter Toolbar -->
@@ -86,8 +92,17 @@ import { environment } from '../../../../../environments/environment';
                               placeholder="Category"
                               optionLabel="name"
                               optionValue="name"
-                              [showClear]="true">
+                              [showClear]="true"
+                              styleClass="mr-2">
                     </p-select>
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button icon="pi pi-download"
+                              label="Export"
+                              severity="success"
+                              [outlined]="true"
+                              (onClick)="exportMenu.toggle($event)"
+                              pTooltip="Export data">
+                    </p-button>
                 </ng-template>
             </p-toolbar>
 
@@ -101,6 +116,7 @@ import { environment } from '../../../../../environments/environment';
                      [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Departement_Emp', 'Categorie_Emp']"
                      [rowHover]="true"
                      dataKey="Id_Emp"
+                     [exportFilename]="'employees_export'"
                      styleClass="p-datatable-sm p-datatable-gridlines">
 
                 <ng-template pTemplate="header">
@@ -190,6 +206,7 @@ import { environment } from '../../../../../environments/environment';
                     </tr>
                 </ng-template>
             </p-table>
+            <p-toast></p-toast>
         </div>
     `,
     styles: [`
@@ -266,7 +283,25 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
 
     private apiUrl = environment.apiUrl;
 
-    constructor(private employeeService: DmsEmployeeService) {}
+    // Export menu items
+    exportMenuItems: MenuItem[] = [
+        {
+            label: 'Export to Excel',
+            icon: 'pi pi-file-excel',
+            command: () => this.exportToExcel()
+        },
+        {
+            label: 'Export to CSV',
+            icon: 'pi pi-file',
+            command: () => this.exportToCsv()
+        }
+    ];
+
+    constructor(
+        private employeeService: DmsEmployeeService,
+        private messageService: MessageService,
+        private exportService: DmsExportService
+    ) {}
 
     ngOnInit(): void {
         this.filteredEmployees = [...this.employees];
@@ -432,5 +467,41 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
 
     onDeleteEmployee(employee: Employee): void {
         this.deleteEmployee.emit(employee);
+    }
+
+    exportToExcel(): void {
+        if (this.filteredEmployees.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No employees to export'
+            });
+            return;
+        }
+
+        this.exportService.exportEmployees(this.filteredEmployees);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.filteredEmployees.length} employees exported to Excel`
+        });
+    }
+
+    exportToCsv(): void {
+        if (this.filteredEmployees.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No employees to export'
+            });
+            return;
+        }
+
+        this.exportService.exportEmployeesToCsv(this.filteredEmployees);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.filteredEmployees.length} employees exported to CSV`
+        });
     }
 }

@@ -36,7 +36,8 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { AccordionModule } from 'primeng/accordion';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { PaginatorModule } from 'primeng/paginator';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 
 // Services & Models
 import { HRService } from '@core/services/hr.service';
@@ -101,7 +102,8 @@ import {
         SkeletonModule,
         AccordionModule,
         SelectButtonModule,
-        PaginatorModule
+        PaginatorModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './hr.component.html',
@@ -335,6 +337,21 @@ export class HrComponent implements OnInit, OnDestroy {
         { label: 'Passed', value: 'passed' },
         { label: 'Failed', value: 'failed' }
     ];
+
+    // Export menu items
+    exportMenuItems: MenuItem[] = [
+        {
+            label: 'Export to Excel',
+            icon: 'pi pi-file-excel',
+            command: () => this.exportEmployees()
+        },
+        {
+            label: 'Export to CSV',
+            icon: 'pi pi-file',
+            command: () => this.exportEmployeesCsv()
+        }
+    ];
+
     showRecyclageDetailsDialog = false;
     selectedRecyclageDetails: any = null;
 
@@ -2226,38 +2243,126 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     exportEmployees(): void {
+        if (this.employees.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No employees to export'
+            });
+            return;
+        }
+
         this.messageService.add({ severity: 'info', summary: 'Export', detail: 'Exporting employees to Excel...' });
 
-        // Build params from current filters
-        const params: { department?: string; status?: string } = {};
-        if (this.selectedDepartment) params.department = this.selectedDepartment;
-        if (this.selectedStatus) params.status = this.selectedStatus;
+        // Use dynamic import for xlsx
+        import('xlsx').then(xlsx => {
+            const data = this.employees.map(emp => ({
+                'ID': emp.Id_Emp,
+                'Badge Number': emp.BadgeNumber || '',
+                'Last Name': emp.Nom_Emp,
+                'First Name': emp.Prenom_Emp,
+                'Gender': emp.Genre_Emp === 'M' ? 'Male' : emp.Genre_Emp === 'F' ? 'Female' : emp.Genre_Emp,
+                'Category': emp.Categorie_Emp,
+                'Department': emp.Departement_Emp,
+                'Team': emp.team?.name || '',
+                'Status': emp.EmpStatus,
+                'Birth Date': emp.DateNaissance_Emp ? new Date(emp.DateNaissance_Emp).toLocaleDateString('en-US') : '',
+                'Hire Date': emp.DateEmbauche_Emp ? new Date(emp.DateEmbauche_Emp).toLocaleDateString('en-US') : '',
+                'Transport Route': emp.trajet?.name || '',
+                'Team Leader ID': emp.TeamLeaderID || '',
+                'Created By': emp.CreatedBy || emp.created_by || '',
+                'Created Date': emp.CreatedDate ? new Date(emp.CreatedDate).toLocaleDateString('en-US') : '',
+                'Changed By': emp.ChangedBy || emp.changed_by || '',
+                'Changed Date': emp.ChangedDate ? new Date(emp.ChangedDate).toLocaleDateString('en-US') : ''
+            }));
 
-        this.hrService.exportEmployeesExcel(params).subscribe({
-            next: (blob) => {
-                // Create download link
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'employees.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
+            const worksheet = xlsx.utils.json_to_sheet(data);
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'Employees');
 
-                this.messageService.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: 'Employees exported successfully'
-                });
-            },
-            error: (err) => {
-                this.messageService.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Failed to export employees'
-                });
-            }
+            // Auto-size columns
+            const colWidths = [8, 15, 20, 20, 10, 15, 20, 20, 12, 12, 12, 20, 15, 15, 12, 15, 12];
+            worksheet['!cols'] = colWidths.map(w => ({ wch: w }));
+
+            xlsx.writeFile(workbook, `employees_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Export Complete',
+                detail: `${this.employees.length} employees exported to Excel`
+            });
+        }).catch(err => {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to export employees to Excel'
+            });
+        });
+    }
+
+    exportEmployeesCsv(): void {
+        if (this.employees.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No employees to export'
+            });
+            return;
+        }
+
+        this.messageService.add({ severity: 'info', summary: 'Export', detail: 'Exporting employees to CSV...' });
+
+        // Prepare CSV data with all attributes
+        const headers = [
+            'ID', 'Badge Number', 'Last Name', 'First Name', 'Gender', 'Category',
+            'Department', 'Team', 'Status', 'Birth Date', 'Hire Date',
+            'Transport Route', 'Team Leader ID', 'Created By', 'Created Date',
+            'Changed By', 'Changed Date'
+        ];
+        const rows = this.employees.map(emp => [
+            emp.Id_Emp,
+            emp.BadgeNumber || '',
+            emp.Nom_Emp,
+            emp.Prenom_Emp,
+            emp.Genre_Emp === 'M' ? 'Male' : emp.Genre_Emp === 'F' ? 'Female' : emp.Genre_Emp,
+            emp.Categorie_Emp,
+            emp.Departement_Emp,
+            emp.team?.name || '',
+            emp.EmpStatus,
+            emp.DateNaissance_Emp ? new Date(emp.DateNaissance_Emp).toLocaleDateString('en-US') : '',
+            emp.DateEmbauche_Emp ? new Date(emp.DateEmbauche_Emp).toLocaleDateString('en-US') : '',
+            emp.trajet?.name || '',
+            emp.TeamLeaderID || '',
+            emp.CreatedBy || emp.created_by || '',
+            emp.CreatedDate ? new Date(emp.CreatedDate).toLocaleDateString('en-US') : '',
+            emp.ChangedBy || emp.changed_by || '',
+            emp.ChangedDate ? new Date(emp.ChangedDate).toLocaleDateString('en-US') : ''
+        ]);
+
+        // Build CSV content
+        const csvContent = [
+            headers.join(';'),
+            ...rows.map(row => row.map(cell => {
+                const value = String(cell ?? '');
+                if (value.includes(';') || value.includes('"') || value.includes('\n')) {
+                    return `"${value.replace(/"/g, '""')}"`;
+                }
+                return value;
+            }).join(';'))
+        ].join('\n');
+
+        // Create download
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `employees_export_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${this.employees.length} employees exported to CSV`
         });
     }
 
