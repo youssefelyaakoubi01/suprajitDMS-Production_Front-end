@@ -6,11 +6,12 @@
             <p class="page-subtitle">View and manage hourly production data</p>
         </div>
         <div class="header-actions">
+            <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
             <p-button
                 label="Export"
                 icon="pi pi-download"
                 [text]="true"
-                (onClick)="exportData()"></p-button>
+                (onClick)="exportMenu.toggle($event)"></p-button>
             <p-button
                 label="New Production"
                 icon="pi pi-plus"

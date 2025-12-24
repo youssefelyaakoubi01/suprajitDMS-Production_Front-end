@@ -696,8 +696,23 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Watch for project changes
         this.shiftSetupForm.get('project')?.valueChanges.subscribe((project: Project) => {
             if (project) {
+                // Reset child controls first WITHOUT triggering their valueChanges
+                this.shiftSetupForm.patchValue(
+                    { productionLine: null, partNumber: null, machine: null },
+                    { emitEvent: false }
+                );
+                // Clear dependent arrays
+                this.workstations = [];
+                this.machines = [];
+                // Then load new data
                 this.loadProductionLines(project.Id_Project);
                 this.loadParts(project.Id_Project);
+            } else {
+                // Clear all dependent data
+                this.productionLines = [];
+                this.parts = [];
+                this.workstations = [];
+                this.machines = [];
             }
         });
 
@@ -758,14 +773,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
     loadProductionLines(projectId: number): void {
         this.productionService.getProductionLines(projectId).subscribe(lines => {
             this.productionLines = lines;
-            this.shiftSetupForm.patchValue({ productionLine: null });
+            // patchValue removed - now handled in project valueChanges with emitEvent: false
         });
     }
 
     loadParts(projectId: number): void {
         this.productionService.getParts(projectId).subscribe(parts => {
             this.parts = parts;
-            this.shiftSetupForm.patchValue({ partNumber: null });
+            // patchValue removed - now handled in project valueChanges with emitEvent: false
         });
     }
 

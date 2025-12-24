@@ -152,7 +152,7 @@ export class DmsSelectorComponent implements OnInit, OnDestroy {
                 label: this.getUserDisplayName(),
                 items: [
                     {
-                        label: 'Mon Profil',
+                        label: 'My Profile',
                         icon: 'pi pi-user',
                         command: () => {}
                     },
@@ -160,7 +160,7 @@ export class DmsSelectorComponent implements OnInit, OnDestroy {
                         separator: true
                     },
                     {
-                        label: 'Déconnexion',
+                        label: 'Logout',
                         icon: 'pi pi-sign-out',
                         command: () => this.logout()
                     }
@@ -200,7 +200,7 @@ export class DmsSelectorComponent implements OnInit, OnDestroy {
     }
 
     getUserDisplayName(): string {
-        if (!this.currentUser) return 'Utilisateur';
+        if (!this.currentUser) return 'User';
 
         if (this.currentUser.first_name && this.currentUser.last_name) {
             return `${this.currentUser.first_name} ${this.currentUser.last_name}`;
@@ -208,12 +208,12 @@ export class DmsSelectorComponent implements OnInit, OnDestroy {
         if (this.currentUser.name) return this.currentUser.name;
         if (this.currentUser.first_name) return this.currentUser.first_name;
         if (this.currentUser.username) return this.currentUser.username;
-        return 'Utilisateur';
+        return 'User';
     }
 
     getUserInitials(): string {
         const name = this.getUserDisplayName();
-        if (!name || name === 'Utilisateur') return 'U';
+        if (!name || name === 'User') return 'U';
 
         const parts = name.split(' ');
         if (parts.length >= 2) {

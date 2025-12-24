@@ -1,5 +1,5 @@
 export const environment = {
     production: false,
-    apiUrl: 'http://localhost:8000/api',
-    mediaUrl: 'http://localhost:8000'
+    apiUrl: 'https://suprajit-api.hysotech.com/api',
+    mediaUrl: 'https://suprajit-api.hysotech.com'
 };

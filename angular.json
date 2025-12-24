@@ -37,6 +37,7 @@
                             }
                         ],
                         "styles": [
+                            "node_modules/primeicons/primeicons.css",
                             "src/assets/styles.scss"
                         ],
                         "scripts": []
@@ -89,6 +90,7 @@
                             }
                         ],
                         "styles": [
+                            "node_modules/primeicons/primeicons.css",
                             "src/assets/styles.scss"
                         ],
                         "scripts": []

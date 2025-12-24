@@ -1149,7 +1149,7 @@ export class HrComponent implements OnInit, OnDestroy {
         });
     }
 
-    getQualificationStatusSeverity(status: string): string {
+    getQualificationStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
         switch (status) {
             case 'passed': return 'success';
             case 'failed': return 'danger';

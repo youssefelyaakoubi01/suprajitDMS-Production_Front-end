@@ -319,10 +319,10 @@ export class ZonesComponent implements OnInit {
         return found ? found.label : type;
     }
 
-    getZoneTypeSeverity(type: ZoneType): string {
-        const map: { [key: string]: string } = {
+    getZoneTypeSeverity(type: ZoneType): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
+        const map: { [key in ZoneType]: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' } = {
             'production': 'success',
-            'maintenance': 'warning',
+            'maintenance': 'warn',
             'storage': 'info',
             'quality': 'secondary'
         };

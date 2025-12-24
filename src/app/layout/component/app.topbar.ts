@@ -67,7 +67,7 @@ interface DmsModuleInfo {
 
         <div class="layout-topbar-actions">
             <div class="layout-config-menu">
-                <button type="button" class="layout-topbar-action" (click)="toggleDarkMode()" pTooltip="Changer le thème" tooltipPosition="bottom">
+                <button type="button" class="layout-topbar-action" (click)="toggleDarkMode()" pTooltip="Toggle Theme" tooltipPosition="bottom">
                     <i [ngClass]="{ 'pi ': true, 'pi-moon': layoutService.isDarkTheme(), 'pi-sun': !layoutService.isDarkTheme() }"></i>
                 </button>
                 <div class="relative">
@@ -79,7 +79,7 @@ interface DmsModuleInfo {
                         leaveToClass="hidden"
                         leaveActiveClass="animate-fadeout"
                         [hideOnOutsideClick]="true"
-                        pTooltip="Personnaliser"
+                        pTooltip="Customize"
                         tooltipPosition="bottom"
                     >
                         <i class="pi pi-palette"></i>
@@ -98,7 +98,7 @@ interface DmsModuleInfo {
             </button>
 
             <!-- Home - Always visible on desktop -->
-            <button type="button" class="layout-topbar-action desktop-only" routerLink="/dms-home" pTooltip="Accueil DMS" tooltipPosition="bottom">
+            <button type="button" class="layout-topbar-action desktop-only" routerLink="/dms-home" pTooltip="DMS Home" tooltipPosition="bottom">
                 <i class="pi pi-home"></i>
             </button>
 
@@ -202,15 +202,15 @@ interface DmsModuleInfo {
                         <div class="user-menu-actions">
                             <a class="menu-action-item" routerLink="/dms-production/profile" (click)="userMenu.hide()">
                                 <i class="pi pi-user"></i>
-                                <span>Mon Profil</span>
+                                <span>My Profile</span>
                             </a>
-                            <a class="menu-action-item" routerLink="/dms-production/settings" (click)="userMenu.hide()">
+                            <a class="menu-action-item" routerLink="/dms-production/user-settings" (click)="userMenu.hide()">
                                 <i class="pi pi-cog"></i>
-                                <span>Paramètres</span>
+                                <span>Settings</span>
                             </a>
                             <a class="menu-action-item" (click)="toggleDarkMode(); userMenu.hide()">
                                 <i [class]="layoutService.isDarkTheme() ? 'pi pi-sun' : 'pi pi-moon'"></i>
-                                <span>{{ layoutService.isDarkTheme() ? 'Mode Clair' : 'Mode Sombre' }}</span>
+                                <span>{{ layoutService.isDarkTheme() ? 'Light Mode' : 'Dark Mode' }}</span>
                             </a>
                         </div>
 
@@ -220,7 +220,7 @@ interface DmsModuleInfo {
                         <div class="user-menu-logout">
                             <a class="menu-action-item logout" (click)="userMenu.hide(); confirmLogout()">
                                 <i class="pi pi-sign-out"></i>
-                                <span>Déconnexion</span>
+                                <span>Logout</span>
                             </a>
                         </div>
                     </div>
@@ -230,7 +230,7 @@ interface DmsModuleInfo {
             <!-- Login Button - Desktop (if not logged in) -->
             <button type="button" class="layout-topbar-action login-btn desktop-only" (click)="goToLogin()" *ngIf="!currentUser">
                 <i class="pi pi-sign-in"></i>
-                <span>Connexion</span>
+                <span>Login</span>
             </button>
 
             <!-- Mobile Menu Button -->
@@ -262,19 +262,19 @@ interface DmsModuleInfo {
                     </button>
                     <button type="button" class="layout-topbar-action" routerLink="/dms-home">
                         <i class="pi pi-home"></i>
-                        <span>Accueil DMS</span>
+                        <span>DMS Home</span>
                     </button>
                     <button type="button" class="layout-topbar-action" *ngIf="currentUser" routerLink="/dms-production/profile">
                         <i class="pi pi-user"></i>
-                        <span>Mon Profil</span>
+                        <span>My Profile</span>
                     </button>
                     <button type="button" class="layout-topbar-action logout-action" (click)="confirmLogout()" *ngIf="currentUser">
                         <i class="pi pi-sign-out"></i>
-                        <span>Déconnexion</span>
+                        <span>Logout</span>
                     </button>
                     <button type="button" class="layout-topbar-action" (click)="goToLogin()" *ngIf="!currentUser">
                         <i class="pi pi-sign-in"></i>
-                        <span>Connexion</span>
+                        <span>Login</span>
                     </button>
                 </div>
             </div>
@@ -290,8 +290,8 @@ interface DmsModuleInfo {
                     <span class="font-bold text-2xl block mb-2 mt-4">{{ message.header }}</span>
                     <p class="mb-0 text-center">{{ message.message }}</p>
                     <div class="flex gap-2 mt-4">
-                        <button pButton pRipple label="Annuler" (click)="cancelLogout()" class="p-button-outlined p-button-secondary"></button>
-                        <button pButton pRipple label="Déconnexion" (click)="logout()" class="p-button-danger"></button>
+                        <button pButton pRipple label="Cancel" (click)="cancelLogout()" class="p-button-outlined p-button-secondary"></button>
+                        <button pButton pRipple label="Logout" (click)="logout()" class="p-button-danger"></button>
                     </div>
                 </div>
             </ng-template>
@@ -700,15 +700,15 @@ export class AppTopbar implements OnInit, OnDestroy {
     };
 
     private roleLabels: { [key: string]: string } = {
-        'admin': 'Administrateur',
-        'rh_manager': 'Manager RH',
-        'team_leader': 'Chef d\'équipe',
-        'supervisor': 'Superviseur',
-        'operator': 'Opérateur',
-        'formateur': 'Formateur',
+        'admin': 'Administrator',
+        'rh_manager': 'HR Manager',
+        'team_leader': 'Team Leader',
+        'supervisor': 'Supervisor',
+        'operator': 'Operator',
+        'formateur': 'Trainer',
         'manager': 'Manager',
-        'technician': 'Technicien',
-        'viewer': 'Visiteur'
+        'technician': 'Technician',
+        'viewer': 'Viewer'
     };
 
     constructor(
@@ -778,7 +778,7 @@ export class AppTopbar implements OnInit, OnDestroy {
         if (this.currentUser.username) {
             return this.currentUser.username;
         }
-        return 'Utilisateur';
+        return 'User';
     }
 
     getUserInitials(): string {
@@ -796,8 +796,8 @@ export class AppTopbar implements OnInit, OnDestroy {
         if (!this.currentUser) return '';
 
         const position = this.currentUser.position;
-        if (!position) return 'Utilisateur';
-        return this.roleLabels[position] || position || 'Utilisateur';
+        if (!position) return 'User';
+        return this.roleLabels[position] || position || 'User';
     }
 
     getAvatarColor(): string {
@@ -870,8 +870,8 @@ export class AppTopbar implements OnInit, OnDestroy {
     confirmLogout(): void {
         this.confirmationService.confirm({
             key: 'logoutDialog',
-            header: 'Déconnexion',
-            message: 'Êtes-vous sûr de vouloir vous déconnecter ?',
+            header: 'Logout',
+            message: 'Are you sure you want to logout?',
             accept: () => {
                 this.logout();
             }

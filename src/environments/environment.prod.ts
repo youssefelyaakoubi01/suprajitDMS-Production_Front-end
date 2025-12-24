@@ -1,5 +1,5 @@
 export const environment = {
     production: true,
-    apiUrl: '/api',
-    mediaUrl: ''
+    apiUrl: 'https://suprajit-api.hysotech.com/api',
+    mediaUrl: 'https://suprajit-api.hysotech.com'
 };

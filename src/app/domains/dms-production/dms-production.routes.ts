@@ -71,6 +71,18 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
                 title: 'Shift Type Settings'
             }
         ]
+    },
+    {
+        path: 'profile',
+        loadComponent: () =>
+            import('@features/profile/profile.component').then(m => m.ProfileComponent),
+        title: 'My Profile'
+    },
+    {
+        path: 'user-settings',
+        loadComponent: () =>
+            import('@features/settings/user-settings.component').then(m => m.UserSettingsComponent),
+        title: 'User Settings'
     }
 ];
 

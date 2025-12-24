@@ -29,12 +29,12 @@ export class AppDmsAdminMenu {
                         routerLink: ['/dms-admin/dashboard']
                     },
                     {
-                        label: 'Utilisateurs',
+                        label: 'Users',
                         icon: 'pi pi-fw pi-users',
                         routerLink: ['/dms-admin/users']
                     },
                     {
-                        label: 'Logs d\'activit\u00e9',
+                        label: 'Activity Logs',
                         icon: 'pi pi-fw pi-history',
                         routerLink: ['/dms-admin/activity-logs']
                     }
@@ -45,7 +45,7 @@ export class AppDmsAdminMenu {
                 label: 'Navigation',
                 items: [
                     {
-                        label: 'Retour \u00e0 DMS Home',
+                        label: 'Back to DMS Home',
                         icon: 'pi pi-fw pi-arrow-left',
                         routerLink: ['/dms-home']
                     }

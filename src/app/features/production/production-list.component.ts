@@ -12,8 +12,10 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from './production.service';
+import { ExportService } from '../../core/services/export.service';
 import {
     HourlyProduction,
     Project,
@@ -45,7 +47,8 @@ interface ProductionListItem extends HourlyProduction {
         TagModule,
         ToastModule,
         ConfirmDialogModule,
-        TooltipModule
+        TooltipModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './production-list.component.html',
@@ -71,11 +74,26 @@ export class ProductionListComponent implements OnInit {
 
     isLoading = false;
 
+    // Export menu items
+    exportMenuItems: MenuItem[] = [
+        {
+            label: 'Export to Excel',
+            icon: 'pi pi-file-excel',
+            command: () => this.exportData()
+        },
+        {
+            label: 'Export to CSV',
+            icon: 'pi pi-file',
+            command: () => this.exportToCsv()
+        }
+    ];
+
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
-        private router: Router
+        private router: Router,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
@@ -256,11 +274,71 @@ export class ProductionListComponent implements OnInit {
     }
 
     exportData(): void {
-        // TODO: Implement export to Excel functionality
+        if (this.filteredProductions.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No production records to export'
+            });
+            return;
+        }
+
+        // Prepare export data with readable column names
+        const exportData = this.filteredProductions.map(p => ({
+            'Date': this.formatDate(p.Date_HourlyProd),
+            'Shift': p.shiftName || p.Shift_HourlyProd,
+            'Hour': p.Hour_HourlyProd,
+            'Time': this.formatTime(p.Hour_HourlyProd, p.Shift_HourlyProd),
+            'Project': p.projectName || '',
+            'Production Line': p.lineName || '',
+            'Part Number': p.partNumber || '',
+            'Output': p.Result_HourlyProdPN,
+            'Target': p.Target_HourlyProdPN,
+            'Efficiency (%)': p.efficiency || 0,
+            'Headcount': p.HC_HourlyProdPN
+        }));
+
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(exportData, `production-export-${timestamp}`, 'Production Data');
+
         this.messageService.add({
-            severity: 'info',
-            summary: 'Export',
-            detail: 'Export functionality coming soon'
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${exportData.length} records exported to Excel`
+        });
+    }
+
+    exportToCsv(): void {
+        if (this.filteredProductions.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Data',
+                detail: 'No production records to export'
+            });
+            return;
+        }
+
+        const exportData = this.filteredProductions.map(p => ({
+            'Date': this.formatDate(p.Date_HourlyProd),
+            'Shift': p.shiftName || p.Shift_HourlyProd,
+            'Hour': p.Hour_HourlyProd,
+            'Time': this.formatTime(p.Hour_HourlyProd, p.Shift_HourlyProd),
+            'Project': p.projectName || '',
+            'Production Line': p.lineName || '',
+            'Part Number': p.partNumber || '',
+            'Output': p.Result_HourlyProdPN,
+            'Target': p.Target_HourlyProdPN,
+            'Efficiency (%)': p.efficiency || 0,
+            'Headcount': p.HC_HourlyProdPN
+        }));
+
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(exportData, `production-export-${timestamp}`);
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `${exportData.length} records exported to CSV`
         });
     }
 

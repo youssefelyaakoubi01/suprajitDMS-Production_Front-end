@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  suprajit-dms-frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-suprajit/dms-frontend}:latest
+    container_name: suprajit-dms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - TZ=Europe/Paris
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
