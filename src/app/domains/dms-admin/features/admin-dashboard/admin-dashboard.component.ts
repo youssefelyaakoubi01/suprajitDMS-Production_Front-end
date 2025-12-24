@@ -189,62 +189,50 @@ interface StatCard {
                             <span class="font-semibold text-900">Actions Rapides</span>
                         </div>
                         <div class="p-4 flex flex-column gap-3">
-                            <a pRipple routerLink="/dms-admin/users"
-                               class="flex align-items-center gap-3 p-3 border-round-lg surface-hover cursor-pointer transition-all transition-duration-200 no-underline text-900"
-                               style="border: 1px solid var(--surface-border);">
-                                <div class="flex align-items-center justify-content-center border-round-lg"
-                                     style="width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);">
-                                    <i class="pi pi-user-plus text-white"></i>
+                            <a pRipple routerLink="/dms-admin/users" class="quick-action-card">
+                                <div class="quick-action-icon" style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);">
+                                    <i class="pi pi-user-plus"></i>
                                 </div>
-                                <div class="flex-1">
-                                    <div class="font-semibold">Créer Utilisateur</div>
-                                    <div class="text-500 text-sm">Ajouter un nouvel accès</div>
+                                <div class="quick-action-content">
+                                    <div class="quick-action-title">Créer Utilisateur</div>
+                                    <div class="quick-action-subtitle">Ajouter un nouvel accès</div>
                                 </div>
-                                <i class="pi pi-chevron-right text-500"></i>
+                                <i class="pi pi-chevron-right quick-action-arrow"></i>
                             </a>
 
-                            <a pRipple routerLink="/dms-admin/activity-logs"
-                               class="flex align-items-center gap-3 p-3 border-round-lg surface-hover cursor-pointer transition-all transition-duration-200 no-underline text-900"
-                               style="border: 1px solid var(--surface-border);">
-                                <div class="flex align-items-center justify-content-center border-round-lg"
-                                     style="width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);">
-                                    <i class="pi pi-history text-white"></i>
+                            <a pRipple routerLink="/dms-admin/activity-logs" class="quick-action-card">
+                                <div class="quick-action-icon" style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);">
+                                    <i class="pi pi-history"></i>
                                 </div>
-                                <div class="flex-1">
-                                    <div class="font-semibold">Logs d'Activité</div>
-                                    <div class="text-500 text-sm">Consulter l'historique</div>
+                                <div class="quick-action-content">
+                                    <div class="quick-action-title">Logs d'Activité</div>
+                                    <div class="quick-action-subtitle">Consulter l'historique</div>
                                 </div>
-                                <i class="pi pi-chevron-right text-500"></i>
+                                <i class="pi pi-chevron-right quick-action-arrow"></i>
                             </a>
 
-                            <a pRipple routerLink="/dms-admin/users"
-                               class="flex align-items-center gap-3 p-3 border-round-lg surface-hover cursor-pointer transition-all transition-duration-200 no-underline text-900"
-                               style="border: 1px solid var(--surface-border);">
-                                <div class="flex align-items-center justify-content-center border-round-lg"
-                                     style="width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
-                                    <i class="pi pi-lock text-white"></i>
+                            <a pRipple routerLink="/dms-admin/users" class="quick-action-card">
+                                <div class="quick-action-icon" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                                    <i class="pi pi-lock"></i>
                                 </div>
-                                <div class="flex-1">
-                                    <div class="font-semibold">Gérer Permissions</div>
-                                    <div class="text-500 text-sm">Modifier les accès</div>
+                                <div class="quick-action-content">
+                                    <div class="quick-action-title">Gérer Permissions</div>
+                                    <div class="quick-action-subtitle">Modifier les accès</div>
                                 </div>
-                                <i class="pi pi-chevron-right text-500"></i>
+                                <i class="pi pi-chevron-right quick-action-arrow"></i>
                             </a>
 
                             <p-divider></p-divider>
 
-                            <a pRipple routerLink="/dms-home"
-                               class="flex align-items-center gap-3 p-3 border-round-lg surface-hover cursor-pointer transition-all transition-duration-200 no-underline text-900"
-                               style="border: 1px solid var(--surface-border);">
-                                <div class="flex align-items-center justify-content-center border-round-lg surface-200"
-                                     style="width: 2.5rem; height: 2.5rem;">
-                                    <i class="pi pi-home text-600"></i>
+                            <a pRipple routerLink="/dms-home" class="quick-action-card">
+                                <div class="quick-action-icon" style="background: linear-gradient(135deg, #6B7280 0%, #4B5563 100%);">
+                                    <i class="pi pi-home"></i>
                                 </div>
-                                <div class="flex-1">
-                                    <div class="font-semibold">Retour à l'accueil</div>
-                                    <div class="text-500 text-sm">DMS Home</div>
+                                <div class="quick-action-content">
+                                    <div class="quick-action-title">Retour à l'accueil</div>
+                                    <div class="quick-action-subtitle">DMS Home</div>
                                 </div>
-                                <i class="pi pi-chevron-right text-500"></i>
+                                <i class="pi pi-chevron-right quick-action-arrow"></i>
                             </a>
                         </div>
                     </div>
@@ -387,6 +375,71 @@ interface StatCard {
 
         .surface-hover:hover {
             background: var(--surface-ground) !important;
+        }
+
+        /* Quick Action Cards */
+        .quick-action-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--surface-border);
+            background: var(--surface-card);
+            text-decoration: none;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-action-card:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary-color);
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .quick-action-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        .quick-action-icon i {
+            color: white;
+            font-size: 1.25rem;
+        }
+
+        .quick-action-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .quick-action-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-color);
+            margin-bottom: 2px;
+        }
+
+        .quick-action-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-color-secondary);
+        }
+
+        .quick-action-arrow {
+            color: var(--text-color-secondary);
+            font-size: 0.875rem;
+            transition: transform 0.2s ease;
+        }
+
+        .quick-action-card:hover .quick-action-arrow {
+            transform: translateX(4px);
+            color: var(--primary-color);
         }
     `]
 })
