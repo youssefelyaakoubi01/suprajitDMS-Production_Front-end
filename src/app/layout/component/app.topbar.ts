@@ -16,6 +16,7 @@ import { PopoverModule } from 'primeng/popover';
 import { AppConfigurator } from './app.configurator';
 import { LayoutService } from '../service/layout.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RecyclageAlertBadgeComponent } from './recyclage-alert-badge.component';
 import { User } from '../../core/models/auth.model';
 import { Subscription, filter } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -43,7 +44,8 @@ interface DmsModuleInfo {
         DividerModule,
         TagModule,
         PopoverModule,
-        AppConfigurator
+        AppConfigurator,
+        RecyclageAlertBadgeComponent
     ],
     providers: [ConfirmationService],
     template: `
@@ -90,6 +92,9 @@ interface DmsModuleInfo {
 
             <!-- Separator -->
             <div class="topbar-separator desktop-only"></div>
+
+            <!-- Recyclage Alerts Badge -->
+            <app-recyclage-alert-badge class="desktop-only"></app-recyclage-alert-badge>
 
             <!-- Notifications - Always visible on desktop -->
             <button type="button" class="layout-topbar-action desktop-only" pTooltip="Notifications" tooltipPosition="bottom">

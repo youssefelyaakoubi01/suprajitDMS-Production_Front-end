@@ -1,0 +1,8 @@
+{
+  "/api": {
+    "target": "https://suprajit-api.hysotech.com",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

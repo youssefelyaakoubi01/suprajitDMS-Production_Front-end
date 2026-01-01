@@ -25,6 +25,7 @@ import { DialogModule } from 'primeng/dialog';
 // Domain imports
 import { DmsProductionService, Downtime, DowntimeProblem } from '@domains/dms-production';
 import { Shift } from '@core/models';
+import { ExportService } from '@core/services';
 
 // Extended interface for internal use (Date object instead of string)
 interface DowntimeWithDetails extends Downtime {
@@ -142,6 +143,14 @@ interface DowntimeWithDetails extends Downtime {
                                           [showClear]="true"
                                           (onChange)="onProblemFilter()">
                                 </p-select>
+                                <button pButton icon="pi pi-file-excel" class="p-button-text p-button-success"
+                                        (click)="exportToExcel()" [disabled]="filteredDowntimes.length === 0"
+                                        pTooltip="Export Excel">
+                                </button>
+                                <button pButton icon="pi pi-file" class="p-button-text p-button-info"
+                                        (click)="exportToCsv()" [disabled]="filteredDowntimes.length === 0"
+                                        pTooltip="Export CSV">
+                                </button>
                                 <button pButton icon="pi pi-refresh" class="p-button-text"
                                         (click)="loadDowntimes()" [loading]="loading"
                                         pTooltip="Refresh">
@@ -460,7 +469,10 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     detailsDialogVisible = false;
     selectedDowntime: DowntimeWithDetails | null = null;
 
-    constructor(private productionService: DmsProductionService) {}
+    constructor(
+        private productionService: DmsProductionService,
+        private exportService: ExportService
+    ) {}
 
     ngOnInit(): void {
         // Load shifts for hour formatting
@@ -733,5 +745,44 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
 
     deleteDowntime(dt: Downtime): void {
         this.delete.emit(dt);
+    }
+
+    /**
+     * Prepare downtime data for export
+     */
+    private prepareExportData(): any[] {
+        return this.filteredDowntimes.map(dt => ({
+            'Date': dt.date ? this.exportService.formatDate(dt.date) : '-',
+            'Heure': this.formatHour(dt.hour, dt.shift_name),
+            'Shift': dt.shift_name || '-',
+            'Ligne de Production': dt.production_line_name || '-',
+            'Zone': dt.zone_name || '-',
+            'Poste de Travail': dt.workstation_name || '-',
+            'Machine': dt.machine_name || '-',
+            'Projet': dt.project_name || '-',
+            'Part Number': dt.part_number || '-',
+            'Type de Problème': dt.problem_name || '-',
+            'Catégorie': dt.problem_category || '-',
+            'Durée (min)': dt.Total_Downtime || 0,
+            'Commentaire': dt.Comment_Downtime || '-'
+        }));
+    }
+
+    /**
+     * Export downtime list to Excel
+     */
+    exportToExcel(): void {
+        const data = this.prepareExportData();
+        const filename = `downtimes_export_${this.exportService.formatDate(new Date())}`;
+        this.exportService.exportToExcel(data, filename, 'Downtimes');
+    }
+
+    /**
+     * Export downtime list to CSV
+     */
+    exportToCsv(): void {
+        const data = this.prepareExportData();
+        const filename = `downtimes_export_${this.exportService.formatDate(new Date())}`;
+        this.exportService.exportToCsv(data, filename);
     }
 }

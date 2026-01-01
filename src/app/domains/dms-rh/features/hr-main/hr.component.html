@@ -666,10 +666,117 @@
 
             <!-- TAB 4: Recyclage -->
             <p-tabpanel value="4">
+                <!-- KPI Stats Cards - Same style as Dashboard -->
+                <div class="kpi-row">
+                    <!-- Total Alertes -->
+                    <div class="modern-kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Total Alertes</span>
+                            <div class="kpi-icon-wrapper bg-blue-100">
+                                <i class="pi pi-users text-blue-500"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-body">
+                            <span class="kpi-value">{{ recyclageStats.total }}</span>
+                            <div class="kpi-trend">
+                                <span>opérateurs concernés</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- En Retard -->
+                    <div class="modern-kpi-card" style="border-left: 4px solid var(--red-500);">
+                        <div class="kpi-header">
+                            <span class="kpi-label">En Retard</span>
+                            <div class="kpi-icon-wrapper bg-red-100">
+                                <i class="pi pi-exclamation-circle text-red-500"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" style="color: var(--red-500);">{{ recyclageStats.overdue }}</span>
+                            <div class="kpi-trend negative">
+                                <i class="pi pi-exclamation-triangle"></i>
+                                <span>action immédiate requise</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Imminent -->
+                    <div class="modern-kpi-card" style="border-left: 4px solid var(--orange-500);">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Imminent</span>
+                            <div class="kpi-icon-wrapper bg-orange-100">
+                                <i class="pi pi-clock text-orange-500"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" style="color: var(--orange-500);">{{ recyclageStats.dueSoon }}</span>
+                            <div class="kpi-trend">
+                                <i class="pi pi-clock"></i>
+                                <span>≤ 30 jours restants</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OK -->
+                    <div class="modern-kpi-card" style="border-left: 4px solid var(--green-500);">
+                        <div class="kpi-header">
+                            <span class="kpi-label">OK</span>
+                            <div class="kpi-icon-wrapper bg-green-100">
+                                <i class="pi pi-check-circle text-green-500"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" style="color: var(--green-500);">{{ recyclageStats.ok }}</span>
+                            <div class="kpi-trend positive">
+                                <i class="pi pi-check"></i>
+                                <span>> 30 jours restants</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Planifiés -->
+                    <div class="modern-kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Planifiés</span>
+                            <div class="kpi-icon-wrapper bg-purple-100">
+                                <i class="pi pi-calendar text-purple-500"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-body">
+                            <span class="kpi-value">{{ recyclageStats.plannedPending + recyclageStats.plannedInProgress }}</span>
+                            <div class="kpi-trend">
+                                <span>formations en attente</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="modern-kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Actions</span>
+                            <div class="kpi-icon-wrapper bg-blue-100">
+                                <i class="pi pi-cog text-blue-500"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-body" style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+                            <div class="flex gap-2">
+                                <button pButton icon="pi pi-refresh" class="p-button-outlined p-button-sm"
+                                    pTooltip="Actualiser" (click)="refreshRecyclageData()"></button>
+                                <button pButton icon="pi pi-download" class="p-button-outlined p-button-sm p-button-success"
+                                    pTooltip="Exporter CSV" (click)="exportRecyclageAlertsCsv()"></button>
+                            </div>
+                            <span class="text-xs text-color-secondary" *ngIf="recyclageLastUpdated">
+                                Màj: {{ recyclageLastUpdated | date:'HH:mm' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Section 1: All Employees - Select for Recyclage -->
                 <p-toolbar styleClass="mb-3 surface-ground border-round">
                     <ng-template #start>
-                        <p-iconfield iconPosition="left">
+                        <p-iconfield iconPosition="left" class="toolbar-search">
                             <p-inputicon styleClass="pi pi-search"></p-inputicon>
                             <input pInputText [(ngModel)]="playlistSearchTerm" placeholder="Search employees..."
                                 (input)="filterEmployeePlaylist()" style="width: 280px" />
@@ -763,33 +870,70 @@
 
                 <!-- Section 2: Employees Requiring Recyclage (Alert Section) -->
                 <div class="mt-4">
-                    <p-table [value]="recyclageEmployees" [rows]="5" [paginator]="true" [rowHover]="true">
-                        <ng-template pTemplate="caption">
-                            <div class="flex justify-content-between align-items-center">
-                                <span class="text-xl font-semibold">
-                                    <i class="pi pi-exclamation-triangle mr-2 text-orange-500"></i>
-                                    Employees Requiring Recyclage
-                                </span>
-                                <p-tag [value]="recyclageEmployees.length + ' employees'" severity="warn"></p-tag>
+                    <p-toolbar styleClass="mb-3 surface-ground border-round">
+                        <ng-template #start>
+                            <span class="text-xl font-semibold">
+                                <i class="pi pi-exclamation-triangle mr-2 text-orange-500"></i>
+                                Alertes Recyclage
+                            </span>
+                            <div class="flex gap-2 ml-3">
+                                <p-tag *ngIf="recyclageStats.overdue > 0"
+                                    [value]="recyclageStats.overdue + ' en retard'"
+                                    severity="danger"
+                                    class="cursor-pointer"
+                                    (click)="recyclageAlertStatusFilter = 'overdue'; filterRecyclageAlerts()"></p-tag>
+                                <p-tag *ngIf="recyclageStats.dueSoon > 0"
+                                    [value]="recyclageStats.dueSoon + ' imminent'"
+                                    severity="warn"
+                                    class="cursor-pointer"
+                                    (click)="recyclageAlertStatusFilter = 'due_soon'; filterRecyclageAlerts()"></p-tag>
                             </div>
                         </ng-template>
+
+                        <ng-template #end>
+                            <div class="flex align-items-center gap-2">
+                                <p-iconfield iconPosition="left">
+                                    <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                                    <input pInputText [(ngModel)]="recyclageAlertSearchTerm"
+                                        placeholder="Rechercher..."
+                                        (input)="filterRecyclageAlerts()"
+                                        style="width: 180px" />
+                                </p-iconfield>
+                                <p-select [options]="recyclageAlertStatusOptions"
+                                    [(ngModel)]="recyclageAlertStatusFilter"
+                                    optionLabel="label" optionValue="value"
+                                    placeholder="Tous les statuts"
+                                    (onChange)="filterRecyclageAlerts()"
+                                    [showClear]="true"
+                                    [style]="{width: '150px'}">
+                                </p-select>
+                            </div>
+                        </ng-template>
+                    </p-toolbar>
+
+                    <p-table [value]="filteredRecyclageEmployees" [rows]="10" [paginator]="true" [rowHover]="true"
+                        [rowsPerPageOptions]="[5, 10, 25]" [sortField]="'daysUntilRecyclage'" [sortOrder]="1">
 
                         <ng-template pTemplate="header">
                             <tr>
                                 <th style="width: 60px">Photo</th>
-                                <th>Name</th>
-                                <th>Hire Date</th>
-                                <th>Last Qualification</th>
-                                <th>Days Remaining</th>
-                                <th style="width: 100px">Status</th>
-                                <th style="width: 120px">Actions</th>
+                                <th pSortableColumn="Employee.Nom_Emp">Nom <p-sortIcon field="Employee.Nom_Emp"></p-sortIcon></th>
+                                <th>Département</th>
+                                <th pSortableColumn="DateEmbauche_Emp">Date Embauche <p-sortIcon field="DateEmbauche_Emp"></p-sortIcon></th>
+                                <th>Dernière Qualification</th>
+                                <th pSortableColumn="daysUntilRecyclage" style="width: 180px">Temps Restant <p-sortIcon field="daysUntilRecyclage"></p-sortIcon></th>
+                                <th style="width: 110px">Statut</th>
+                                <th style="width: 100px">Actions</th>
                             </tr>
                         </ng-template>
 
                         <ng-template pTemplate="body" let-rec>
-                            <tr [ngClass]="{'surface-100': rec.isOverdue}">
+                            <tr [ngClass]="{
+                                'bg-red-50': rec.isOverdue,
+                                'bg-orange-50': !rec.isOverdue && rec.daysUntilRecyclage <= 7
+                            }">
                                 <td>
-                                    <p-avatar *ngIf="rec.Employee?.Picture" [image]="rec.Employee.Picture"
+                                    <p-avatar *ngIf="rec.Employee?.Picture" [image]="getEmployeePictureUrl(rec.Employee.Picture)"
                                         shape="circle" size="large"></p-avatar>
                                     <p-avatar *ngIf="!rec.Employee?.Picture" [label]="getInitials(rec.Employee)"
                                         shape="circle" size="large" styleClass="bg-primary text-white"></p-avatar>
@@ -798,22 +942,32 @@
                                     <div class="font-semibold">{{ rec.Employee?.Prenom_Emp }} {{ rec.Employee?.Nom_Emp }}</div>
                                     <div class="text-sm text-color-secondary">{{ rec.Employee?.Categorie_Emp }}</div>
                                 </td>
+                                <td>
+                                    <span class="text-sm">{{ rec.Employee?.Departement_Emp || '-' }}</span>
+                                </td>
                                 <td>{{ rec.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</td>
                                 <td>
                                     <span *ngIf="rec.lastQualificationDate">{{ rec.lastQualificationDate | date:'dd/MM/yyyy' }}</span>
-                                    <span *ngIf="!rec.lastQualificationDate" class="text-color-secondary">-</span>
+                                    <span *ngIf="!rec.lastQualificationDate" class="text-color-secondary font-italic">Aucune</span>
                                 </td>
                                 <td>
-                                    <span [class]="rec.isOverdue ? 'text-red-600 font-bold' : (rec.daysUntilRecyclage <= 30 ? 'text-orange-600 font-bold' : '')">
-                                        {{ rec.isOverdue ? 'Overdue ' + getAbsValue(rec.daysUntilRecyclage) + 'd' : rec.daysUntilRecyclage + ' days' }}
-                                    </span>
+                                    <div class="flex align-items-center gap-2">
+                                        <i [class]="rec.isOverdue ? 'pi pi-exclamation-triangle text-red-600' :
+                                            (rec.daysUntilRecyclage <= 7 ? 'pi pi-clock text-orange-600' : 'pi pi-check text-green-600')"></i>
+                                        <span [class]="rec.isOverdue ? 'text-red-600 font-bold' :
+                                            (rec.daysUntilRecyclage <= 30 ? 'text-orange-600 font-semibold' : 'text-color')">
+                                            {{ getFormattedDaysText(rec) }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     <p-tag [severity]="getRecyclageSeverity(rec)"
-                                        [value]="rec.isOverdue ? 'OVERDUE' : (rec.daysUntilRecyclage <= 30 ? 'DUE SOON' : 'OK')"></p-tag>
+                                        [value]="rec.isOverdue ? 'EN RETARD' : (rec.daysUntilRecyclage <= 30 ? 'IMMINENT' : 'OK')"></p-tag>
                                 </td>
                                 <td>
-                                    <button pButton label="Plan" icon="pi pi-calendar" class="p-button-sm"
+                                    <button pButton icon="pi pi-calendar-plus"
+                                        class="p-button-sm p-button-success"
+                                        pTooltip="Planifier formation"
                                         (click)="planRecyclage(rec)"></button>
                                 </td>
                             </tr>
@@ -821,10 +975,20 @@
 
                         <ng-template pTemplate="emptymessage">
                             <tr>
-                                <td colspan="7" class="text-center p-4">
-                                    <i class="pi pi-check-circle text-4xl text-green-500 mb-3" style="display: block;"></i>
-                                    <p class="font-medium text-green-600">All employees are up to date!</p>
-                                    <p class="text-color-secondary text-sm">No employees require recyclage</p>
+                                <td colspan="8" class="text-center p-4">
+                                    <div *ngIf="recyclageEmployees.length === 0">
+                                        <i class="pi pi-check-circle text-4xl text-green-500 mb-3" style="display: block;"></i>
+                                        <p class="font-medium text-green-600">Tous les employés sont à jour !</p>
+                                        <p class="text-color-secondary text-sm">Aucun employé ne nécessite de recyclage</p>
+                                    </div>
+                                    <div *ngIf="recyclageEmployees.length > 0 && filteredRecyclageEmployees.length === 0">
+                                        <i class="pi pi-filter-slash text-4xl text-color-secondary mb-3" style="display: block;"></i>
+                                        <p class="font-medium">Aucun résultat</p>
+                                        <p class="text-color-secondary text-sm">Essayez de modifier vos filtres</p>
+                                        <button pButton label="Réinitialiser filtres" icon="pi pi-times"
+                                            class="p-button-text p-button-sm mt-2"
+                                            (click)="recyclageAlertSearchTerm = ''; recyclageAlertStatusFilter = null; filterRecyclageAlerts()"></button>
+                                    </div>
                                 </td>
                             </tr>
                         </ng-template>

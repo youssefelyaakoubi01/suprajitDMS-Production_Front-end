@@ -352,6 +352,27 @@ export class HrComponent implements OnInit, OnDestroy {
         { label: 'Failed', value: 'failed' }
     ];
 
+    // Section 2: Recyclage Alerts filtering & stats
+    filteredRecyclageEmployees: RecyclageEmployee[] = [];
+    recyclageAlertSearchTerm = '';
+    recyclageAlertStatusFilter: string | null = null;
+    recyclageAlertStatusOptions = [
+        { label: 'En retard', value: 'overdue' },
+        { label: 'Imminent (≤30j)', value: 'due_soon' },
+        { label: 'OK', value: 'ok' }
+    ];
+    recyclageLastUpdated: Date | null = null;
+
+    // Recyclage KPI Stats
+    recyclageStats = {
+        total: 0,
+        overdue: 0,
+        dueSoon: 0,
+        ok: 0,
+        plannedPending: 0,
+        plannedInProgress: 0
+    };
+
     // Export menu items
     exportMenuItems: MenuItem[] = [
         {
@@ -907,12 +928,134 @@ export class HrComponent implements OnInit, OnDestroy {
                     isOverdue: e.is_overdue,
                     requiresRecyclage: e.requires_recyclage
                 } as RecyclageEmployee));
+
+                // Update stats and apply filters
+                this.updateRecyclageStats();
+                this.filterRecyclageAlerts();
+                this.recyclageLastUpdated = new Date();
             },
             error: (err) => {
                 console.error('Error loading recyclage employees:', err);
                 this.recyclageEmployees = [];
+                this.filteredRecyclageEmployees = [];
+                this.updateRecyclageStats();
             }
         });
+    }
+
+    // Update recyclage statistics
+    updateRecyclageStats(): void {
+        const overdue = this.recyclageEmployees.filter(e => e.isOverdue).length;
+        const dueSoon = this.recyclageEmployees.filter(e => !e.isOverdue && e.daysUntilRecyclage <= 30).length;
+        const ok = this.recyclageEmployees.filter(e => !e.isOverdue && e.daysUntilRecyclage > 30).length;
+
+        this.recyclageStats = {
+            total: this.recyclageEmployees.length,
+            overdue,
+            dueSoon,
+            ok,
+            plannedPending: this.getRecyclageCountByStatus('pending'),
+            plannedInProgress: this.getRecyclageCountByStatus('in_progress')
+        };
+    }
+
+    // Filter recyclage alerts (Section 2)
+    filterRecyclageAlerts(): void {
+        let filtered = [...this.recyclageEmployees];
+
+        // Filter by search term
+        if (this.recyclageAlertSearchTerm) {
+            const term = this.recyclageAlertSearchTerm.toLowerCase();
+            filtered = filtered.filter(e =>
+                e.Employee?.Nom_Emp?.toLowerCase().includes(term) ||
+                e.Employee?.Prenom_Emp?.toLowerCase().includes(term) ||
+                e.Employee?.Departement_Emp?.toLowerCase().includes(term)
+            );
+        }
+
+        // Filter by status
+        if (this.recyclageAlertStatusFilter) {
+            switch (this.recyclageAlertStatusFilter) {
+                case 'overdue':
+                    filtered = filtered.filter(e => e.isOverdue);
+                    break;
+                case 'due_soon':
+                    filtered = filtered.filter(e => !e.isOverdue && e.daysUntilRecyclage <= 30);
+                    break;
+                case 'ok':
+                    filtered = filtered.filter(e => !e.isOverdue && e.daysUntilRecyclage > 30);
+                    break;
+            }
+        }
+
+        // Sort by urgency (overdue first, then by days remaining)
+        filtered.sort((a, b) => {
+            if (a.isOverdue && !b.isOverdue) return -1;
+            if (!a.isOverdue && b.isOverdue) return 1;
+            return a.daysUntilRecyclage - b.daysUntilRecyclage;
+        });
+
+        this.filteredRecyclageEmployees = filtered;
+    }
+
+    // Refresh recyclage data
+    refreshRecyclageData(): void {
+        this.loadRecyclageEmployees();
+        this.loadPlannedRecyclages();
+        this.messageService.add({
+            severity: 'info',
+            summary: 'Actualisé',
+            detail: 'Données recyclage mises à jour',
+            life: 2000
+        });
+    }
+
+    // Export recyclage alerts to CSV
+    exportRecyclageAlertsCsv(): void {
+        const data = this.filteredRecyclageEmployees.map(e => ({
+            'Nom': e.Employee?.Nom_Emp || '',
+            'Prénom': e.Employee?.Prenom_Emp || '',
+            'Département': e.Employee?.Departement_Emp || '',
+            'Catégorie': e.Employee?.Categorie_Emp || '',
+            'Date Embauche': e.DateEmbauche_Emp ? new Date(e.DateEmbauche_Emp).toLocaleDateString('fr-FR') : '',
+            'Dernière Qualification': e.lastQualificationDate ? new Date(e.lastQualificationDate).toLocaleDateString('fr-FR') : '-',
+            'Jours Restants': e.daysUntilRecyclage,
+            'Statut': e.isOverdue ? 'EN RETARD' : (e.daysUntilRecyclage <= 30 ? 'IMMINENT' : 'OK')
+        }));
+
+        const headers = Object.keys(data[0] || {});
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(h => `"${(row as any)[h]}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `recyclage_alertes_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export réussi',
+            detail: `${data.length} enregistrements exportés`,
+            life: 3000
+        });
+    }
+
+    // Get formatted days text in French
+    getFormattedDaysText(employee: RecyclageEmployee): string {
+        if (employee.isOverdue) {
+            const days = Math.abs(employee.daysUntilRecyclage);
+            return `${days} jour${days > 1 ? 's' : ''} de retard`;
+        }
+        if (employee.daysUntilRecyclage === 0) {
+            return "Expire aujourd'hui";
+        }
+        if (employee.daysUntilRecyclage === 1) {
+            return "1 jour restant";
+        }
+        return `${employee.daysUntilRecyclage} jours restants`;
     }
 
     loadPlannedRecyclages(): void {
@@ -924,11 +1067,13 @@ export class HrComponent implements OnInit, OnDestroy {
                     q => q.test_result === 'pending' || q.test_result === 'in_progress'
                 );
                 this.filterRecyclages(); // Apply initial filtering
+                this.updateRecyclageStats(); // Sync stats with planned recyclages
             },
             error: (err) => {
                 console.error('Error loading planned recyclages:', err);
                 this.plannedRecyclages = [];
                 this.filteredRecyclages = [];
+                this.updateRecyclageStats();
             }
         });
     }
@@ -1133,23 +1278,54 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     updateRecyclageStatus(qualification: any, newStatus: string): void {
-        this.hrService.updateQualification(qualification.id, { test_result: newStatus }).subscribe({
-            next: () => {
-                this.messageService.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: 'Status updated successfully'
+        const oldStatus = qualification.test_result;
+
+        // If same status, do nothing
+        if (oldStatus === newStatus) return;
+
+        // Status labels for display
+        const statusLabels: { [key: string]: string } = {
+            'pending': 'En attente',
+            'in_progress': 'En cours',
+            'passed': 'Validé',
+            'failed': 'Échoué'
+        };
+
+        this.confirmationService.confirm({
+            message: `Voulez-vous vraiment changer le statut de "${statusLabels[oldStatus] || oldStatus}" vers "${statusLabels[newStatus] || newStatus}" ?`,
+            header: 'Confirmer le changement',
+            icon: 'pi pi-exclamation-triangle',
+            acceptLabel: 'Oui, changer',
+            rejectLabel: 'Annuler',
+            acceptButtonStyleClass: 'p-button-success',
+            rejectButtonStyleClass: 'p-button-text',
+            accept: () => {
+                this.hrService.updateQualification(qualification.id, { test_result: newStatus }).subscribe({
+                    next: () => {
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Succès',
+                            detail: `Statut mis à jour: ${statusLabels[newStatus] || newStatus}`
+                        });
+                        this.loadPlannedRecyclages();
+                        this.loadRecyclageEmployees();
+                        this.updateRecyclageStats();
+                    },
+                    error: (err) => {
+                        console.error('Error updating status:', err);
+                        // Revert the dropdown value
+                        qualification.test_result = oldStatus;
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Erreur',
+                            detail: 'Échec de la mise à jour du statut'
+                        });
+                    }
                 });
-                this.loadPlannedRecyclages();
-                this.loadRecyclageEmployees();
             },
-            error: (err) => {
-                console.error('Error updating status:', err);
-                this.messageService.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Failed to update status'
-                });
+            reject: () => {
+                // Revert the dropdown value
+                qualification.test_result = oldStatus;
             }
         });
     }

@@ -3,6 +3,8 @@ export * from './api.service';
 export * from './auth.service';
 export * from './notification.service';
 export * from './downtime-notification.service';
+export * from './export.service';
+export * from './recyclage-alert.service';
 
 // Feature Services
 export * from './dashboard.service';

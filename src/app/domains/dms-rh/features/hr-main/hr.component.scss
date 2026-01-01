@@ -1018,6 +1018,12 @@ code {
     .bg-purple-100 {
         background: var(--purple-100);
     }
+    .bg-red-100 {
+        background: var(--red-100);
+    }
+    .bg-cyan-100 {
+        background: var(--cyan-100);
+    }
 
     .text-blue-500 {
         color: var(--blue-500);
@@ -1030,6 +1036,12 @@ code {
     }
     .text-purple-500 {
         color: var(--purple-500);
+    }
+    .text-red-500 {
+        color: var(--red-500);
+    }
+    .text-cyan-500 {
+        color: var(--cyan-500);
     }
 }
 

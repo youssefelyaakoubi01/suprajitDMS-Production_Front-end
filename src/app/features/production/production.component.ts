@@ -743,7 +743,6 @@ export class ProductionComponent implements OnInit, OnDestroy {
             project: [null, Validators.required],
             productionLine: [null, Validators.required],
             partNumber: [null, Validators.required],
-            machine: [null],
             zone: [null]
         });
 
@@ -752,7 +751,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             if (project) {
                 // Reset child controls first WITHOUT triggering their valueChanges
                 this.shiftSetupForm.patchValue(
-                    { productionLine: null, partNumber: null, machine: null },
+                    { productionLine: null, partNumber: null },
                     { emitEvent: false }
                 );
                 // Clear dependent arrays
@@ -847,7 +846,6 @@ export class ProductionComponent implements OnInit, OnDestroy {
     loadMachines(lineId: number): void {
         this.productionService.getMachinesByProductionLine(lineId).subscribe(machines => {
             this.machines = machines;
-            this.shiftSetupForm.patchValue({ machine: null });
         });
     }
 
@@ -904,7 +902,6 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.session.project = formValue.project;
         this.session.productionLine = formValue.productionLine;
         this.session.part = formValue.partNumber;
-        this.session.machine = formValue.machine;
         this.session.zone = formValue.zone;
         this.session.isSetupComplete = true;
 
