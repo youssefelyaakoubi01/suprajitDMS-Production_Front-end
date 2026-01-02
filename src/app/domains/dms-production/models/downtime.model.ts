@@ -31,6 +31,14 @@ export interface Downtime {
     zone_code?: string;
     problem_name?: string;
     problem_category?: string;
+    // Status and resolution fields
+    status?: 'open' | 'in_progress' | 'closed';
+    resolution?: string;
+    assigned_to?: string;
+    closed_at?: string;
+    leader_confirmed_at?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 // ==================== DOWNTIME PROBLEM ====================

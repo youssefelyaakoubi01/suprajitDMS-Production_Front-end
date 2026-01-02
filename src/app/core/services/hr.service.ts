@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, of, BehaviorSubject } from 'rxjs';
 import { map, tap, catchError } from 'rxjs/operators';
 import { ApiService } from './api.service';
@@ -32,6 +32,15 @@ import {
     LicenseCreate,
     LicenseStats
 } from '../models/employee.model';
+import {
+    EmployeeWorkstationAssignment,
+    AssignmentCreateRequest,
+    EmployeePrimaryAssignment,
+    AssignmentStats
+} from '../../domains/dms-rh/models/assignment.model';
+import { HRCacheStateService } from '../state/hr-cache-state.service';
+import { QualificationStateService } from '../state/qualification-state.service';
+import { AssignmentStateService } from '../state/assignment-state.service';
 
 @Injectable({
     providedIn: 'root'
@@ -39,7 +48,13 @@ import {
 export class HRService {
     private readonly endpoint = 'employees';
 
-    // Cache subjects
+    // Inject state services for reactive state management
+    private cacheState = inject(HRCacheStateService);
+    private qualificationState = inject(QualificationStateService);
+    private assignmentState = inject(AssignmentStateService);
+
+    // Legacy cache subjects (kept for backward compatibility)
+    // @deprecated Use cacheState signals instead
     private employeesCache$ = new BehaviorSubject<Employee[]>([]);
     private teamsCache$ = new BehaviorSubject<Team[]>([]);
     private departmentsCache$ = new BehaviorSubject<Department[]>([]);
@@ -63,8 +78,19 @@ export class HRService {
         teamId?: number;
         search?: string;
     }): Observable<Employee[]> {
+        this.cacheState.setLoadingEmployees(true);
         return this.api.get<Employee[]>(`${this.endpoint}`, params).pipe(
-            tap(employees => this.employeesCache$.next(employees))
+            tap(employees => {
+                // Update signal-based cache
+                this.cacheState.setEmployees(employees);
+                this.cacheState.setLoadingEmployees(false);
+                // Also update legacy BehaviorSubject for backward compatibility
+                this.employeesCache$.next(employees);
+            }),
+            catchError(err => {
+                this.cacheState.setLoadingEmployees(false);
+                throw err;
+            })
         );
     }
 
@@ -78,24 +104,34 @@ export class HRService {
     }
 
     createEmployee(employee: Partial<Employee>): Observable<Employee> {
-        return this.api.post<Employee>(`${this.endpoint}`, employee);
+        return this.api.post<Employee>(`${this.endpoint}`, employee).pipe(
+            tap(created => this.cacheState.addEmployee(created))
+        );
     }
 
     updateEmployee(id: number, employee: Partial<Employee>): Observable<Employee> {
-        return this.api.put<Employee>(`${this.endpoint}/${id}`, employee);
+        return this.api.put<Employee>(`${this.endpoint}/${id}`, employee).pipe(
+            tap(updated => this.cacheState.updateEmployee(id, updated))
+        );
     }
 
     // Methods with photo upload support (FormData)
     createEmployeeWithPhoto(formData: FormData): Observable<Employee> {
-        return this.api.post<Employee>(`${this.endpoint}`, formData);
+        return this.api.post<Employee>(`${this.endpoint}`, formData).pipe(
+            tap(created => this.cacheState.addEmployee(created))
+        );
     }
 
     updateEmployeeWithPhoto(id: number, formData: FormData): Observable<Employee> {
-        return this.api.patch<Employee>(`${this.endpoint}/${id}`, formData);
+        return this.api.patch<Employee>(`${this.endpoint}/${id}`, formData).pipe(
+            tap(updated => this.cacheState.updateEmployee(id, updated))
+        );
     }
 
     deleteEmployee(id: number): Observable<void> {
-        return this.api.delete<void>(`${this.endpoint}/${id}`);
+        return this.api.delete<void>(`${this.endpoint}/${id}`).pipe(
+            tap(() => this.cacheState.removeEmployee(id))
+        );
     }
 
     importEmployeesExcel(file: File): Observable<{ imported: number; errors: string[]; success: boolean }> {
@@ -121,7 +157,10 @@ export class HRService {
     // ==================== TEAMS ====================
     getTeams(): Observable<Team[]> {
         return this.api.get<Team[]>(`${this.endpoint}/teams`).pipe(
-            tap(teams => this.teamsCache$.next(teams))
+            tap(teams => {
+                this.cacheState.setTeams(teams);
+                this.teamsCache$.next(teams);
+            })
         );
     }
 
@@ -130,15 +169,21 @@ export class HRService {
     }
 
     createTeam(team: Partial<Team>): Observable<Team> {
-        return this.api.post<Team>(`${this.endpoint}/teams`, team);
+        return this.api.post<Team>(`${this.endpoint}/teams`, team).pipe(
+            tap(created => this.cacheState.addTeam(created))
+        );
     }
 
     updateTeam(id: number, team: Partial<Team>): Observable<Team> {
-        return this.api.put<Team>(`${this.endpoint}/teams/${id}`, team);
+        return this.api.put<Team>(`${this.endpoint}/teams/${id}`, team).pipe(
+            tap(updated => this.cacheState.updateTeam(id, updated))
+        );
     }
 
     deleteTeam(id: number): Observable<void> {
-        return this.api.delete<void>(`${this.endpoint}/teams/${id}`);
+        return this.api.delete<void>(`${this.endpoint}/teams/${id}`).pipe(
+            tap(() => this.cacheState.removeTeam(id))
+        );
     }
 
     assignEmployeeToTeam(employeeId: number, teamId: number): Observable<void> {
@@ -186,7 +231,10 @@ export class HRService {
     // ==================== DEPARTMENTS ====================
     getDepartments(): Observable<Department[]> {
         return this.api.get<Department[]>(`${this.endpoint}/departments`).pipe(
-            tap(depts => this.departmentsCache$.next(depts))
+            tap(depts => {
+                this.cacheState.setDepartments(depts);
+                this.departmentsCache$.next(depts);
+            })
         );
     }
 
@@ -292,7 +340,17 @@ export class HRService {
         projectId?: number;
         result?: string;
     }): Observable<Qualification[]> {
-        return this.api.get<Qualification[]>(`${this.endpoint}/qualifications`, params);
+        this.qualificationState.setLoading(true);
+        return this.api.get<Qualification[]>(`${this.endpoint}/qualifications`, params).pipe(
+            tap(qualifications => {
+                this.qualificationState.setQualifications(qualifications);
+                this.qualificationState.setLoading(false);
+            }),
+            catchError(err => {
+                this.qualificationState.setLoading(false);
+                throw err;
+            })
+        );
     }
 
     getQualification(id: number): Observable<Qualification> {
@@ -300,15 +358,30 @@ export class HRService {
     }
 
     createQualification(qualification: Partial<Qualification>): Observable<Qualification> {
-        return this.api.post<Qualification>(`${this.endpoint}/qualifications`, qualification);
+        return this.api.post<Qualification>(`${this.endpoint}/qualifications`, qualification).pipe(
+            tap(created => {
+                // Immediately update the state - UI will refresh automatically
+                this.qualificationState.addQualification(created);
+            })
+        );
     }
 
     updateQualification(id: number, qualification: Partial<Qualification>): Observable<Qualification> {
-        return this.api.patch<Qualification>(`${this.endpoint}/qualifications/${id}`, qualification);
+        return this.api.patch<Qualification>(`${this.endpoint}/qualifications/${id}`, qualification).pipe(
+            tap(updated => {
+                // Immediately update the state - UI will refresh automatically
+                this.qualificationState.updateQualification(id, updated);
+            })
+        );
     }
 
     deleteQualification(id: number): Observable<void> {
-        return this.api.delete<void>(`${this.endpoint}/qualifications/${id}`);
+        return this.api.delete<void>(`${this.endpoint}/qualifications/${id}`).pipe(
+            tap(() => {
+                // Immediately update the state - UI will refresh automatically
+                this.qualificationState.removeQualification(id);
+            })
+        );
     }
 
     validateQualification(id: number, result: string, comment?: string): Observable<Qualification> {
@@ -316,7 +389,12 @@ export class HRService {
             test_result: result,
             comment_qualif: comment,
             end_qualif: new Date()
-        });
+        }).pipe(
+            tap(updated => {
+                // Immediately update the state - UI will refresh automatically
+                this.qualificationState.updateQualification(id, updated);
+            })
+        );
     }
 
     getTotalQualification(): Observable<{
@@ -633,6 +711,138 @@ export class HRService {
 
     deleteLicenseType(id: number): Observable<void> {
         return this.api.delete<void>(`${this.endpoint}/license-types/${id}`);
+    }
+
+    // ==================== EMPLOYEE WORKSTATION ASSIGNMENTS ====================
+
+    /**
+     * Get all workstation assignments with optional filters.
+     * Automatically updates the AssignmentStateService via tap().
+     */
+    getWorkstationAssignments(params?: {
+        employee?: number;
+        workstation?: number;
+        is_primary?: boolean;
+    }): Observable<EmployeeWorkstationAssignment[]> {
+        this.assignmentState.setLoading(true);
+        return this.api.get<EmployeeWorkstationAssignment[] | { results: EmployeeWorkstationAssignment[] }>(`${this.endpoint}/workstation-assignments`, params).pipe(
+            map(response => {
+                // Handle both direct array and paginated response formats
+                if (Array.isArray(response)) {
+                    return response;
+                }
+                // Handle DRF paginated response: { count, next, previous, results }
+                if (response && 'results' in response && Array.isArray(response.results)) {
+                    return response.results;
+                }
+                return [];
+            }),
+            tap(assignments => {
+                // Update state service (single source of truth)
+                this.assignmentState.setAssignments(assignments);
+                this.assignmentState.setLoading(false);
+            }),
+            catchError(err => {
+                this.assignmentState.setLoading(false);
+                throw err;
+            })
+        );
+    }
+
+    /**
+     * Get all assignments for a specific employee
+     */
+    getEmployeeAssignments(employeeId: number): Observable<EmployeeWorkstationAssignment[]> {
+        return this.api.get<EmployeeWorkstationAssignment[]>(
+            `${this.endpoint}/workstation-assignments/by-employee/${employeeId}`
+        );
+    }
+
+    /**
+     * Get primary assignment for an employee with qualification validation.
+     * Used by Production module when scanning employee badges.
+     */
+    getPrimaryAssignment(employeeId: number): Observable<EmployeePrimaryAssignment> {
+        return this.api.get<EmployeePrimaryAssignment>(
+            `${this.endpoint}/workstation-assignments/primary/${employeeId}`
+        );
+    }
+
+    /**
+     * Get all assignments for a specific workstation
+     */
+    getWorkstationEmployees(workstationId: number): Observable<EmployeeWorkstationAssignment[]> {
+        return this.api.get<EmployeeWorkstationAssignment[]>(
+            `${this.endpoint}/workstation-assignments/by-workstation/${workstationId}`
+        );
+    }
+
+    /**
+     * Create a new workstation assignment
+     */
+    createWorkstationAssignment(assignment: AssignmentCreateRequest): Observable<EmployeeWorkstationAssignment> {
+        return this.api.post<EmployeeWorkstationAssignment>(
+            `${this.endpoint}/workstation-assignments`,
+            assignment
+        ).pipe(
+            tap(() => {
+                // Invalidate state to force reload with full data
+                // Backend returns partial data on create, so we need to reload
+                this.assignmentState.invalidate();
+            })
+        );
+    }
+
+    /**
+     * Update an existing workstation assignment
+     */
+    updateWorkstationAssignment(
+        id: number,
+        assignment: Partial<AssignmentCreateRequest>
+    ): Observable<EmployeeWorkstationAssignment> {
+        return this.api.put<EmployeeWorkstationAssignment>(
+            `${this.endpoint}/workstation-assignments/${id}`,
+            assignment
+        ).pipe(
+            tap(() => {
+                // Invalidate state to force reload with full data
+                this.assignmentState.invalidate();
+            })
+        );
+    }
+
+    /**
+     * Delete a workstation assignment
+     */
+    deleteWorkstationAssignment(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/workstation-assignments/${id}`).pipe(
+            tap(() => {
+                // Remove from state for immediate UI update
+                this.assignmentState.removeAssignment(id);
+            })
+        );
+    }
+
+    /**
+     * Set an assignment as primary (auto-unsets others for the same employee)
+     */
+    setPrimaryAssignment(assignmentId: number): Observable<{ success: boolean; message: string }> {
+        return this.api.post<{ success: boolean; message: string }>(
+            `${this.endpoint}/workstation-assignments/set-primary`,
+            { assignment_id: assignmentId }
+        ).pipe(
+            tap(() => {
+                // Invalidate state to force reload (multiple assignments may have changed)
+                this.assignmentState.invalidate();
+            })
+        );
+    }
+
+    /**
+     * Get assignment statistics
+     */
+    getAssignmentStats(): Observable<AssignmentStats> {
+        return this.api.get<AssignmentStats>(`${this.endpoint}/workstation-assignments/stats`);
     }
 
     // ==================== CACHE GETTERS ====================

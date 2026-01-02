@@ -2729,3 +2729,109 @@ code {
         display: none;
     }
 }
+
+// ==================== QUALIFICATION TIMELINE DRAWER ====================
+:host ::ng-deep .p-drawer {
+    .p-drawer-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--surface-200);
+        background: var(--surface-50);
+    }
+
+    .p-drawer-content {
+        padding: 1.5rem;
+        background: var(--surface-ground);
+    }
+
+    .p-drawer-footer {
+        padding: 0 1.5rem 1rem;
+        background: var(--surface-ground);
+    }
+}
+
+// Timeline Custom Styles
+.qualification-timeline-wrapper {
+    :host ::ng-deep .p-timeline {
+        .p-timeline-event-opposite {
+            display: none;
+        }
+
+        .p-timeline-event-content {
+            padding-left: 1rem;
+        }
+
+        .p-timeline-event-connector {
+            background: var(--surface-300);
+        }
+    }
+}
+
+// Stats Cards Animation
+.grid > div > .surface-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+}
+
+// Score Circle Animation
+.score-circle-container {
+    svg {
+        circle:last-child {
+            transition: stroke-dashoffset 0.8s ease-out;
+        }
+    }
+}
+
+// Timeline Card Hover
+.qualification-timeline-wrapper .surface-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+        transform: translateX(4px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+}
+
+// Empty State Styling
+.empty-state-illustration {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+// Responsive Drawer
+@media (max-width: 576px) {
+    :host ::ng-deep .p-drawer {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        .p-drawer-header,
+        .p-drawer-content,
+        .p-drawer-footer {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+
+    .grid > div {
+        padding: 0.25rem !important;
+
+        .surface-card {
+            padding: 0.75rem !important;
+
+            .text-2xl {
+                font-size: 1.25rem !important;
+            }
+        }
+    }
+}

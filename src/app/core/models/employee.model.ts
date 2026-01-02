@@ -153,25 +153,33 @@ export interface PasswordChangeRequest {
 
 // ==================== QUALIFICATION ====================
 export interface Qualification {
-    id_qualif: number;
-    start_qualif: Date;
-    end_qualif: Date;
-    id_formation: number;
+    id: number;
+    start_date: Date | string | null;
+    end_date: Date | string | null;
     test?: string;
     test_result: string;
-    Id_Emp: number;
-    Trainer: number;
-    comment_qualif?: string;
-    prodline?: string;
-    Id_Project: number;
-    createdby?: string;
-    createddate?: Date;
-    changedby?: string;
-    changeddate?: Date;
-    // Joined fields
+    score?: number | null;
+    comment?: string;
+    prod_line?: string;
+    notes?: string;
+    created_by?: string;
+    changed_by?: string;
+    created_at?: string;
+    updated_at?: string;
+    // Foreign keys (IDs)
+    employee: number;
+    formation: number;
+    project: number | null;
+    trainer: number | null;
+    // Joined fields (read-only from API)
+    employee_name?: string;
+    formation_name?: string;
+    project_name?: string;
     Employee?: Employee;
     Formation?: Formation;
     TrainerName?: string;
+    // Legacy field aliases for backward compatibility
+    id_qualif?: number;
 }
 
 export type QualificationLevel = 0 | 1 | 2 | 3 | 4;

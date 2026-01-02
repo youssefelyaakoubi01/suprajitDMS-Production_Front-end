@@ -4,7 +4,7 @@
  *
  * Uses the HrComponent which contains all HR functionality
  * in a single component with tabs: Dashboard, Employees, Formations, Versatility,
- * Recyclage, Teams, Users, Licenses, Workstations.
+ * Recyclage, Teams, Users, Licenses, Workstations, Affectations, Qualifications.
  */
 import { Routes } from '@angular/router';
 
@@ -83,6 +83,20 @@ export const DMS_RH_ROUTES: Routes = [
             import('./features/hr-main/hr.component').then(m => m.HrComponent),
         data: { tab: 'workstations' },
         title: 'Workstations'
+    },
+    {
+        path: 'affectations',
+        loadComponent: () =>
+            import('./features/hr-main/hr.component').then(m => m.HrComponent),
+        data: { tab: 'affectations' },
+        title: 'Workstation Assignments'
+    },
+    {
+        path: 'qualifications-list',
+        loadComponent: () =>
+            import('./features/hr-main/hr.component').then(m => m.HrComponent),
+        data: { tab: 'qualifications-list' },
+        title: 'Gestion des Qualifications'
     }
 ];
 

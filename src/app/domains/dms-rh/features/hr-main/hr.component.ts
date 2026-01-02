@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy, ViewChild, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
-import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { takeUntil, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { trigger, transition, style, animate } from '@angular/animations';
 
 // PrimeNG Modules
@@ -37,10 +37,14 @@ import { AccordionModule } from 'primeng/accordion';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { PaginatorModule } from 'primeng/paginator';
 import { MenuModule } from 'primeng/menu';
+import { TimelineModule } from 'primeng/timeline';
+import { DrawerModule } from 'primeng/drawer';
+import { KnobModule } from 'primeng/knob';
 import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 
 // Services & Models
 import { HRService } from '@core/services/hr.service';
+import { ProductionService } from '@core/services/production.service';
 import { environment } from '../../../../../environments/environment';
 import {
     Employee,
@@ -66,6 +70,13 @@ import {
     LicenseCreate,
     LicenseStats
 } from '@core/models/employee.model';
+import { Machine } from '@core/models/production.model';
+import {
+    EmployeeWorkstationAssignment,
+    AssignmentCreateRequest
+} from '../../models/assignment.model';
+import { QualificationStateService } from '@core/state/qualification-state.service';
+import { AssignmentStateService } from '@core/state/assignment-state.service';
 
 @Component({
     selector: 'app-hr',
@@ -103,7 +114,10 @@ import {
         AccordionModule,
         SelectButtonModule,
         PaginatorModule,
-        MenuModule
+        MenuModule,
+        TimelineModule,
+        DrawerModule,
+        KnobModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './hr.component.html',
@@ -124,6 +138,10 @@ import {
 export class HrComponent implements OnInit, OnDestroy {
     @ViewChild('employeeTable') employeeTable!: Table;
 
+    // Inject state services for reactive management
+    private qualificationState = inject(QualificationStateService);
+    private assignmentState = inject(AssignmentStateService);
+
     private destroy$ = new Subject<void>();
 
     // Active Tab
@@ -135,6 +153,7 @@ export class HrComponent implements OnInit, OnDestroy {
 
     // Data
     employees: Employee[] = [];
+    operatorEmployees: Employee[] = []; // Only operators - for qualification/recyclage forms
     teams: Team[] = [];
     departments: Department[] = [];
     departmentEntities: any[] = [];
@@ -252,6 +271,58 @@ export class HrComponent implements OnInit, OnDestroy {
     statuses: any[] = [];
     selectedRecyclageEmployee: RecyclageEmployee | null = null;
 
+    // ==================== QUALIFICATIONS TAB (TAB 10) ====================
+    // Using signal-based state management via QualificationStateService
+    // These getters provide template-compatible access to signals
+
+    /** Get qualifications list from signal state */
+    get qualificationsList(): any[] {
+        return this.qualificationState.qualifications();
+    }
+
+    /** Get filtered qualifications from computed signal */
+    get filteredQualifications(): any[] {
+        return this.qualificationState.filteredQualifications();
+    }
+
+    /** Get loading state from signal */
+    get qualificationsLoading(): boolean {
+        return this.qualificationState.loading();
+    }
+
+    // Qualifications Filters (now delegated to state service)
+    get qualificationSearchTerm(): string {
+        return this.qualificationState.searchTerm();
+    }
+    set qualificationSearchTerm(value: string) {
+        this.qualificationState.setSearchTerm(value);
+    }
+
+    qualificationStatusFilter: string | null = null;
+    qualificationEmployeeFilter: number | null = null;
+    qualificationFormationFilter: number | null = null;
+
+    /** Get statistics from computed signal - automatically updated */
+    get qualificationStats() {
+        return this.qualificationState.stats();
+    }
+
+    // Timeline Dialog
+    selectedEmployeeForTimeline: any | null = null;
+    employeeQualificationHistory: any[] = [];
+    showEmployeeTimelineDialog = false;
+
+    // Qualification Save State
+    qualificationSaving = false;
+
+    // Qualification Status Options
+    qualificationStatusOptions = [
+        { label: 'Réussi', value: 'passed' },
+        { label: 'Échoué', value: 'failed' },
+        { label: 'En attente', value: 'pending' },
+        { label: 'En cours', value: 'in_progress' }
+    ];
+
     // Photo upload
     employeePhotoPreview: string | null = null;
     employeePhotoFile: File | null = null;
@@ -331,7 +402,9 @@ export class HrComponent implements OnInit, OnDestroy {
         'teams': '5',
         'users': '6',
         'licenses': '7',
-        'workstations': '8'
+        'workstations': '8',
+        'affectations': '9',
+        'qualifications-list': '10'
     };
 
     // License status options
@@ -409,8 +482,44 @@ export class HrComponent implements OnInit, OnDestroy {
         { label: 'Full Automatic', value: 'full_auto' }
     ];
 
+    // Workstation Assignments (Affectations tab) - Getters delegate to state service
+    /** Get all assignments from state service signal */
+    get workstationAssignments(): EmployeeWorkstationAssignment[] {
+        return this.assignmentState.assignments();
+    }
+
+    /** Get filtered assignments from computed signal */
+    get filteredAssignments(): EmployeeWorkstationAssignment[] {
+        return this.assignmentState.filteredAssignments();
+    }
+
+    /** Get loading state from signal */
+    get assignmentsLoading(): boolean {
+        return this.assignmentState.loading();
+    }
+
+    /** Search term getter/setter delegating to state service */
+    get assignmentSearchTerm(): string {
+        return this.assignmentState.searchTerm();
+    }
+    set assignmentSearchTerm(value: string) {
+        this.assignmentState.setSearchTerm(value);
+    }
+
+    showAssignmentDialog = false;
+    assignmentForm!: FormGroup;
+    isEditModeAssignment = false;
+    selectedAssignment: EmployeeWorkstationAssignment | null = null;
+    machines: Machine[] = [];
+    assignmentLoadingStates = {
+        list: false,
+        save: false,
+        delete: false
+    };
+
     constructor(
         private hrService: HRService,
+        private productionService: ProductionService,
         private fb: FormBuilder,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
@@ -429,6 +538,97 @@ export class HrComponent implements OnInit, OnDestroy {
         this.route.data.pipe(takeUntil(this.destroy$)).subscribe(data => {
             if (data['tab']) {
                 this.activeTab = this.tabMapping[data['tab']] || '0';
+                this.loadDataForActiveTab();
+            }
+        });
+    }
+
+    /**
+     * Load data required for the currently active tab.
+     * Lazy loading - only load what's needed for the current tab.
+     */
+    private loadDataForActiveTab(): void {
+        switch (this.activeTab) {
+            case '0': // Dashboard tab
+                if (!this.dashboardStats?.totalEmployees) {
+                    this.loadDashboardStats();
+                }
+                if (this.employees.length === 0) {
+                    this.loadEmployees();
+                }
+                break;
+            case '1': // Employees tab
+                if (this.employees.length === 0) {
+                    this.loadEmployees();
+                }
+                this.loadTrajetsIfNeeded();
+                break;
+            case '2': // Formations tab
+                if (this.employees.length === 0) {
+                    this.loadEmployees();
+                }
+                this.loadFormationsTabData();
+                break;
+            case '3': // Versatility tab
+                if (this.employees.length === 0) {
+                    this.loadEmployees();
+                }
+                this.loadVersatilityTabData();
+                break;
+            case '4': // Recyclage tab
+                if (this.employees.length === 0) {
+                    this.loadEmployees();
+                }
+                this.loadRecyclageTabData();
+                break;
+            case '5': // Teams tab
+                this.loadTeamsTabData();
+                break;
+            case '6': // Users tab
+                this.loadUsersTabData();
+                break;
+            case '7': // Licenses tab
+                this.loadLicensesTabData();
+                break;
+            case '8': // Workstations tab
+                this.loadWorkstationsTabData();
+                break;
+            case '9': // Affectations tab
+                this.loadWorkstationAssignmentsWithState();
+                this.loadWorkstationsTabData();
+                break;
+            case '10': // Qualifications list tab
+                if (this.qualificationsList.length === 0) {
+                    this.loadQualificationsList();
+                }
+                // Load reference data needed for edit form
+                if (this.employees.length === 0) {
+                    this.loadEmployees();
+                }
+                if (this.formations.length === 0 || this.formateurs.length === 0) {
+                    this.loadFormationsTabData();
+                }
+                break;
+        }
+    }
+
+    /**
+     * Load workstation assignments from API.
+     * The service automatically updates the signal-based state via tap(),
+     * so we just need to call getWorkstationAssignments().
+     */
+    loadWorkstationAssignmentsWithState(): void {
+        this.hrService.getWorkstationAssignments().subscribe({
+            next: () => {
+                // Signal-based state is automatically updated by the service
+            },
+            error: (error) => {
+                console.error('Error loading workstation assignments:', error);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: 'Impossible de charger les affectations'
+                });
             }
         });
     }
@@ -597,6 +797,14 @@ export class HrComponent implements OnInit, OnDestroy {
             planned_date: [new Date(), Validators.required],
             notes: ['']
         });
+
+        this.assignmentForm = this.fb.group({
+            employee: [null, Validators.required],
+            workstation: [null, Validators.required],
+            machine: [null],
+            is_primary: [false],
+            notes: ['']
+        });
     }
 
     private initChartOptions(): void {
@@ -685,9 +893,7 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     private loadInitialData(): void {
-        this.loading = true;
-        this.loadDashboardStats();
-        this.loadEmployees();
+        // Only load reference data (lightweight) - tab-specific data is loaded on demand
         this.loadReferenceData();
     }
 
@@ -780,6 +986,11 @@ export class HrComponent implements OnInit, OnDestroy {
         this.hrService.getEmployees().subscribe({
             next: (data) => {
                 this.employees = data;
+                // Filter only operators for qualification/recyclage forms
+                this.operatorEmployees = data.filter(e => {
+                    const category = (e.Categorie_Emp || '').toLowerCase();
+                    return category.includes('operator') || category.includes('opérateur');
+                });
                 this.loading = false;
                 this.loadEmployeePlaylist(); // Update playlist when employees are loaded
             },
@@ -791,71 +1002,113 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     loadReferenceData(): void {
-        this.hrService.getTeams().subscribe({
-            next: (data) => this.teams = data,
-            error: (err) => { console.error('Failed to load teams:', err); this.teams = []; }
-        });
+        // Only load essential reference data - other data loaded on demand per tab
         this.hrService.getDepartments().subscribe({
             next: (data) => this.departments = data,
-            error: (err) => { console.error('Failed to load departments:', err); this.departments = []; }
+            error: () => this.departments = []
         });
         this.hrService.getEmployeeCategories().subscribe({
             next: (data) => this.categories = data,
-            error: (err) => { console.error('Failed to load categories:', err); this.categories = []; }
+            error: () => this.categories = []
         });
         this.hrService.getEmployeeStatuses().subscribe({
             next: (data) => this.statuses = data,
-            error: (err) => { console.error('Failed to load statuses:', err); this.statuses = []; }
+            error: () => this.statuses = []
         });
-        this.hrService.getFormations().subscribe({
-            next: (data) => {
-                this.formations = data;
-                this.updateGroupedFormations();
-            },
-            error: (err) => {
-                console.error('Failed to load formations:', err);
-                this.formations = [];
-                this.updateGroupedFormations();
-            }
-        });
-        this.hrService.getFormateurs().subscribe({
-            next: (data) => this.formateurs = data,
-            error: (err) => { console.error('Failed to load formateurs:', err); this.formateurs = []; }
-        });
-        this.hrService.getProcesses().subscribe({
-            next: (data) => this.processes = data,
-            error: (err) => { console.error('Failed to load processes:', err); this.processes = []; }
-        });
-        this.hrService.getSpecializations().subscribe({
-            next: (data) => this.specializations = data,
-            error: (err) => { console.error('Failed to load specializations:', err); this.specializations = []; }
-        });
-        this.hrService.getWorkstations().subscribe({
-            next: (data) => this.workstations = data,
-            error: (err) => { console.error('Failed to load workstations:', err); this.workstations = []; }
-        });
-        this.hrService.getTrajets().subscribe({
-            next: (data) => this.trajets = data,
-            error: (err) => { console.error('Failed to load trajets:', err); this.trajets = []; }
-        });
+    }
 
-        // Load recyclage employees from API
+    /** Load data for Teams & Trainers tab */
+    private loadTeamsTabData(): void {
+        if (this.teams.length === 0) {
+            this.hrService.getTeams().subscribe({
+                next: (data) => this.teams = data,
+                error: () => this.teams = []
+            });
+        }
+        if (this.formateurs.length === 0) {
+            this.hrService.getFormateurs().subscribe({
+                next: (data) => this.formateurs = data,
+                error: () => this.formateurs = []
+            });
+        }
+        if (this.specializations.length === 0) {
+            this.hrService.getSpecializations().subscribe({
+                next: (data) => this.specializations = data,
+                error: () => this.specializations = []
+            });
+        }
+    }
+
+    /** Load data for Formations tab */
+    private loadFormationsTabData(): void {
+        if (this.formations.length === 0) {
+            this.hrService.getFormations().subscribe({
+                next: (data) => {
+                    this.formations = data;
+                    this.updateGroupedFormations();
+                },
+                error: () => {
+                    this.formations = [];
+                    this.updateGroupedFormations();
+                }
+            });
+        }
+        if (this.processes.length === 0) {
+            this.hrService.getProcesses().subscribe({
+                next: (data) => this.processes = data,
+                error: () => this.processes = []
+            });
+        }
+        if (this.formateurs.length === 0) {
+            this.hrService.getFormateurs().subscribe({
+                next: (data) => this.formateurs = data,
+                error: () => this.formateurs = []
+            });
+        }
+    }
+
+    /** Load data for Recyclage tab */
+    private loadRecyclageTabData(): void {
         this.loadRecyclageEmployees();
         this.loadPlannedRecyclages();
+    }
 
-        // Load versatility matrix from API
+    /** Load data for Versatility tab */
+    private loadVersatilityTabData(): void {
         this.loadVersatilityMatrix();
+    }
 
-        // Load users
+    /** Load data for Users tab */
+    private loadUsersTabData(): void {
         this.loadUsers();
-
-        // Load department entities
         this.loadDepartmentEntities();
+    }
 
-        // Load licenses data
+    /** Load data for Licenses tab */
+    private loadLicensesTabData(): void {
         this.loadLicenses();
         this.loadLicenseTypes();
         this.loadLicenseStats();
+    }
+
+    /** Load data for Workstations tab */
+    private loadWorkstationsTabData(): void {
+        if (this.workstations.length === 0) {
+            this.hrService.getWorkstations().subscribe({
+                next: (data) => this.workstations = data,
+                error: () => this.workstations = []
+            });
+        }
+    }
+
+    /** Load trajets for employee form */
+    private loadTrajetsIfNeeded(): void {
+        if (this.trajets.length === 0) {
+            this.hrService.getTrajets().subscribe({
+                next: (data) => this.trajets = data,
+                error: () => this.trajets = []
+            });
+        }
 
         // Load production lines for workstation form
         this.loadProductionLines();
@@ -907,8 +1160,14 @@ export class HrComponent implements OnInit, OnDestroy {
     loadRecyclageEmployees(): void {
         this.hrService.getEmployeesRequiringRecyclage().subscribe({
             next: (employees: any[]) => {
+                // Filter only "Operator" category employees - only they are concerned by recyclage requirements
+                const operatorEmployees = employees.filter(e => {
+                    const category = (e.category || '').toLowerCase();
+                    return category.includes('operator') || category.includes('opérateur');
+                });
+
                 // Map API response to RecyclageEmployee interface
-                this.recyclageEmployees = employees.map(e => ({
+                this.recyclageEmployees = operatorEmployees.map(e => ({
                     Id_Emp: e.id,
                     Employee: {
                         Id_Emp: e.id,
@@ -1184,7 +1443,7 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     getEmployeeQualificationCount(empId: number): number {
-        return this.qualifications.filter(q => q.Id_Emp === empId && q.test_result === 'passed').length;
+        return this.qualifications.filter(q => q.employee === empId && q.test_result === 'passed').length;
     }
 
     openBatchRecyclageDialog(): void {
@@ -2264,12 +2523,108 @@ export class HrComponent implements OnInit, OnDestroy {
 
     saveQualification(): void {
         if (this.qualificationForm.invalid) {
-            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields' });
+            this.qualificationForm.markAllAsTouched();
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Please fill all required fields'
+            });
             return;
         }
 
-        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Qualification created successfully' });
-        this.showQualificationDialog = false;
+        this.qualificationSaving = true;
+        const formValue = this.qualificationForm.value;
+
+        // Format date to YYYY-MM-DD string
+        const formatDateForApi = (date: Date | string | null): string | null => {
+            if (!date) return null;
+            const d = date instanceof Date ? date : new Date(date);
+            return d.toISOString().split('T')[0];
+        };
+
+        // Map form fields to backend API format
+        const qualificationData = {
+            employee: formValue.Id_Emp,
+            formation: formValue.id_formation,
+            trainer: formValue.Trainer || null,
+            start_date: formatDateForApi(formValue.start_qualif),
+            end_date: formatDateForApi(formValue.end_qualif),
+            test_result: formValue.test_result || 'pending',
+            score: formValue.score || null,
+            notes: formValue.comment_qualif || ''
+        };
+
+        console.log('Qualification data being sent:', qualificationData);
+
+        // Check if in edit mode
+        const qualificationId = (this.qualificationForm as any)._qualificationId;
+
+        if (this.isEditMode && qualificationId) {
+            // UPDATE MODE - Signal automatically updates UI via tap() in service
+            this.hrService.updateQualification(qualificationId, qualificationData).subscribe({
+                next: () => {
+                    // Signal-based state is already updated in the service
+                    // UI will refresh automatically - no need for manual array updates
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Succès',
+                        detail: 'Qualification mise à jour'
+                    });
+                    this.showQualificationDialog = false;
+                    this.qualificationSaving = false;
+                    this.isEditMode = false;
+                },
+                error: (error) => {
+                    console.error('Error updating qualification:', error);
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Erreur',
+                        detail: error.error?.detail || 'Échec de la mise à jour'
+                    });
+                    this.qualificationSaving = false;
+                }
+            });
+        } else {
+            // CREATE MODE - Signal automatically updates UI via tap() in service
+            this.hrService.createQualification(qualificationData).subscribe({
+                next: () => {
+                    // Signal-based state is already updated in the service
+                    // UI will refresh automatically - no need for manual array updates
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Succès',
+                        detail: 'Qualification créée avec succès'
+                    });
+                    this.showQualificationDialog = false;
+                    this.qualificationSaving = false;
+                },
+                error: (error) => {
+                    console.error('Error creating qualification:', error);
+                    console.error('Error response body:', error.error);
+                    let errorMessage = 'Échec de la création';
+                    if (error.error) {
+                        // Build detailed error message from API response
+                        const errors = [];
+                        for (const [field, messages] of Object.entries(error.error)) {
+                            if (Array.isArray(messages)) {
+                                errors.push(`${field}: ${messages.join(', ')}`);
+                            } else if (typeof messages === 'string') {
+                                errors.push(messages);
+                            }
+                        }
+                        if (errors.length > 0) {
+                            errorMessage = errors.join('; ');
+                        }
+                    }
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Erreur',
+                        detail: errorMessage
+                    });
+                    this.qualificationSaving = false;
+                }
+            });
+        }
     }
 
     // ==================== TEAM CRUD ====================
@@ -2946,15 +3301,17 @@ export class HrComponent implements OnInit, OnDestroy {
         return fieldMappings[field] || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
-    onTabChange(event: any): void {
-        this.activeTab = event.index?.toString() || '0';
+    onTabChange(newValue: string | number | undefined): void {
+        const tabValue = newValue?.toString() || '0';
+
+        // Update activeTab explicitly for loadDataForActiveTab
+        this.activeTab = tabValue;
 
         // Force chart recreation when returning to dashboard tab
-        if (this.activeTab === '0') {
+        if (tabValue === '0') {
             this.showCharts = false;
             this.cdr.detectChanges();
 
-            // Reinitialize chart options and recreate charts
             setTimeout(() => {
                 this.initChartOptions();
                 this.updateCharts();
@@ -2962,6 +3319,9 @@ export class HrComponent implements OnInit, OnDestroy {
                 this.cdr.detectChanges();
             }, 50);
         }
+
+        // Load data for the active tab (lazy loading)
+        this.loadDataForActiveTab();
     }
 
     // ==================== COUNT HELPERS ====================
@@ -3489,5 +3849,517 @@ export class HrComponent implements OnInit, OnDestroy {
     get ongoingSessions(): number {
         // Return count of ongoing formation sessions (placeholder)
         return this.formationStats?.plannedFormations || 0;
+    }
+
+    // ==================== WORKSTATION ASSIGNMENTS (AFFECTATIONS) ====================
+
+    /**
+     * @deprecated Use loadWorkstationAssignmentsWithState() instead.
+     * Kept for backward compatibility.
+     */
+    loadWorkstationAssignments(): void {
+        this.loadWorkstationAssignmentsWithState();
+    }
+
+    /**
+     * Update filters in the state service.
+     * The filtered list is a computed signal that automatically updates.
+     */
+    filterAssignments(): void {
+        // Search term is already synced via getter/setter
+        // Filtered list is a computed signal - automatically updated
+        // This method is kept for backward compatibility with template bindings
+    }
+
+    openNewAssignmentDialog(): void {
+        this.isEditModeAssignment = false;
+        this.selectedAssignment = null;
+        this.assignmentForm.reset({ is_primary: false });
+        this.loadMachines();
+        this.showAssignmentDialog = true;
+    }
+
+    editAssignment(assignment: EmployeeWorkstationAssignment): void {
+        this.isEditModeAssignment = true;
+        this.selectedAssignment = assignment;
+        this.assignmentForm.patchValue({
+            employee: assignment.employee,
+            workstation: assignment.workstation,
+            machine: assignment.machine,
+            is_primary: assignment.is_primary,
+            notes: assignment.notes || ''
+        });
+        this.loadMachines(assignment.workstation);
+        this.showAssignmentDialog = true;
+    }
+
+    loadMachines(workstationId?: number): void {
+        this.productionService.getMachines(workstationId).subscribe({
+            next: (machines) => {
+                this.machines = machines;
+            },
+            error: (error) => {
+                console.error('Error loading machines:', error);
+            }
+        });
+    }
+
+    onWorkstationChangeInAssignment(event: any): void {
+        const workstationId = event?.value;
+        this.assignmentForm.patchValue({ machine: null });
+        if (workstationId) {
+            this.loadMachines(workstationId);
+        } else {
+            this.machines = [];
+        }
+    }
+
+    saveAssignment(): void {
+        if (this.assignmentForm.invalid) {
+            this.assignmentForm.markAllAsTouched();
+            return;
+        }
+
+        const formValue = this.assignmentForm.value;
+
+        const request: AssignmentCreateRequest = {
+            employee: formValue.employee,
+            workstation: formValue.workstation,
+            machine: formValue.machine || null,
+            is_primary: formValue.is_primary || false,
+            notes: formValue.notes || ''
+        };
+
+        // Check for existing assignment before creating
+        if (!this.isEditModeAssignment) {
+            const existingAssignment = this.workstationAssignments.find(a =>
+                a.employee === request.employee &&
+                a.workstation === request.workstation &&
+                (a.machine === request.machine || (!a.machine && !request.machine))
+            );
+
+            if (existingAssignment) {
+                this.confirmationService.confirm({
+                    message: 'Une affectation existe déjà pour cet employé sur ce poste de travail. Voulez-vous la mettre à jour?',
+                    header: 'Affectation existante',
+                    icon: 'pi pi-exclamation-triangle',
+                    acceptLabel: 'Oui, mettre à jour',
+                    rejectLabel: 'Non',
+                    accept: () => {
+                        this.assignmentLoadingStates.save = true;
+                        this.hrService.updateWorkstationAssignment(existingAssignment.id, request).subscribe({
+                            next: () => {
+                                this.loadWorkstationAssignmentsWithState();
+                                this.messageService.add({
+                                    severity: 'success',
+                                    summary: 'Succès',
+                                    detail: 'Affectation mise à jour'
+                                });
+                                this.showAssignmentDialog = false;
+                                this.assignmentLoadingStates.save = false;
+                            },
+                            error: () => {
+                                this.messageService.add({
+                                    severity: 'error',
+                                    summary: 'Erreur',
+                                    detail: 'Échec de la mise à jour'
+                                });
+                                this.assignmentLoadingStates.save = false;
+                            }
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        this.assignmentLoadingStates.save = true;
+
+        if (this.isEditModeAssignment && this.selectedAssignment) {
+            // UPDATE MODE
+            this.hrService.updateWorkstationAssignment(this.selectedAssignment.id, request).subscribe({
+                next: () => {
+                    this.loadWorkstationAssignmentsWithState();
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Succès',
+                        detail: 'Assignation mise à jour avec succès'
+                    });
+                    this.showAssignmentDialog = false;
+                    this.assignmentLoadingStates.save = false;
+                },
+                error: (error) => {
+                    console.error('Error updating assignment:', error);
+                    let errorMessage = 'Échec de la mise à jour';
+                    if (error.error?.employee || error.error?.workstation || error.error?.machine || error.error?.non_field_errors) {
+                        errorMessage = 'Cet employé est déjà assigné à ce poste de travail';
+                    } else if (error.error?.detail) {
+                        errorMessage = error.error.detail;
+                    }
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Erreur',
+                        detail: errorMessage
+                    });
+                    this.assignmentLoadingStates.save = false;
+                }
+            });
+        } else {
+            // CREATE MODE
+            this.hrService.createWorkstationAssignment(request).subscribe({
+                next: () => {
+                    this.loadWorkstationAssignmentsWithState();
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Succès',
+                        detail: 'Assignation créée avec succès'
+                    });
+                    this.showAssignmentDialog = false;
+                    this.assignmentLoadingStates.save = false;
+                },
+                error: (error) => {
+                    console.error('Error creating assignment:', error);
+                    this.assignmentLoadingStates.save = false;
+
+                    // Check for unique constraint violation (duplicate assignment)
+                    const isUniqueError = error.error?.non_field_errors?.some((e: string) =>
+                        e.toLowerCase().includes('unique') || e.toLowerCase().includes('already exists')
+                    );
+
+                    if (isUniqueError) {
+                        // Ask user if they want to update the existing assignment
+                        this.confirmationService.confirm({
+                            message: 'Une affectation existe déjà pour cet employé sur ce poste de travail. Voulez-vous la mettre à jour?',
+                            header: 'Affectation existante',
+                            icon: 'pi pi-exclamation-triangle',
+                            acceptLabel: 'Oui, mettre à jour',
+                            rejectLabel: 'Non',
+                            accept: () => {
+                                // Find existing assignment and update it
+                                const existingAssignment = this.workstationAssignments.find(a =>
+                                    a.employee === request.employee &&
+                                    a.workstation === request.workstation
+                                );
+                                if (existingAssignment) {
+                                    this.assignmentLoadingStates.save = true;
+                                    this.hrService.updateWorkstationAssignment(existingAssignment.id, request).subscribe({
+                                        next: () => {
+                                            this.loadWorkstationAssignmentsWithState();
+                                            this.messageService.add({
+                                                severity: 'success',
+                                                summary: 'Succès',
+                                                detail: 'Affectation mise à jour'
+                                            });
+                                            this.showAssignmentDialog = false;
+                                            this.assignmentLoadingStates.save = false;
+                                        },
+                                        error: () => {
+                                            this.messageService.add({
+                                                severity: 'error',
+                                                summary: 'Erreur',
+                                                detail: 'Échec de la mise à jour'
+                                            });
+                                            this.assignmentLoadingStates.save = false;
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    } else {
+                        let errorMessage = 'Échec de la création';
+                        if (error.error?.non_field_errors) {
+                            errorMessage = error.error.non_field_errors.join(', ');
+                        } else if (error.error?.employee) {
+                            errorMessage = 'Employé invalide';
+                        } else if (error.error?.workstation) {
+                            errorMessage = 'Poste de travail invalide';
+                        } else if (error.error?.detail) {
+                            errorMessage = error.error.detail;
+                        }
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Erreur',
+                            detail: errorMessage
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    deleteAssignment(assignment: EmployeeWorkstationAssignment): void {
+        this.confirmationService.confirm({
+            message: `Are you sure you want to delete the assignment of ${assignment.employee_name} to ${assignment.workstation_name}?`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () => {
+                this.assignmentLoadingStates.delete = true;
+                this.hrService.deleteWorkstationAssignment(assignment.id).subscribe({
+                    next: () => {
+                        // Signal-based state is automatically updated by the service
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Success',
+                            detail: 'Assignment deleted successfully'
+                        });
+                        this.assignmentLoadingStates.delete = false;
+                    },
+                    error: (error) => {
+                        console.error('Error deleting assignment:', error);
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Error',
+                            detail: 'Failed to delete assignment'
+                        });
+                        this.assignmentLoadingStates.delete = false;
+                    }
+                });
+            }
+        });
+    }
+
+    setAsPrimary(assignment: EmployeeWorkstationAssignment): void {
+        if (assignment.is_primary) {
+            return; // Already primary
+        }
+
+        this.hrService.setPrimaryAssignment(assignment.id).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: `${assignment.employee_name} primary assignment set to ${assignment.workstation_name}`
+                });
+                // Invalidate and reload to get updated is_primary flags
+                this.assignmentState.invalidate();
+                this.loadWorkstationAssignmentsWithState();
+            },
+            error: (error) => {
+                console.error('Error setting primary assignment:', error);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to set primary assignment'
+                });
+            }
+        });
+    }
+
+    // ==================== QUALIFICATIONS LIST TAB (TAB 10) ====================
+
+    /**
+     * Load qualifications from API.
+     * The service automatically updates the signal-based state,
+     * so we just need to call getQualifications().
+     */
+    loadQualificationsList(): void {
+        // The service handles loading state and signal updates via tap()
+        this.hrService.getQualifications().subscribe({
+            next: () => {
+                // Signal-based state is automatically updated by the service
+                // Stats and filtered list are computed signals - no manual update needed
+            },
+            error: (err) => {
+                console.error('Error loading qualifications:', err);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: 'Échec du chargement des qualifications'
+                });
+            }
+        });
+    }
+
+    /**
+     * @deprecated Stats are now computed automatically via QualificationStateService.stats()
+     * Kept for backward compatibility with any code that might call it directly
+     */
+    updateQualificationStats(): void {
+        // No-op: Stats are now a computed signal in QualificationStateService
+        // This method is kept for backward compatibility
+    }
+
+    /**
+     * Update filters in the state service.
+     * The filtered list is a computed signal that automatically updates.
+     */
+    filterQualificationsList(): void {
+        // Update filters in the state service
+        this.qualificationState.setSearchTerm(this.qualificationSearchTerm || '');
+        this.qualificationState.setStatusFilter(this.qualificationStatusFilter);
+        this.qualificationState.setEmployeeFilter(this.qualificationEmployeeFilter);
+        this.qualificationState.setFormationFilter(this.qualificationFormationFilter);
+        // Filtered list is a computed signal - automatically updated
+    }
+
+    openNewQualificationFromList(): void {
+        this.isEditMode = false;
+        this.qualificationForm.reset({
+            start_qualif: new Date()
+        });
+        this.showQualificationDialog = true;
+    }
+
+    editQualificationFromList(qual: any): void {
+        this.isEditMode = true;
+        this.qualificationForm.patchValue({
+            Id_Emp: qual.employee,
+            id_formation: qual.formation,
+            Trainer: qual.trainer,
+            start_qualif: qual.start_date ? new Date(qual.start_date) : null,
+            end_qualif: qual.end_date ? new Date(qual.end_date) : null,
+            test_result: qual.test_result,
+            score: qual.score,
+            comment_qualif: qual.comment || qual.notes
+        });
+        // Store the qualification ID for update
+        (this.qualificationForm as any)._qualificationId = qual.id;
+        this.showQualificationDialog = true;
+    }
+
+    deleteQualificationFromList(qual: any): void {
+        this.confirmationService.confirm({
+            message: `Êtes-vous sûr de vouloir supprimer la qualification de ${qual.employee_name} pour ${qual.formation_name}?`,
+            header: 'Confirmer la suppression',
+            icon: 'pi pi-exclamation-triangle',
+            acceptLabel: 'Oui',
+            rejectLabel: 'Non',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () => {
+                this.hrService.deleteQualification(qual.id).subscribe({
+                    next: () => {
+                        // Signal-based state is automatically updated by the service
+                        // UI will refresh automatically - no need to call loadQualificationsList()
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Succès',
+                            detail: 'Qualification supprimée'
+                        });
+                    },
+                    error: (err) => {
+                        console.error('Error deleting qualification:', err);
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Erreur',
+                            detail: 'Échec de la suppression'
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    openEmployeeTimeline(qual: any): void {
+        this.selectedEmployeeForTimeline = {
+            Id_Emp: qual.employee,
+            Prenom_Emp: qual.employee_name?.split(' ')[0] || '',
+            Nom_Emp: qual.employee_name?.split(' ').slice(1).join(' ') || ''
+        };
+        this.loadEmployeeQualificationHistory(qual.employee);
+        this.showEmployeeTimelineDialog = true;
+    }
+
+    loadEmployeeQualificationHistory(employeeId: number): void {
+        this.employeeQualificationHistory = this.qualificationsList
+            .filter(q => q.employee === employeeId)
+            .sort((a, b) => {
+                const dateA = a.end_date ? new Date(a.end_date).getTime() : 0;
+                const dateB = b.end_date ? new Date(b.end_date).getTime() : 0;
+                return dateB - dateA; // Sort by end_date descending
+            });
+    }
+
+    // Get timeline stats for selected employee
+    getTimelineStats(): { passed: number; failed: number; pending: number; inProgress: number; total: number; avgScore: number } {
+        const history = this.employeeQualificationHistory;
+        const passed = history.filter(q => q.test_result === 'passed').length;
+        const failed = history.filter(q => q.test_result === 'failed').length;
+        const pending = history.filter(q => q.test_result === 'pending').length;
+        const inProgress = history.filter(q => q.test_result === 'in_progress').length;
+        const scores = history.filter(q => q.score !== null && q.score !== undefined).map(q => q.score);
+        const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+        return { passed, failed, pending, inProgress, total: history.length, avgScore };
+    }
+
+    // Get color for timeline marker based on status
+    getTimelineMarkerColor(status: string): string {
+        switch (status) {
+            case 'passed': return 'var(--green-500)';
+            case 'failed': return 'var(--red-500)';
+            case 'pending': return 'var(--orange-500)';
+            case 'in_progress': return 'var(--cyan-500)';
+            default: return 'var(--gray-500)';
+        }
+    }
+
+    // Get icon for timeline marker
+    getTimelineMarkerIcon(status: string): string {
+        switch (status) {
+            case 'passed': return 'pi pi-check';
+            case 'failed': return 'pi pi-times';
+            case 'pending': return 'pi pi-clock';
+            case 'in_progress': return 'pi pi-spin pi-spinner';
+            default: return 'pi pi-circle';
+        }
+    }
+
+    // Get knob color based on score
+    getScoreKnobColor(score: number): string {
+        if (score >= 80) return 'var(--green-500)';
+        if (score >= 60) return 'var(--cyan-500)';
+        if (score >= 40) return 'var(--orange-500)';
+        return 'var(--red-500)';
+    }
+
+    exportQualificationsCsv(): void {
+        const data = this.filteredQualifications.map(q => ({
+            'Employé': q.employee_name || '',
+            'Formation': q.formation_name || '',
+            'Formateur': q.trainer_name || '',
+            'Date Début': q.start_date ? new Date(q.start_date).toLocaleDateString('fr-FR') : '',
+            'Date Fin': q.end_date ? new Date(q.end_date).toLocaleDateString('fr-FR') : '',
+            'Score': q.score !== null ? q.score + '%' : '-',
+            'Statut': q.test_result || ''
+        }));
+
+        if (data.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Attention',
+                detail: 'Aucune donnée à exporter'
+            });
+            return;
+        }
+
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(h => `"${(row as any)[h]}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `qualifications_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export réussi',
+            detail: `${data.length} qualifications exportées`
+        });
+    }
+
+    resetQualificationFilters(): void {
+        this.qualificationSearchTerm = '';
+        this.qualificationStatusFilter = null;
+        this.qualificationEmployeeFilter = null;
+        this.qualificationFormationFilter = null;
+        // State service computed signal automatically recalculates filtered list
+        this.qualificationState.setSearchTerm('');
+        this.qualificationState.setStatusFilter(null);
+        this.qualificationState.setEmployeeFilter(null);
+        this.qualificationState.setFormationFilter(null);
     }
 }

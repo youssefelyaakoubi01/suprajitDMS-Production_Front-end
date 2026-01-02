@@ -231,7 +231,7 @@
                 <div class="header-left">
                     <i class="pi pi-users header-icon"></i>
                     <h2 class="card-title">Team Assignment</h2>
-                    <p-tag *ngIf="session.isTeamComplete" [value]="session.team.length + ' Assigned'" severity="success"></p-tag>
+                    <p-tag *ngIf="session.isTeamComplete" [value]="team.length + ' Assigned'" severity="success"></p-tag>
                     <p-tag *ngIf="!session.isTeamComplete" value="Assign Team" severity="warn"></p-tag>
                 </div>
                 <div class="header-actions">
@@ -247,21 +247,45 @@
         </ng-template>
 
         <div *ngIf="!session.isTeamComplete">
+            <!-- Simplified Team Assignment Form - Just scan badge -->
             <div class="team-assignment-form">
                 <div class="form-row">
                     <div class="form-field flex-grow">
                         <label for="employeeScan"><i class="pi pi-id-card"></i> Scan Employee Badge</label>
-                        <input
-                            id="employeeScan"
-                            type="text"
-                            pInputText
-                            [(ngModel)]="employeeIdScan"
-                            placeholder="Scan employee badge"
-                            class="w-full">
+                        <div class="p-inputgroup">
+                            <input
+                                id="employeeScan"
+                                type="text"
+                                pInputText
+                                [(ngModel)]="employeeIdScan"
+                                placeholder="Scan employee badge"
+                                (keyup.enter)="addEmployee()"
+                                class="w-full">
+                            <p-button
+                                icon="pi pi-plus"
+                                label="Add Employee"
+                                (click)="addEmployee()">
+                            </p-button>
+                        </div>
+                        <small class="text-color-secondary mt-1 block">
+                            <i class="pi pi-info-circle"></i> Workstation and machine will be auto-filled from employee's default assignment
+                        </small>
                     </div>
+                </div>
+            </div>
 
+            <!-- Manual Workstation Selection (shown when no default assignment exists) -->
+            <div *ngIf="showManualWorkstationSelection" class="manual-selection-form surface-ground p-3 border-round mt-3">
+                <div class="flex align-items-center gap-2 mb-3">
+                    <i class="pi pi-exclamation-circle text-orange-500 text-xl"></i>
+                    <span class="font-semibold">Manual Selection Required</span>
+                    <span class="text-color-secondary ml-2" *ngIf="pendingEmployeeData">
+                        for {{ pendingEmployeeData.first_name }} {{ pendingEmployeeData.last_name }}
+                    </span>
+                </div>
+                <div class="form-row">
                     <div class="form-field">
-                        <label for="workstation"><i class="pi pi-desktop"></i> Workstation</label>
+                        <label for="workstation"><i class="pi pi-desktop"></i> Workstation *</label>
                         <p-select
                             id="workstation"
                             [(ngModel)]="selectedWorkstation"
@@ -269,7 +293,7 @@
                             optionLabel="Name_Workstation"
                             placeholder="Select Workstation"
                             (onChange)="onWorkstationChange()"
-                            [style]="{ width: '200px' }">
+                            [style]="{ width: '250px' }">
                         </p-select>
                     </div>
 
@@ -283,40 +307,22 @@
                             placeholder="Select Machine (Optional)"
                             [showClear]="true"
                             [disabled]="!selectedWorkstation"
-                            [style]="{ width: '200px' }">
+                            [style]="{ width: '250px' }">
                         </p-select>
                     </div>
 
-                    <div class="form-field">
-                        <label for="roleAssignment"><i class="pi pi-id-card"></i> Role</label>
-                        <p-select
-                            id="roleAssignment"
-                            [(ngModel)]="selectedRole"
-                            [options]="roleOptions"
-                            optionLabel="label"
-                            optionValue="value"
-                            [style]="{ width: '180px' }">
-                            <ng-template pTemplate="selectedItem" let-selected>
-                                <div class="role-option" *ngIf="selected">
-                                    <i [class]="selected.icon"></i>
-                                    <span>{{ selected.label }}</span>
-                                </div>
-                            </ng-template>
-                            <ng-template pTemplate="item" let-option>
-                                <div class="role-option">
-                                    <i [class]="option.icon"></i>
-                                    <span>{{ option.label }}</span>
-                                </div>
-                            </ng-template>
-                        </p-select>
-                    </div>
-
-                    <div class="form-field button-field">
-                        <label>&nbsp;</label>
+                    <div class="form-field button-field flex gap-2">
                         <p-button
-                            icon="pi pi-plus"
-                            label="Add Employee"
-                            (click)="addEmployee()">
+                            icon="pi pi-check"
+                            label="Confirm"
+                            (click)="addEmployeeManual()"
+                            [disabled]="!selectedWorkstation">
+                        </p-button>
+                        <p-button
+                            icon="pi pi-times"
+                            label="Cancel"
+                            severity="secondary"
+                            (click)="cancelManualSelection()">
                         </p-button>
                     </div>
                 </div>
@@ -324,13 +330,12 @@
 
             <p-divider></p-divider>
 
-            <p-table [value]="session.team" [tableStyle]="{ 'min-width': '70rem' }">
+            <p-table [value]="team" [tableStyle]="{ 'min-width': '60rem' }">
                 <ng-template pTemplate="header">
                     <tr>
                         <th>Photo</th>
                         <th>Name</th>
                         <th>Employee ID</th>
-                        <th>Role</th>
                         <th>Workstation</th>
                         <th>Machine</th>
                         <th>Qualification</th>
@@ -344,9 +349,6 @@
                         </td>
                         <td><span class="employee-name">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span></td>
                         <td><span class="employee-id">{{ emp.Id_Emp }}</span></td>
-                        <td>
-                            <p-tag [value]="getRoleLabel(emp.role)" [severity]="getRoleSeverity(emp.role)"></p-tag>
-                        </td>
                         <td>{{ emp.workstation }}</td>
                         <td>
                             <span *ngIf="emp.machine">{{ emp.machine }}</span>
@@ -362,11 +364,11 @@
                 </ng-template>
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="8" class="text-center">
+                        <td colspan="7" class="text-center">
                             <div class="empty-state">
                                 <i class="pi pi-users empty-icon"></i>
                                 <p class="empty-title">No employees assigned yet</p>
-                                <p class="empty-subtitle">Scan employee badges to assign them to workstations and machines</p>
+                                <p class="empty-subtitle">Scan employee badges to auto-assign them to their default workstations</p>
                             </div>
                         </td>
                     </tr>
@@ -377,7 +379,7 @@
                 <p-button
                     label="Complete Team Assignment"
                     icon="pi pi-check"
-                    [disabled]="session.team.length === 0"
+                    [disabled]="team.length === 0"
                     (click)="completeTeamAssignment()">
                 </p-button>
             </div>
@@ -388,7 +390,7 @@
                 <div class="summary-item">
                     <i class="pi pi-users summary-icon"></i>
                     <span class="summary-label">Team Members:</span>
-                    <span class="summary-value">{{ session.team.length }}</span>
+                    <span class="summary-value">{{ team.length }}</span>
                 </div>
                 <div class="summary-item" *ngIf="session.actors.lineLeader.name">
                     <i class="pi pi-user summary-icon"></i>
@@ -624,6 +626,7 @@
                             {{ dt.duration }} min
                         </span>
                         <p-tag [value]="getDowntimeProblemName(dt.problemId)" severity="warn"></p-tag>
+                        <p-tag *ngIf="dt.machineId" [value]="getMachineName(dt.machineId)" severity="info" icon="pi pi-cog"></p-tag>
                     </div>
                     <div class="downtime-item-comment" *ngIf="dt.comment">
                         {{ dt.comment }}
@@ -690,6 +693,21 @@
                             optionLabel="Name_DowntimeProblems"
                             optionValue="Id_DowntimeProblems"
                             placeholder="Select Problem"
+                            appendTo="body"
+                            [style]="{ width: '100%' }">
+                        </p-select>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="newDowntimeMachine"><i class="pi pi-cog"></i> Machine</label>
+                        <p-select
+                            id="newDowntimeMachine"
+                            [(ngModel)]="newDowntimeInput.machineId"
+                            [options]="machines"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Select Machine (Optional)"
+                            [showClear]="true"
                             appendTo="body"
                             [style]="{ width: '100%' }">
                         </p-select>
@@ -812,6 +830,39 @@
             icon="pi pi-check"
             (click)="saveAdditionalDowntime()">
         </p-button>
+    </ng-template>
+</p-dialog>
+
+<!-- Qualification Warning Dialog -->
+<p-dialog
+    [(visible)]="showQualificationWarningDialog"
+    header="Avertissement Qualification"
+    [modal]="true"
+    [style]="{width: '450px'}"
+    [closable]="true"
+    (onHide)="cancelQualificationWarning()">
+    <div class="flex align-items-start gap-3 p-2">
+        <i class="pi pi-exclamation-triangle text-4xl text-orange-500"></i>
+        <div>
+            <p class="m-0 line-height-3">{{ qualificationWarningMessage }}</p>
+        </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <div class="flex justify-content-end gap-2">
+            <p-button
+                label="Non"
+                icon="pi pi-times"
+                severity="secondary"
+                (click)="cancelQualificationWarning()">
+            </p-button>
+            <p-button
+                label="Oui"
+                icon="pi pi-check"
+                severity="warn"
+                (click)="confirmQualificationWarning()">
+            </p-button>
+        </div>
     </ng-template>
 </p-dialog>
 

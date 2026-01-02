@@ -21,6 +21,10 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { ChartModule } from 'primeng/chart';
 import { DialogModule } from 'primeng/dialog';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { TextareaModule } from 'primeng/textarea';
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
 
 // Domain imports
 import { DmsProductionService, Downtime, DowntimeProblem } from '@domains/dms-production';
@@ -47,8 +51,12 @@ interface DowntimeWithDetails extends Downtime {
         SelectModule,
         DatePickerModule,
         ChartModule,
-        DialogModule
+        DialogModule,
+        InputNumberModule,
+        TextareaModule,
+        ToastModule
     ],
+    providers: [MessageService],
     template: `
         <div class="downtime-list">
             <!-- Summary Cards -->
@@ -279,6 +287,95 @@ interface DowntimeWithDetails extends Downtime {
                     </div>
                 </div>
             </p-dialog>
+
+            <!-- Edit Dialog -->
+            <p-dialog [(visible)]="editDialogVisible" [modal]="true"
+                      header="Edit Downtime" [style]="{ width: '600px' }">
+                <div class="edit-form" *ngIf="editingDowntime">
+                    <div class="grid">
+                        <!-- Info display (read-only) -->
+                        <div class="col-12 mb-3">
+                            <div class="info-banner">
+                                <i class="pi pi-info-circle mr-2"></i>
+                                <span>{{ editingDowntime.date | date:'dd/MM/yyyy' }} - {{ editingDowntime.production_line_name }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Problem Type -->
+                        <div class="col-12 mb-3">
+                            <label class="block mb-2 font-medium">Problem Type</label>
+                            <p-select [options]="problems"
+                                      [(ngModel)]="editingDowntime.problem"
+                                      optionLabel="name"
+                                      optionValue="id"
+                                      placeholder="Select Problem"
+                                      styleClass="w-full">
+                            </p-select>
+                        </div>
+
+                        <!-- Duration -->
+                        <div class="col-12 md:col-6 mb-3">
+                            <label class="block mb-2 font-medium">Duration (minutes)</label>
+                            <p-inputNumber [(ngModel)]="editingDowntime.Total_Downtime"
+                                           [min]="1"
+                                           [max]="480"
+                                           [showButtons]="true"
+                                           buttonLayout="horizontal"
+                                           spinnerMode="horizontal"
+                                           decrementButtonClass="p-button-secondary"
+                                           incrementButtonClass="p-button-secondary"
+                                           incrementButtonIcon="pi pi-plus"
+                                           decrementButtonIcon="pi pi-minus"
+                                           styleClass="w-full">
+                            </p-inputNumber>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="col-12 md:col-6 mb-3">
+                            <label class="block mb-2 font-medium">Status</label>
+                            <p-select [options]="statusOptions"
+                                      [(ngModel)]="editingDowntime.status"
+                                      optionLabel="label"
+                                      optionValue="value"
+                                      styleClass="w-full">
+                            </p-select>
+                        </div>
+
+                        <!-- Comment -->
+                        <div class="col-12 mb-3">
+                            <label class="block mb-2 font-medium">Comment</label>
+                            <textarea pTextarea [(ngModel)]="editingDowntime.Comment_Downtime"
+                                      rows="3"
+                                      placeholder="Add a comment..."
+                                      class="w-full">
+                            </textarea>
+                        </div>
+
+                        <!-- Resolution (if closed) -->
+                        <div class="col-12 mb-3" *ngIf="editingDowntime.status === 'closed'">
+                            <label class="block mb-2 font-medium">Resolution</label>
+                            <textarea pTextarea [(ngModel)]="editingDowntime.resolution"
+                                      rows="2"
+                                      placeholder="Describe the resolution..."
+                                      class="w-full">
+                            </textarea>
+                        </div>
+                    </div>
+                </div>
+                <ng-template pTemplate="footer">
+                    <button pButton label="Cancel" icon="pi pi-times"
+                            class="p-button-text"
+                            (click)="cancelEdit()">
+                    </button>
+                    <button pButton label="Save" icon="pi pi-check"
+                            class="p-button-success"
+                            [loading]="saving"
+                            (click)="saveDowntime()">
+                    </button>
+                </ng-template>
+            </p-dialog>
+
+            <p-toast position="top-right"></p-toast>
         </div>
     `,
     styles: [`
@@ -435,6 +532,20 @@ interface DowntimeWithDetails extends Downtime {
                 white-space: pre-wrap;
             }
         }
+
+        .edit-form {
+            padding: 0.5rem;
+        }
+
+        .info-banner {
+            background: var(--surface-100);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+            display: flex;
+            align-items: center;
+            color: var(--text-color-secondary);
+        }
     `]
 })
 export class DowntimeListComponent implements OnInit, OnDestroy {
@@ -469,9 +580,20 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     detailsDialogVisible = false;
     selectedDowntime: DowntimeWithDetails | null = null;
 
+    // Edit dialog
+    editDialogVisible = false;
+    editingDowntime: DowntimeWithDetails | null = null;
+    saving = false;
+    statusOptions = [
+        { label: 'Open', value: 'open' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Closed', value: 'closed' }
+    ];
+
     constructor(
         private productionService: DmsProductionService,
-        private exportService: ExportService
+        private exportService: ExportService,
+        private messageService: MessageService
     ) {}
 
     ngOnInit(): void {
@@ -739,8 +861,72 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
         this.detailsDialogVisible = true;
     }
 
-    editDowntime(dt: Downtime): void {
-        this.edit.emit(dt);
+    editDowntime(dt: DowntimeWithDetails): void {
+        // Create a copy to edit
+        this.editingDowntime = { ...dt };
+        this.editDialogVisible = true;
+    }
+
+    cancelEdit(): void {
+        this.editDialogVisible = false;
+        this.editingDowntime = null;
+    }
+
+    saveDowntime(): void {
+        if (!this.editingDowntime) return;
+
+        this.saving = true;
+        const id = this.editingDowntime.id || this.editingDowntime.Id_Downtime;
+
+        const updatePayload = {
+            duration: this.editingDowntime.Total_Downtime,
+            comment: this.editingDowntime.Comment_Downtime,
+            status: this.editingDowntime.status,
+            resolution: this.editingDowntime.resolution || '',
+            problem: this.editingDowntime.problem
+        };
+
+        this.productionService.updateDowntime(id, updatePayload)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+                next: (updated) => {
+                    // Update the item in the list
+                    const index = this.downtimes.findIndex(d =>
+                        (d.id || d.Id_Downtime) === id
+                    );
+                    if (index !== -1) {
+                        this.downtimes[index] = {
+                            ...this.downtimes[index],
+                            ...updated,
+                            Total_Downtime: updated.duration ?? this.editingDowntime!.Total_Downtime,
+                            Comment_Downtime: updated.comment ?? this.editingDowntime!.Comment_Downtime
+                        };
+                        this.filteredDowntimes = [...this.downtimes];
+                    }
+
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Success',
+                        detail: 'Downtime updated successfully'
+                    });
+
+                    this.saving = false;
+                    this.editDialogVisible = false;
+                    this.editingDowntime = null;
+
+                    // Rebuild charts with updated data
+                    this.buildCharts();
+                },
+                error: (err) => {
+                    console.error('Error updating downtime:', err);
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Error',
+                        detail: 'Failed to update downtime'
+                    });
+                    this.saving = false;
+                }
+            });
     }
 
     deleteDowntime(dt: Downtime): void {
@@ -753,18 +939,18 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     private prepareExportData(): any[] {
         return this.filteredDowntimes.map(dt => ({
             'Date': dt.date ? this.exportService.formatDate(dt.date) : '-',
-            'Heure': this.formatHour(dt.hour, dt.shift_name),
+            'Hour': this.formatHour(dt.hour, dt.shift_name),
             'Shift': dt.shift_name || '-',
-            'Ligne de Production': dt.production_line_name || '-',
+            'Production Line': dt.production_line_name || '-',
             'Zone': dt.zone_name || '-',
-            'Poste de Travail': dt.workstation_name || '-',
+            'Workstation': dt.workstation_name || '-',
             'Machine': dt.machine_name || '-',
-            'Projet': dt.project_name || '-',
+            'Project': dt.project_name || '-',
             'Part Number': dt.part_number || '-',
-            'Type de Problème': dt.problem_name || '-',
-            'Catégorie': dt.problem_category || '-',
-            'Durée (min)': dt.Total_Downtime || 0,
-            'Commentaire': dt.Comment_Downtime || '-'
+            'Problem Type': dt.problem_name || '-',
+            'Category': dt.problem_category || '-',
+            'Duration (min)': dt.Total_Downtime || 0,
+            'Comment': dt.Comment_Downtime || '-'
         }));
     }
 

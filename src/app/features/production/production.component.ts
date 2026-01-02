@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -23,6 +23,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
 import { ProductionService } from './production.service';
 import { EmployeeService } from '../../core/services/employee.service';
+import { HRService } from '../../core/services/hr.service';
+import { EmployeePrimaryAssignment } from '../../domains/dms-rh/models/assignment.model';
 import {
     Project,
     ProductionLine,
@@ -45,6 +47,7 @@ import {
 } from '../../core/models/production-session.model';
 import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '../../core/models/employee.model';
 import { environment } from '../../../environments/environment';
+import { TeamAssignmentStateService } from '../../core/state/team-assignment-state.service';
 
 @Component({
     selector: 'app-production',
@@ -76,6 +79,14 @@ import { environment } from '../../../environments/environment';
     styleUrls: ['./production.component.scss']
 })
 export class ProductionComponent implements OnInit, OnDestroy {
+    // Inject state service for reactive team assignment management
+    private teamState = inject(TeamAssignmentStateService);
+
+    // Getter for reactive team access (used in template)
+    get team(): EmployeeWithAssignment[] {
+        return this.teamState.team();
+    }
+
     // Production Session
     session: ShiftProductionSession = {
         shift: null,
@@ -131,6 +142,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
         { label: 'PQC', value: 'pqc', icon: 'pi pi-shield' }
     ];
 
+    // Qualification Warning Dialog (for non-qualified employees)
+    showQualificationWarningDialog = false;
+    pendingEmployeeAssignment: EmployeeWithAssignment | null = null;
+    qualificationWarningMessage = '';
+    pendingEmployeeData: any = null;
+    pendingPrimaryAssignment: EmployeePrimaryAssignment | null = null;
+
+    // Manual Workstation Selection (when no default assignment exists)
+    showManualWorkstationSelection = false;
+
     // Hour Production Dialog
     showHourDialog = false;
     selectedHourIndex: number | null = null;
@@ -149,9 +170,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
     // Multiple Downtimes in Dialog
     showAddDowntimeForm = false;
     editingDowntimeDialogIndex: number | null = null;
-    newDowntimeInput: { duration: number; problemId: number; comment: string; id?: number } = {
+    newDowntimeInput: { duration: number; problemId: number; machineId?: number; comment: string; id?: number } = {
         duration: 0,
         problemId: 0,
+        machineId: undefined,
         comment: ''
     };
 
@@ -221,6 +243,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         private route: ActivatedRoute,
         private productionService: ProductionService,
         private employeeService: EmployeeService,
+        private hrService: HRService,
         private messageService: MessageService
     ) {}
 
@@ -990,18 +1013,20 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Trim whitespace from scanned badge (common issue with barcode scanners)
         const cleanBadgeId = this.employeeIdScan?.trim() || '';
 
-        if (!cleanBadgeId || !this.selectedWorkstation) {
+        if (!cleanBadgeId) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Warning',
-                detail: 'Please scan employee ID and select workstation'
+                detail: 'Please scan employee ID'
             });
             return;
         }
 
+        // Step 1: Get employee by badge
         this.employeeService.getEmployeeByBadge(cleanBadgeId).subscribe({
             next: (employee: any) => {
-                const alreadyAssigned = this.session.team.some(e => e.Id_Emp === employee.id);
+                // Use signal-based state service for duplicate check
+                const alreadyAssigned = this.teamState.isEmployeeInTeam(employee.id);
                 if (alreadyAssigned) {
                     this.messageService.add({
                         severity: 'warn',
@@ -1011,75 +1036,66 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     return;
                 }
 
-                const newAssignment: EmployeeWithAssignment = {
-                    Id_Emp: employee.id,
-                    Nom_Emp: employee.last_name,
-                    Prenom_Emp: employee.first_name,
-                    DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
-                    Genre_Emp: employee.gender,
-                    Categorie_Emp: employee.category,
-                    DateEmbauche_Emp: new Date(employee.hire_date),
-                    Departement_Emp: employee.department,
-                    Picture: this.getEmployeePictureUrl(employee.picture),
-                    EmpStatus: employee.status,
-                    workstation: this.selectedWorkstation!.Name_Workstation,
-                    workstationId: this.selectedWorkstation!.Id_Workstation,
-                    machine: this.selectedMachineForAssignment?.name,
-                    machineId: this.selectedMachineForAssignment?.id,
-                    qualification: employee.current_qualification || 'Not Qualified',
-                    qualificationLevel: employee.current_qualification ? 1 : 0,
-                    role: this.selectedRole
-                };
+                // Step 2: Get primary assignment from HR module
+                this.hrService.getPrimaryAssignment(employee.id).subscribe({
+                    next: (primaryAssignment: EmployeePrimaryAssignment) => {
+                        // Build the assignment with default workstation/machine
+                        const newAssignment: EmployeeWithAssignment = {
+                            Id_Emp: employee.id,
+                            Nom_Emp: employee.last_name,
+                            Prenom_Emp: employee.first_name,
+                            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+                            Genre_Emp: employee.gender,
+                            Categorie_Emp: employee.category,
+                            DateEmbauche_Emp: new Date(employee.hire_date),
+                            Departement_Emp: employee.department,
+                            Picture: this.getEmployeePictureUrl(employee.picture),
+                            EmpStatus: employee.status,
+                            workstation: primaryAssignment.workstation_name,
+                            workstationId: primaryAssignment.workstation_id,
+                            machine: primaryAssignment.machine_name || undefined,
+                            machineId: primaryAssignment.machine_id || undefined,
+                            qualification: primaryAssignment.qualification_name || employee.current_qualification || 'Not Qualified',
+                            qualificationLevel: primaryAssignment.is_qualified ? (primaryAssignment.qualification_valid ? 3 : 2) : 0,
+                            role: 'operator' // Default role
+                        };
 
-                this.session.team.push(newAssignment);
-
-                // Update actors based on role
-                const fullName = `${employee.first_name} ${employee.last_name}`;
-                const qualification = employee.current_qualification || 'Not Qualified';
-
-                if (this.selectedRole === 'line_leader') {
-                    this.session.actors.lineLeader = {
-                        badgeId: cleanBadgeId,
-                        name: fullName,
-                        qualification: qualification,
-                        employeeId: employee.id
-                    };
-                } else if (this.selectedRole === 'quality_agent') {
-                    this.session.actors.qualityAgent = {
-                        badgeId: cleanBadgeId,
-                        name: fullName,
-                        qualification: qualification,
-                        employeeId: employee.id
-                    };
-                } else if (this.selectedRole === 'maintenance_tech') {
-                    this.session.actors.maintenanceTech = {
-                        badgeId: cleanBadgeId,
-                        name: fullName,
-                        qualification: qualification,
-                        employeeId: employee.id
-                    };
-                } else if (this.selectedRole === 'pqc') {
-                    this.session.actors.pqc = {
-                        badgeId: cleanBadgeId,
-                        name: fullName,
-                        qualification: qualification,
-                        employeeId: employee.id
-                    };
-                }
-
-                const roleLabel = this.getRoleLabel(this.selectedRole);
-                this.messageService.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: `${fullName} assigned as ${roleLabel} to ${this.selectedWorkstation!.Name_Workstation}${this.selectedMachineForAssignment ? ' - ' + this.selectedMachineForAssignment.name : ''}`
+                        // Step 3: Check qualification validity
+                        if (!primaryAssignment.qualification_valid) {
+                            // Show warning dialog
+                            const fullName = `${employee.first_name} ${employee.last_name}`;
+                            if (!primaryAssignment.is_qualified) {
+                                this.qualificationWarningMessage = `${fullName} n'est pas qualifié(e) pour le poste "${primaryAssignment.workstation_name}". Êtes-vous sûr(e) de vouloir l'ajouter ?`;
+                            } else {
+                                this.qualificationWarningMessage = `La qualification de ${fullName} pour le poste "${primaryAssignment.workstation_name}" est expirée (fin: ${primaryAssignment.qualification_end_date ? new Date(primaryAssignment.qualification_end_date).toLocaleDateString() : 'N/A'}). Êtes-vous sûr(e) de vouloir l'ajouter ?`;
+                            }
+                            this.pendingEmployeeAssignment = newAssignment;
+                            this.pendingEmployeeData = employee;
+                            this.pendingPrimaryAssignment = primaryAssignment;
+                            this.showQualificationWarningDialog = true;
+                        } else {
+                            // Qualified - add directly
+                            this.finalizeEmployeeAssignment(newAssignment, employee, cleanBadgeId);
+                        }
+                    },
+                    error: (error) => {
+                        if (error.status === 404) {
+                            // No default assignment found - use manual selection
+                            this.messageService.add({
+                                severity: 'info',
+                                summary: 'No Default Assignment',
+                                detail: `${employee.first_name} ${employee.last_name} has no default workstation. Please select one manually.`
+                            });
+                            this.pendingEmployeeData = employee;
+                            this.showManualWorkstationSelection = true;
+                        } else {
+                            console.error('Error fetching primary assignment:', error);
+                            // Fallback to manual selection
+                            this.pendingEmployeeData = employee;
+                            this.showManualWorkstationSelection = true;
+                        }
+                    }
                 });
-
-                // Save session to localStorage
-                this.saveSessionToStorage();
-
-                this.employeeIdScan = '';
-                this.selectedMachineForAssignment = null;
-                this.selectedRole = 'operator'; // Reset to default role
             },
             error: (error) => {
                 this.messageService.add({
@@ -1089,6 +1105,123 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 });
             }
         });
+    }
+
+    /**
+     * Finalize the employee assignment after qualification check.
+     * Uses signal-based state management for immediate UI updates.
+     */
+    private finalizeEmployeeAssignment(assignment: EmployeeWithAssignment, employee: any, badgeId: string): void {
+        // Use signal-based state service for immediate UI update
+        const success = this.teamState.addMember(assignment);
+
+        if (!success) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: `${employee.first_name} ${employee.last_name} is already in the team`
+            });
+            return;
+        }
+
+        // Sync with session object for localStorage persistence
+        this.session.team = [...this.teamState.team()];
+
+        const fullName = `${employee.first_name} ${employee.last_name}`;
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: `${fullName} assigned to ${assignment.workstation}${assignment.machine ? ' - ' + assignment.machine : ''}`
+        });
+
+        // Save session to localStorage
+        this.saveSessionToStorage();
+
+        // Reset form
+        this.employeeIdScan = '';
+        this.selectedWorkstation = null;
+        this.selectedMachineForAssignment = null;
+        this.showManualWorkstationSelection = false;
+        this.pendingEmployeeData = null;
+    }
+
+    /**
+     * Confirm adding an unqualified/expired employee
+     */
+    confirmQualificationWarning(): void {
+        if (this.pendingEmployeeAssignment && this.pendingEmployeeData) {
+            this.finalizeEmployeeAssignment(
+                this.pendingEmployeeAssignment,
+                this.pendingEmployeeData,
+                this.employeeIdScan
+            );
+        }
+        this.showQualificationWarningDialog = false;
+        this.pendingEmployeeAssignment = null;
+        this.pendingEmployeeData = null;
+        this.pendingPrimaryAssignment = null;
+        this.qualificationWarningMessage = '';
+    }
+
+    /**
+     * Cancel adding an unqualified/expired employee
+     */
+    cancelQualificationWarning(): void {
+        this.showQualificationWarningDialog = false;
+        this.pendingEmployeeAssignment = null;
+        this.pendingEmployeeData = null;
+        this.pendingPrimaryAssignment = null;
+        this.qualificationWarningMessage = '';
+        this.employeeIdScan = '';
+    }
+
+    /**
+     * Add employee with manually selected workstation (fallback when no default assignment)
+     */
+    addEmployeeManual(): void {
+        if (!this.selectedWorkstation || !this.pendingEmployeeData) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please select a workstation'
+            });
+            return;
+        }
+
+        const employee = this.pendingEmployeeData;
+        const newAssignment: EmployeeWithAssignment = {
+            Id_Emp: employee.id,
+            Nom_Emp: employee.last_name,
+            Prenom_Emp: employee.first_name,
+            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+            Genre_Emp: employee.gender,
+            Categorie_Emp: employee.category,
+            DateEmbauche_Emp: new Date(employee.hire_date),
+            Departement_Emp: employee.department,
+            Picture: this.getEmployeePictureUrl(employee.picture),
+            EmpStatus: employee.status,
+            workstation: this.selectedWorkstation!.Name_Workstation,
+            workstationId: this.selectedWorkstation!.Id_Workstation,
+            machine: this.selectedMachineForAssignment?.name,
+            machineId: this.selectedMachineForAssignment?.id,
+            qualification: employee.current_qualification || 'Not Qualified',
+            qualificationLevel: employee.current_qualification ? 1 : 0,
+            role: 'operator'
+        };
+
+        this.finalizeEmployeeAssignment(newAssignment, employee, this.employeeIdScan);
+    }
+
+    /**
+     * Cancel manual workstation selection
+     */
+    cancelManualSelection(): void {
+        this.showManualWorkstationSelection = false;
+        this.pendingEmployeeData = null;
+        this.selectedWorkstation = null;
+        this.selectedMachineForAssignment = null;
+        this.employeeIdScan = '';
     }
 
     getRoleLabel(role: ProductionRole): string {
@@ -1108,7 +1241,12 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     removeEmployee(employee: EmployeeWithAssignment): void {
-        this.session.team = this.session.team.filter(e => e.Id_Emp !== employee.Id_Emp);
+        // Use signal-based state service for immediate UI update
+        this.teamState.removeMember(employee.Id_Emp);
+
+        // Sync with session object for localStorage persistence
+        this.session.team = [...this.teamState.team()];
+
         this.messageService.add({
             severity: 'info',
             summary: 'Removed',
@@ -1741,13 +1879,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Save/update downtimes
         downtimes.forEach((dt) => {
-            const downtimePayload = {
+            const downtimePayload: any = {
                 Total_Downtime: dt.duration,
                 Comment_Downtime: dt.comment,
                 Id_DowntimeProblems: dt.problemId,
                 Id_HourlyProd: hourlyProductionId,
                 Id_Downtime: dt.id // Include ID for updates
             };
+
+            // Include machine if specified
+            if (dt.machineId) {
+                downtimePayload.machine = dt.machineId;
+            }
 
             const saveObs = dt.id
                 ? this.productionService.updateDowntime(dt.id, downtimePayload)
@@ -1817,6 +1960,12 @@ export class ProductionComponent implements OnInit, OnDestroy {
         return problem?.Name_DowntimeProblems || 'Unknown';
     }
 
+    getMachineName(machineId: number | undefined): string {
+        if (!machineId) return '';
+        const machine = this.machines.find(m => m.id === machineId);
+        return machine?.name || '';
+    }
+
     getTotalDowntimeInDialog(): number {
         if (!this.hourProductionInput.downtimes) return 0;
         return this.hourProductionInput.downtimes.reduce((sum, dt) => sum + dt.duration, 0);
@@ -1828,6 +1977,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             id: dt.id,
             duration: dt.duration,
             problemId: dt.problemId,
+            machineId: dt.machineId,
             comment: dt.comment
         };
         this.editingDowntimeDialogIndex = index;
@@ -1843,6 +1993,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.newDowntimeInput = {
             duration: 0,
             problemId: 0,
+            machineId: undefined,
             comment: ''
         };
         this.editingDowntimeDialogIndex = null;
@@ -1868,6 +2019,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 id: this.newDowntimeInput.id,
                 duration: this.newDowntimeInput.duration,
                 problemId: this.newDowntimeInput.problemId,
+                machineId: this.newDowntimeInput.machineId,
                 comment: this.newDowntimeInput.comment
             };
         } else {
@@ -1875,6 +2027,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             this.hourProductionInput.downtimes.push({
                 duration: this.newDowntimeInput.duration,
                 problemId: this.newDowntimeInput.problemId,
+                machineId: this.newDowntimeInput.machineId,
                 comment: this.newDowntimeInput.comment
             });
         }
@@ -2165,6 +2318,11 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     hourType: h.hourType // Preserve hour type from saved session (will be synced after shiftTypes load)
                 }))
             };
+
+            // Sync team with state service for reactive UI updates
+            if (this.session.team && this.session.team.length > 0) {
+                this.teamState.setTeam(this.session.team);
+            }
 
             // Restore form values after reference data is loaded
             setTimeout(() => {
