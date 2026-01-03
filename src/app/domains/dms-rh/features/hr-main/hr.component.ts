@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy, ViewChild, ChangeDetectorRef, inject } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject } from 'rxjs';
-import { takeUntil, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { Subject, forkJoin, Observable, of } from 'rxjs';
+import { takeUntil, debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { trigger, transition, style, animate } from '@angular/animations';
 
 // PrimeNG Modules
@@ -1002,67 +1002,84 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     loadReferenceData(): void {
-        // Only load essential reference data - other data loaded on demand per tab
-        this.hrService.getDepartments().subscribe({
-            next: (data) => this.departments = data,
-            error: () => this.departments = []
-        });
-        this.hrService.getEmployeeCategories().subscribe({
-            next: (data) => this.categories = data,
-            error: () => this.categories = []
-        });
-        this.hrService.getEmployeeStatuses().subscribe({
-            next: (data) => this.statuses = data,
-            error: () => this.statuses = []
+        // Skip if already loaded
+        if (this.departments.length > 0 && this.categories.length > 0 && this.statuses.length > 0) {
+            return;
+        }
+
+        // Load all reference data in parallel with forkJoin for better performance
+        forkJoin({
+            departments: this.hrService.getDepartments().pipe(catchError(() => of([]))),
+            categories: this.hrService.getEmployeeCategories().pipe(catchError(() => of([]))),
+            statuses: this.hrService.getEmployeeStatuses().pipe(catchError(() => of([])))
+        }).pipe(takeUntil(this.destroy$)).subscribe({
+            next: (data) => {
+                this.departments = data.departments as Department[];
+                this.categories = data.categories as EmployeeCategory[];
+                this.statuses = data.statuses as string[];
+            }
         });
     }
 
     /** Load data for Teams & Trainers tab */
     private loadTeamsTabData(): void {
+        // Skip if all data already loaded
+        if (this.teams.length > 0 && this.formateurs.length > 0 && this.specializations.length > 0) {
+            return;
+        }
+
+        // Build requests object only for data that needs loading
+        const requests: { [key: string]: Observable<any> } = {};
         if (this.teams.length === 0) {
-            this.hrService.getTeams().subscribe({
-                next: (data) => this.teams = data,
-                error: () => this.teams = []
-            });
+            requests['teams'] = this.hrService.getTeams().pipe(catchError(() => of([])));
         }
         if (this.formateurs.length === 0) {
-            this.hrService.getFormateurs().subscribe({
-                next: (data) => this.formateurs = data,
-                error: () => this.formateurs = []
-            });
+            requests['formateurs'] = this.hrService.getFormateurs().pipe(catchError(() => of([])));
         }
         if (this.specializations.length === 0) {
-            this.hrService.getSpecializations().subscribe({
-                next: (data) => this.specializations = data,
-                error: () => this.specializations = []
+            requests['specializations'] = this.hrService.getSpecializations().pipe(catchError(() => of([])));
+        }
+
+        if (Object.keys(requests).length > 0) {
+            forkJoin(requests).pipe(takeUntil(this.destroy$)).subscribe({
+                next: (data: any) => {
+                    if (data.teams) this.teams = data.teams;
+                    if (data.formateurs) this.formateurs = data.formateurs;
+                    if (data.specializations) this.specializations = data.specializations;
+                }
             });
         }
     }
 
     /** Load data for Formations tab */
     private loadFormationsTabData(): void {
+        // Skip if all data already loaded
+        if (this.formations.length > 0 && this.processes.length > 0 && this.formateurs.length > 0) {
+            return;
+        }
+
+        // Build requests object only for data that needs loading
+        const requests: { [key: string]: Observable<any> } = {};
         if (this.formations.length === 0) {
-            this.hrService.getFormations().subscribe({
-                next: (data) => {
-                    this.formations = data;
-                    this.updateGroupedFormations();
-                },
-                error: () => {
-                    this.formations = [];
-                    this.updateGroupedFormations();
-                }
-            });
+            requests['formations'] = this.hrService.getFormations().pipe(catchError(() => of([])));
         }
         if (this.processes.length === 0) {
-            this.hrService.getProcesses().subscribe({
-                next: (data) => this.processes = data,
-                error: () => this.processes = []
-            });
+            requests['processes'] = this.hrService.getProcesses().pipe(catchError(() => of([])));
         }
         if (this.formateurs.length === 0) {
-            this.hrService.getFormateurs().subscribe({
-                next: (data) => this.formateurs = data,
-                error: () => this.formateurs = []
+            requests['formateurs'] = this.hrService.getFormateurs().pipe(catchError(() => of([])));
+        }
+
+        if (Object.keys(requests).length > 0) {
+            forkJoin(requests).pipe(takeUntil(this.destroy$)).subscribe({
+                next: (data: any) => {
+                    if (data.formations) {
+                        this.formations = data.formations;
+                        this.updateGroupedFormations();
+                    }
+                    if (data.processes) this.processes = data.processes;
+                    if (data.formateurs) this.formateurs = data.formateurs;
+                }
             });
         }
     }
@@ -1080,15 +1097,58 @@ export class HrComponent implements OnInit, OnDestroy {
 
     /** Load data for Users tab */
     private loadUsersTabData(): void {
-        this.loadUsers();
-        this.loadDepartmentEntities();
+        // Skip if already loaded
+        if (this.users.length > 0 && this.departmentEntities.length > 0) {
+            return;
+        }
+
+        // Load all users data in parallel
+        const requests: { [key: string]: Observable<any> } = {};
+        if (this.users.length === 0) {
+            requests['users'] = this.hrService.getUsers().pipe(catchError(() => of([])));
+        }
+        if (this.departmentEntities.length === 0) {
+            requests['departmentEntities'] = this.hrService.getDepartmentEntities().pipe(catchError(() => of([])));
+        }
+
+        if (Object.keys(requests).length > 0) {
+            forkJoin(requests).pipe(takeUntil(this.destroy$)).subscribe({
+                next: (data: any) => {
+                    if (data.users) this.users = data.users;
+                    if (data.departmentEntities) this.departmentEntities = data.departmentEntities;
+                }
+            });
+        }
     }
 
     /** Load data for Licenses tab */
     private loadLicensesTabData(): void {
-        this.loadLicenses();
-        this.loadLicenseTypes();
-        this.loadLicenseStats();
+        // Skip if already loaded
+        if (this.licenses.length > 0 && this.licenseTypes.length > 0 && this.licenseStats) {
+            return;
+        }
+
+        // Load all license data in parallel
+        const requests: { [key: string]: Observable<any> } = {};
+        if (this.licenses.length === 0) {
+            requests['licenses'] = this.hrService.getLicenses().pipe(catchError(() => of([])));
+        }
+        if (this.licenseTypes.length === 0) {
+            requests['licenseTypes'] = this.hrService.getLicenseTypes().pipe(catchError(() => of([])));
+        }
+        if (!this.licenseStats) {
+            requests['licenseStats'] = this.hrService.getLicenseStats().pipe(catchError(() => of(null)));
+        }
+
+        if (Object.keys(requests).length > 0) {
+            forkJoin(requests).pipe(takeUntil(this.destroy$)).subscribe({
+                next: (data: any) => {
+                    if (data.licenses) this.licenses = data.licenses;
+                    if (data.licenseTypes) this.licenseTypes = data.licenseTypes;
+                    if (data.licenseStats) this.licenseStats = data.licenseStats;
+                }
+            });
+        }
     }
 
     /** Load data for Workstations tab */

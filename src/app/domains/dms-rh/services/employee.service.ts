@@ -18,7 +18,7 @@ import {
     providedIn: 'root'
 })
 export class DmsEmployeeService {
-    private readonly endpoint = 'hr';
+    private readonly endpoint = 'employees';
 
     constructor(private api: ApiService) {}
 
@@ -29,33 +29,33 @@ export class DmsEmployeeService {
         team?: number;
         search?: string;
     }): Observable<Employee[]> {
-        return this.api.get<Employee[]>(`${this.endpoint}/employees`, params);
+        return this.api.get<Employee[]>(this.endpoint, params);
     }
 
     getEmployee(id: number): Observable<Employee> {
-        return this.api.get<Employee>(`${this.endpoint}/employees/${id}`);
+        return this.api.get<Employee>(`${this.endpoint}/${id}`);
     }
 
     getEmployeeDetail(id: number): Observable<EmployeeDetail> {
-        return this.api.get<EmployeeDetail>(`${this.endpoint}/employees/${id}/detail`);
+        return this.api.get<EmployeeDetail>(`${this.endpoint}/${id}/detail`);
     }
 
     createEmployee(employee: Partial<Employee>): Observable<Employee> {
-        return this.api.post<Employee>(`${this.endpoint}/employees`, employee);
+        return this.api.post<Employee>(this.endpoint, employee);
     }
 
     updateEmployee(id: number, employee: Partial<Employee>): Observable<Employee> {
-        return this.api.put<Employee>(`${this.endpoint}/employees/${id}`, employee);
+        return this.api.put<Employee>(`${this.endpoint}/${id}`, employee);
     }
 
     deleteEmployee(id: number): Observable<void> {
-        return this.api.delete<void>(`${this.endpoint}/employees/${id}`);
+        return this.api.delete<void>(`${this.endpoint}/${id}`);
     }
 
     uploadEmployeePhoto(id: number, photo: File): Observable<Employee> {
         const formData = new FormData();
         formData.append('photo', photo);
-        return this.api.post<Employee>(`${this.endpoint}/employees/${id}/photo`, formData);
+        return this.api.post<Employee>(`${this.endpoint}/${id}/photo`, formData);
     }
 
     // ==================== EMPLOYEE CATEGORIES ====================
@@ -101,10 +101,10 @@ export class DmsEmployeeService {
 
     // ==================== SEARCH ====================
     searchEmployees(query: string): Observable<Employee[]> {
-        return this.api.get<Employee[]>(`${this.endpoint}/employees/search`, { q: query });
+        return this.api.get<Employee[]>(`${this.endpoint}/search`, { q: query });
     }
 
     getEmployeesByBadge(badgeNumber: string): Observable<Employee> {
-        return this.api.get<Employee>(`${this.endpoint}/employees/by-badge`, { badge: badgeNumber });
+        return this.api.get<Employee>(`${this.endpoint}/by-badge`, { badge: badgeNumber });
     }
 }

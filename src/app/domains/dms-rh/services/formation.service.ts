@@ -17,7 +17,7 @@ import {
     providedIn: 'root'
 })
 export class DmsFormationService {
-    private readonly endpoint = 'hr';
+    private readonly endpoint = 'employees';
 
     constructor(private api: ApiService) {}
 

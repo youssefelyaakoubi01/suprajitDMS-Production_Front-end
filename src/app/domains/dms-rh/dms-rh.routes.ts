@@ -2,9 +2,8 @@
  * DMS-RH Routes
  * Domain: Human Resources Management
  *
- * Uses the HrComponent which contains all HR functionality
- * in a single component with tabs: Dashboard, Employees, Formations, Versatility,
- * Recyclage, Teams, Users, Licenses, Workstations, Affectations, Qualifications.
+ * Each route loads a separate lightweight component for optimal performance.
+ * Components are lazy-loaded and split into separate chunks.
  */
 import { Routes } from '@angular/router';
 
@@ -17,85 +16,73 @@ export const DMS_RH_ROUTES: Routes = [
     {
         path: 'dashboard',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'dashboard' },
+            import('./features/rh-dashboard/rh-dashboard.component').then(m => m.RhDashboardComponent),
         title: 'RH Dashboard'
     },
     {
         path: 'employees',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'employees' },
+            import('./features/employees/employees-list.component').then(m => m.EmployeesListComponent),
         title: 'Employees'
     },
     {
         path: 'formations',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'formations' },
+            import('./features/formations/formations-list.component').then(m => m.FormationsListComponent),
         title: 'Formations'
     },
     {
         path: 'qualifications',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'qualifications' },
+            import('./features/qualifications/qualifications-list.component').then(m => m.QualificationsListComponent),
         title: 'Qualifications'
     },
     {
         path: 'versatility',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'versatility' },
+            import('./features/versatility/versatility-matrix.component').then(m => m.VersatilityMatrixComponent),
         title: 'Versatility Matrix'
     },
     {
         path: 'recyclage',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'recyclage' },
+            import('./features/recyclage/recyclage-list.component').then(m => m.RecyclageListComponent),
         title: 'Recyclage'
     },
     {
         path: 'teams',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'teams' },
+            import('./features/teams/teams-list.component').then(m => m.TeamsListComponent),
         title: 'Teams & Trainers'
     },
     {
         path: 'users',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'users' },
+            import('./features/users/users-list.component').then(m => m.UsersListComponent),
         title: 'Users & Access'
     },
     {
         path: 'licenses',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'licenses' },
+            import('./features/licenses/licenses-manager.component').then(m => m.LicensesManagerComponent),
         title: 'Licenses Manager'
     },
     {
         path: 'workstations',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'workstations' },
+            import('./features/workstations/workstations-manager.component').then(m => m.WorkstationsManagerComponent),
         title: 'Workstations'
     },
     {
         path: 'affectations',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'affectations' },
+            import('./features/affectations/affectations.component').then(m => m.AffectationsComponent),
         title: 'Workstation Assignments'
     },
     {
         path: 'qualifications-list',
         loadComponent: () =>
-            import('./features/hr-main/hr.component').then(m => m.HrComponent),
-        data: { tab: 'qualifications-list' },
+            import('./features/qualifications/qualifications-list.component').then(m => m.QualificationsListComponent),
         title: 'Gestion des Qualifications'
     }
 ];

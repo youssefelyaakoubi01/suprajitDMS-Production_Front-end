@@ -12,7 +12,7 @@ import { Employee } from '../models/employee.model';
     providedIn: 'root'
 })
 export class DmsTeamService {
-    private readonly endpoint = 'hr';
+    private readonly endpoint = 'employees';
 
     constructor(private api: ApiService) {}
 

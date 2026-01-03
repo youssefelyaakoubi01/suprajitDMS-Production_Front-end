@@ -11,7 +11,7 @@ import { License, LicenseType, LicenseCreate, LicenseStats } from '../models';
     providedIn: 'root'
 })
 export class DmsLicenseService {
-    private readonly endpoint = 'hr';
+    private readonly endpoint = 'employees';
 
     constructor(private api: ApiService) {}
 

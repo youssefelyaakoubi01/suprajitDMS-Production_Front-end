@@ -19,7 +19,7 @@ import {
     providedIn: 'root'
 })
 export class DmsQualificationService {
-    private readonly endpoint = 'hr';
+    private readonly endpoint = 'employees';
 
     constructor(private api: ApiService) {}
 
@@ -62,27 +62,28 @@ export class DmsQualificationService {
     }
 
     // ==================== HR WORKSTATIONS ====================
+    // Note: Uses production/workstations endpoint
     getHRWorkstations(params?: {
         processId?: number;
         productionLineId?: number;
     }): Observable<HRWorkstation[]> {
-        return this.api.get<HRWorkstation[]>(`${this.endpoint}/workstations`, params);
+        return this.api.get<HRWorkstation[]>('production/workstations', params);
     }
 
     getHRWorkstation(id: number): Observable<HRWorkstation> {
-        return this.api.get<HRWorkstation>(`${this.endpoint}/workstations/${id}`);
+        return this.api.get<HRWorkstation>(`production/workstations/${id}`);
     }
 
     createHRWorkstation(workstation: Partial<HRWorkstation>): Observable<HRWorkstation> {
-        return this.api.post<HRWorkstation>(`${this.endpoint}/workstations`, workstation);
+        return this.api.post<HRWorkstation>('production/workstations', workstation);
     }
 
     updateHRWorkstation(id: number, workstation: Partial<HRWorkstation>): Observable<HRWorkstation> {
-        return this.api.put<HRWorkstation>(`${this.endpoint}/workstations/${id}`, workstation);
+        return this.api.put<HRWorkstation>(`production/workstations/${id}`, workstation);
     }
 
     deleteHRWorkstation(id: number): Observable<void> {
-        return this.api.delete<void>(`${this.endpoint}/workstations/${id}`);
+        return this.api.delete<void>(`production/workstations/${id}`);
     }
 
     // ==================== PROCESSES ====================
@@ -107,7 +108,7 @@ export class DmsQualificationService {
         daysThreshold?: number;
         includeOverdue?: boolean;
     }): Observable<RecyclageEmployee[]> {
-        return this.api.get<RecyclageEmployee[]>(`${this.endpoint}/recyclage/employees`, params);
+        return this.api.get<RecyclageEmployee[]>(`${this.endpoint}/recyclage`, params);
     }
 
     getRecyclageNotifications(params?: {

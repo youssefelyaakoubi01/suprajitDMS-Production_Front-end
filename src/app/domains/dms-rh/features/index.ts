@@ -25,3 +25,15 @@ export * from './teams';
 
 // Workstations
 export * from './workstations';
+
+// Users
+export * from './users';
+
+// Licenses
+export * from './licenses';
+
+// Affectations
+export * from './affectations';
+
+// Qualifications
+export * from './qualifications';

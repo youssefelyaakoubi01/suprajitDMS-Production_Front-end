@@ -15,7 +15,7 @@ import { TableModule } from 'primeng/table';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
-import { AccordionModule } from 'primeng/accordion';
+import { Accordion, AccordionPanel, AccordionHeader, AccordionContent } from 'primeng/accordion';
 import { BadgeModule } from 'primeng/badge';
 import { TooltipModule } from 'primeng/tooltip';
 import { SkeletonModule } from 'primeng/skeleton';
@@ -38,7 +38,10 @@ import { DmsFormationService, DmsExportService, Formation, FormationPlan, Format
         CardModule,
         ButtonModule,
         TagModule,
-        AccordionModule,
+        Accordion,
+        AccordionPanel,
+        AccordionHeader,
+        AccordionContent,
         BadgeModule,
         TooltipModule,
         SkeletonModule,
@@ -88,17 +91,17 @@ import { DmsFormationService, DmsExportService, Formation, FormationPlan, Format
             </div>
 
             <!-- Grouped Formations by Type -->
-            <div *ngIf="!loading" @.disabled>
-            <p-accordion [multiple]="true">
-                <p-accordionpanel *ngFor="let group of groupedFormations | keyvalue" [value]="group.key">
-                    <ng-template pTemplate="header">
+            <div *ngIf="!loading">
+            <p-accordion [value]="activeAccordionValues" [multiple]="true">
+                <p-accordion-panel *ngFor="let group of groupedFormations | keyvalue" [value]="group.key">
+                    <p-accordion-header>
                         <div class="flex align-items-center gap-2">
                             <i class="pi pi-book"></i>
                             <span>{{ group.key }}</span>
                             <p-badge [value]="group.value.length" severity="info"></p-badge>
                         </div>
-                    </ng-template>
-                    <ng-template pTemplate="content">
+                    </p-accordion-header>
+                    <p-accordion-content>
                         <div class="grid">
                             <div class="col-12 md:col-6 lg:col-4" *ngFor="let formation of group.value">
                                 <p-card styleClass="formation-card h-full">
@@ -145,8 +148,8 @@ import { DmsFormationService, DmsExportService, Formation, FormationPlan, Format
                                 </p-card>
                             </div>
                         </div>
-                    </ng-template>
-                </p-accordionpanel>
+                    </p-accordion-content>
+                </p-accordion-panel>
             </p-accordion>
             </div>
 
@@ -234,6 +237,7 @@ export class FormationsListComponent implements OnInit, OnDestroy {
 
     groupedFormations: Map<string, Formation[]> = new Map();
     selectedType: string | null = null;
+    activeAccordionValues: string[] = [];
 
     typeOptions = [
         { label: 'Initial', value: 'initial' },
@@ -303,6 +307,9 @@ export class FormationsListComponent implements OnInit, OnDestroy {
             }
             this.groupedFormations.get(type)!.push(formation);
         });
+
+        // Expand all accordion panels by default
+        this.activeAccordionValues = Array.from(this.groupedFormations.keys());
     }
 
     onTypeFilterChange(): void {
