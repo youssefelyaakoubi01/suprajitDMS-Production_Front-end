@@ -581,9 +581,122 @@
 
         <p-divider></p-divider>
 
-        <h4 class="section-title"><i class="pi pi-box"></i> Production Metrics</h4>
+        <!-- TEAM CONFIRMATION SECTION -->
+        <div *ngIf="showTeamConfirmationStep && !teamConfirmed" class="team-confirmation-section">
+            <div class="confirmation-header">
+                <i class="pi pi-users"></i>
+                <h4>Confirmation de l'equipe</h4>
+            </div>
 
-        <div class="metrics-input-grid">
+            <div class="confirmation-question">
+                <p>Les employes sont-ils les memes que pour l'heure precedente ?</p>
+                <div class="previous-team-summary">
+                    <span>Equipe precedente: {{ getPreviousHourTeam(selectedHourIndex).length }} employes</span>
+                </div>
+            </div>
+
+            <div class="confirmation-buttons">
+                <p-button
+                    label="Oui, meme equipe"
+                    icon="pi pi-check"
+                    severity="success"
+                    (click)="confirmTeamSameAsPrevious()">
+                </p-button>
+                <p-button
+                    label="Non, modifier l'equipe"
+                    icon="pi pi-pencil"
+                    severity="warn"
+                    (click)="confirmTeamDifferent()">
+                </p-button>
+            </div>
+        </div>
+
+        <!-- TEAM EDITING SECTION (when user selects "Non") -->
+        <div *ngIf="!showTeamConfirmationStep && !teamConfirmed" class="hour-team-section">
+            <div class="team-section-header">
+                <h4 class="section-title"><i class="pi pi-users"></i> Modifier l'equipe ({{ currentHourTeam.length }})</h4>
+            </div>
+
+            <!-- Badge scan pour ajout -->
+            <div class="team-add-form">
+                <div class="p-inputgroup">
+                    <input
+                        pInputText
+                        [(ngModel)]="employeeScanForHour"
+                        placeholder="Scanner badge employe"
+                        (keyup.enter)="addEmployeeToHourTeam()"
+                        class="w-full">
+                    <p-button icon="pi pi-plus" label="Ajouter" (click)="addEmployeeToHourTeam()"></p-button>
+                </div>
+            </div>
+
+            <!-- Liste des employes de l'heure -->
+            <p-table [value]="currentHourTeam" styleClass="p-datatable-sm" [scrollable]="true" scrollHeight="200px">
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th style="width: 50px"></th>
+                        <th>Employe</th>
+                        <th>Poste</th>
+                        <th style="width: 60px">Actions</th>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-emp>
+                    <tr>
+                        <td>
+                            <p-avatar [image]="emp.Picture" shape="circle" size="normal"></p-avatar>
+                        </td>
+                        <td>{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</td>
+                        <td>{{ emp.workstation }}</td>
+                        <td>
+                            <p-button icon="pi pi-trash" severity="danger" [text]="true" [rounded]="true"
+                                      (click)="removeEmployeeFromHourTeam(emp)"></p-button>
+                        </td>
+                    </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                    <tr>
+                        <td colspan="4" class="text-center text-color-secondary">
+                            Aucun employe assigne. Scannez des badges pour ajouter.
+                        </td>
+                    </tr>
+                </ng-template>
+            </p-table>
+
+            <!-- Bouton pour confirmer apres modification -->
+            <div class="team-actions">
+                <p-button
+                    label="Confirmer l'equipe ({{ currentHourTeam.length }})"
+                    icon="pi pi-check"
+                    (click)="confirmHourTeam()"
+                    [disabled]="currentHourTeam.length === 0">
+                </p-button>
+            </div>
+        </div>
+
+        <!-- TEAM SUMMARY (when team is confirmed) -->
+        <div *ngIf="teamConfirmed" class="team-confirmed-summary">
+            <div class="flex align-items-center justify-content-between">
+                <div class="flex align-items-center gap-2">
+                    <i class="pi pi-users text-primary"></i>
+                    <span class="font-medium">Equipe: {{ currentHourTeam.length }} employes</span>
+                </div>
+                <p-button
+                    label="Modifier"
+                    icon="pi pi-pencil"
+                    [text]="true"
+                    size="small"
+                    (click)="confirmTeamDifferent()">
+                </p-button>
+            </div>
+        </div>
+
+        <p-divider *ngIf="teamConfirmed"></p-divider>
+
+        <!-- PRODUCTION METRICS (only show when team confirmed) -->
+        <div *ngIf="teamConfirmed">
+            <h4 class="section-title"><i class="pi pi-box"></i> Production Metrics</h4>
+
+            <div class="metrics-input-grid">
             <div class="metric-input-card">
                 <label>Output</label>
                 <p-inputNumber
@@ -743,6 +856,7 @@
                 </div>
             </div>
         </div>
+        </div> <!-- End of teamConfirmed wrapper -->
     </div>
 
     <ng-template pTemplate="footer">
@@ -755,6 +869,7 @@
         <p-button
             label="Save Hour Production"
             icon="pi pi-check"
+            [disabled]="!teamConfirmed"
             (click)="saveHourProduction()">
         </p-button>
     </ng-template>

@@ -34,6 +34,7 @@ export interface HourlyProductionState {
     downtimes: DowntimeExtended[];
     totalDowntime: number; // Sum of all downtimes in minutes
     hourlyProductionId: number | null; // ID after save
+    team: EmployeeWithAssignment[]; // Team assigned to this specific hour
 }
 
 // Target percentages for each hour type

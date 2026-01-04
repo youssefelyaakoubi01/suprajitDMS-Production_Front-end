@@ -187,6 +187,12 @@ export class ProductionComponent implements OnInit, OnDestroy {
         Comment_Downtime: ''
     };
 
+    // Per-Hour Team Confirmation
+    showTeamConfirmationStep = true;
+    teamConfirmed = false;
+    currentHourTeam: EmployeeWithAssignment[] = [];
+    employeeScanForHour = '';
+
     // Real-time tracking
     currentTime: Date = new Date();
     hourProgress = 0;
@@ -655,8 +661,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             next: (existingAssignments) => {
                 const existingEmployeeIds = new Set(existingAssignments.map(a => a.employee || a.Id_Emp));
 
-                // Only create assignments for employees not already assigned
-                this.session.team.forEach(member => {
+                // Only create assignments for employees not already assigned (use currentHourTeam for per-hour tracking)
+                this.currentHourTeam.forEach(member => {
                     if (existingEmployeeIds.has(member.Id_Emp)) {
                         console.log(`Employee ${member.Id_Emp} already assigned, skipping...`);
                         return;
@@ -706,7 +712,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     private createAllTeamAssignments(hourlyProductionId: number): void {
-        this.session.team.forEach(member => {
+        // Use currentHourTeam for per-hour team tracking
+        this.currentHourTeam.forEach(member => {
             const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
             const workstationId = workstation?.Id_Workstation || this.workstations[0]?.Id_Workstation;
 
@@ -983,7 +990,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 scrapRate: null,
                 downtimes: [],
                 totalDowntime: 0,
-                hourlyProductionId: null
+                hourlyProductionId: null,
+                team: [] // Per-hour team assignment
             });
         }
 
@@ -1570,18 +1578,272 @@ export class ProductionComponent implements OnInit, OnDestroy {
             };
         }
 
+        // Initialize per-hour team confirmation
+        this.initializeHourTeam(hourIndex);
+
         this.showHourDialog = true;
     }
 
     closeHourDialog(): void {
         this.showHourDialog = false;
         this.selectedHourIndex = null;
+        // Reset team confirmation state
+        this.showTeamConfirmationStep = true;
+        this.teamConfirmed = false;
+        this.currentHourTeam = [];
+        this.employeeScanForHour = '';
+    }
+
+    // ==================== PER-HOUR TEAM MANAGEMENT ====================
+
+    /**
+     * Get the team from the previous hour, or the current team state if this is H1
+     * Deep copies the employees to preserve all properties including workstation
+     * Uses teamState.team() for the most current data (reactive state)
+     */
+    getPreviousHourTeam(currentIndex: number | null): EmployeeWithAssignment[] {
+        let sourceTeam: EmployeeWithAssignment[] = [];
+
+        if (currentIndex === null || currentIndex < 0) {
+            // Use reactive team state for most current data
+            sourceTeam = this.teamState.team();
+        } else if (currentIndex === 0) {
+            // For H1 (index 0), use the current team state (most current data)
+            sourceTeam = this.teamState.team();
+        } else {
+            // For subsequent hours, look for the most recent completed hour with a team
+            for (let i = currentIndex - 1; i >= 0; i--) {
+                const prevHour = this.session.hours[i];
+                if (prevHour.team && prevHour.team.length > 0) {
+                    sourceTeam = prevHour.team;
+                    break;
+                }
+            }
+            // Fallback to current team state if no previous hour has a team
+            if (sourceTeam.length === 0) {
+                sourceTeam = this.teamState.team();
+            }
+        }
+
+        // Deep copy to preserve all properties including workstation
+        return sourceTeam.map(emp => ({
+            ...emp,
+            // Ensure workstation is preserved or use fallback
+            workstation: emp.workstation || emp.workstationId?.toString() || 'Non défini'
+        }));
+    }
+
+    /**
+     * Initialize the hour team when opening the dialog
+     */
+    initializeHourTeam(hourIndex: number): void {
+        const hour = this.session.hours[hourIndex];
+
+        // If hour already has a saved team, use it (deep copy with fallback)
+        if (hour.team && hour.team.length > 0) {
+            this.currentHourTeam = hour.team.map(emp => ({
+                ...emp,
+                workstation: emp.workstation || emp.workstationId?.toString() || 'Non défini'
+            }));
+            this.teamConfirmed = true;
+            this.showTeamConfirmationStep = false;
+        } else {
+            // Initialize with previous hour's team for the confirmation question
+            this.currentHourTeam = this.getPreviousHourTeam(hourIndex);
+            this.teamConfirmed = false;
+            this.showTeamConfirmationStep = true;
+        }
+    }
+
+    /**
+     * User confirms the team is the same as previous hour
+     */
+    confirmTeamSameAsPrevious(): void {
+        // Team is already initialized with previous hour's team
+        this.teamConfirmed = true;
+        this.showTeamConfirmationStep = false;
+
+        this.messageService.add({
+            severity: 'info',
+            summary: 'Team Confirmed',
+            detail: `${this.currentHourTeam.length} employees assigned to this hour`,
+            life: 2000
+        });
+    }
+
+    /**
+     * User wants to modify the team for this hour
+     */
+    confirmTeamDifferent(): void {
+        // Keep the current team as starting point but allow editing
+        this.showTeamConfirmationStep = false;
+        this.teamConfirmed = false; // Not confirmed yet, needs to be confirmed after editing
+    }
+
+    /**
+     * Confirm the modified team and proceed to production input
+     */
+    confirmHourTeam(): void {
+        if (this.currentHourTeam.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Team',
+                detail: 'Please assign at least one employee to this hour'
+            });
+            return;
+        }
+
+        this.teamConfirmed = true;
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Team Confirmed',
+            detail: `${this.currentHourTeam.length} employees assigned to this hour`,
+            life: 2000
+        });
+    }
+
+    /**
+     * Add an employee to the current hour's team via badge scan
+     */
+    addEmployeeToHourTeam(): void {
+        const badgeId = this.employeeScanForHour.trim();
+        if (!badgeId) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Please scan an employee badge'
+            });
+            return;
+        }
+
+        // Check if already in current hour team
+        if (this.currentHourTeam.some(e => e.Id_Emp.toString() === badgeId)) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Warning',
+                detail: 'Employee is already in the team for this hour'
+            });
+            this.employeeScanForHour = '';
+            return;
+        }
+
+        this.employeeService.getEmployeeByBadge(badgeId).subscribe({
+            next: (employee: any) => {
+                // Get primary assignment for workstation info
+                this.hrService.getPrimaryAssignment(employee.id).subscribe({
+                    next: (assignment: EmployeePrimaryAssignment) => {
+                        const newMember: EmployeeWithAssignment = {
+                            Id_Emp: employee.id,
+                            Nom_Emp: employee.last_name,
+                            Prenom_Emp: employee.first_name,
+                            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+                            Genre_Emp: employee.gender,
+                            Categorie_Emp: employee.category,
+                            DateEmbauche_Emp: new Date(employee.hire_date),
+                            Departement_Emp: employee.department,
+                            Picture: this.getEmployeePictureUrl(employee.picture),
+                            EmpStatus: employee.status,
+                            workstation: assignment.workstation_name,
+                            workstationId: assignment.workstation_id,
+                            machine: assignment.machine_name || undefined,
+                            machineId: assignment.machine_id || undefined,
+                            qualification: assignment.qualification_name || 'Not Qualified',
+                            qualificationLevel: assignment.is_qualified ? (assignment.qualification_valid ? 3 : 2) : 0,
+                            role: 'operator'
+                        };
+
+                        this.currentHourTeam.push(newMember);
+                        this.employeeScanForHour = '';
+
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Added',
+                            detail: `${employee.first_name} ${employee.last_name} added to hour team`,
+                            life: 2000
+                        });
+                    },
+                    error: () => {
+                        // No primary assignment, add with minimal info
+                        const newMember: EmployeeWithAssignment = {
+                            Id_Emp: employee.id,
+                            Nom_Emp: employee.last_name,
+                            Prenom_Emp: employee.first_name,
+                            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+                            Genre_Emp: employee.gender,
+                            Categorie_Emp: employee.category,
+                            DateEmbauche_Emp: new Date(employee.hire_date),
+                            Departement_Emp: employee.department,
+                            Picture: this.getEmployeePictureUrl(employee.picture),
+                            EmpStatus: employee.status,
+                            workstation: 'Not Assigned',
+                            qualification: 'Not Qualified',
+                            qualificationLevel: 0,
+                            role: 'operator'
+                        };
+
+                        this.currentHourTeam.push(newMember);
+                        this.employeeScanForHour = '';
+
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Added',
+                            detail: `${employee.first_name} ${employee.last_name} added (no default workstation)`,
+                            life: 2000
+                        });
+                    }
+                });
+            },
+            error: () => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Not Found',
+                    detail: `Employee with badge ${badgeId} not found`
+                });
+                this.employeeScanForHour = '';
+            }
+        });
+    }
+
+    /**
+     * Remove an employee from the current hour's team
+     */
+    removeEmployeeFromHourTeam(employee: EmployeeWithAssignment): void {
+        const index = this.currentHourTeam.findIndex(e => e.Id_Emp === employee.Id_Emp);
+        if (index > -1) {
+            this.currentHourTeam.splice(index, 1);
+            this.messageService.add({
+                severity: 'info',
+                summary: 'Removed',
+                detail: `${employee.Prenom_Emp} ${employee.Nom_Emp} removed from hour team`,
+                life: 2000
+            });
+        }
     }
 
     saveHourProduction(): void {
         if (this.selectedHourIndex === null) return;
 
         const hour = this.session.hours[this.selectedHourIndex];
+
+        // Validate team is confirmed
+        if (!this.teamConfirmed) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Team Not Confirmed',
+                detail: 'Please confirm the team for this hour before saving'
+            });
+            return;
+        }
+
+        // Validate team has at least one member
+        if (this.currentHourTeam.length === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'No Team',
+                detail: 'Please assign at least one employee to this hour'
+            });
+            return;
+        }
 
         // Validate
         if (this.hourProductionInput.output === null || this.hourProductionInput.output < 0) {
@@ -1628,7 +1890,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             part: this.session.part.Id_Part,
             result: this.hourProductionInput.output,
             target: hour.target,
-            headcount: this.session.team.length || 0,
+            headcount: this.currentHourTeam.length,
             production_line: this.session.productionLine.id,
             // Machine
             machine: this.session.machine?.id || null,
@@ -1684,11 +1946,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Math.round((hour.scrap! / hour.scrapTarget) * 10000) / 100 : 0;
                 hour.status = 'completed';
 
+                // Save the per-hour team
+                hour.team = [...this.currentHourTeam];
+
                 // Save session to localStorage
                 this.saveSessionToStorage();
 
-                // Save team assignments for this hourly production (only if it's a new creation)
-                if (!isUpdate && typeof hour.hourlyProductionId === 'number' && this.session.team.length > 0) {
+                // Save team assignments for this hourly production
+                if (typeof hour.hourlyProductionId === 'number' && this.currentHourTeam.length > 0) {
                     this.saveTeamAssignmentsForHour(hour.hourlyProductionId);
                 }
 
