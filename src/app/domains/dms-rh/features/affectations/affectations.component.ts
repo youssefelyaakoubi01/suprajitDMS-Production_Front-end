@@ -2,13 +2,14 @@
  * Affectations Component
  * Domain: DMS-RH
  *
- * Manages employee-workstation assignments
+ * Manages employee-workstation assignments with full CRUD operations
+ * Following Sakai template design patterns and PrimeNG v19
  */
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject, forkJoin, of } from 'rxjs';
-import { takeUntil, catchError } from 'rxjs/operators';
+import { takeUntil, catchError, finalize } from 'rxjs/operators';
 
 // PrimeNG
 import { TableModule } from 'primeng/table';
@@ -24,13 +25,33 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { CardModule } from 'primeng/card';
 import { AvatarModule } from 'primeng/avatar';
 import { CheckboxModule } from 'primeng/checkbox';
+import { TextareaModule } from 'primeng/textarea';
+import { BadgeModule } from 'primeng/badge';
+import { SkeletonModule } from 'primeng/skeleton';
+import { RippleModule } from 'primeng/ripple';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { MessageService, ConfirmationService } from 'primeng/api';
 
 import { HRService } from '@core/services/hr.service';
+import { ApiService } from '@core/services/api.service';
 import { AssignmentStateService } from '@core/state/assignment-state.service';
 import { EmployeeWorkstationAssignment, AssignmentCreateRequest } from '../../models/assignment.model';
 import { Employee, HRWorkstation } from '@core/models/employee.model';
 import { environment } from '../../../../../environments/environment';
+
+interface Machine {
+    id: number;
+    name: string;
+    code: string;
+    workstation: number;
+}
+
+interface ProductionLine {
+    id: number;
+    name: string;
+    code: string;
+}
 
 @Component({
     selector: 'app-affectations',
@@ -51,129 +72,899 @@ import { environment } from '../../../../../environments/environment';
         ToolbarModule,
         CardModule,
         AvatarModule,
-        CheckboxModule
+        CheckboxModule,
+        TextareaModule,
+        BadgeModule,
+        SkeletonModule,
+        RippleModule,
+        IconFieldModule,
+        InputIconModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
         <div class="affectations-container">
-            <p-card>
-                <ng-template pTemplate="header">
-                    <p-toolbar styleClass="border-none p-0">
-                        <ng-template #start>
-                            <h2 class="m-0 text-xl font-semibold">Workstation Assignments</h2>
-                        </ng-template>
-                        <ng-template #end>
-                            <button pButton icon="pi pi-plus" label="New Assignment"
-                                    (click)="openNewAssignmentDialog()"></button>
-                        </ng-template>
-                    </p-toolbar>
-                </ng-template>
+            <!-- Page Header -->
+            <div class="hr-page-header">
+                <div class="header-title">
+                    <div class="header-icon">
+                        <i class="pi pi-link"></i>
+                    </div>
+                    <div class="title-text">
+                        <h1>Workstation Assignments</h1>
+                        <span class="subtitle">Manage employee workstation and machine assignments</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button pButton pRipple
+                            icon="pi pi-refresh"
+                            class="p-button-outlined p-button-secondary"
+                            (click)="loadData()"
+                            [loading]="loading"
+                            pTooltip="Refresh data">
+                    </button>
+                </div>
+            </div>
 
-                <p-table [value]="assignments()" [loading]="loading" [paginator]="true" [rows]="10"
-                         [rowHover]="true" dataKey="id">
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th>Employee</th>
-                            <th pSortableColumn="workstation_name">Workstation <p-sortIcon field="workstation_name"></p-sortIcon></th>
-                            <th>Process</th>
-                            <th>Primary</th>
-                            <th pSortableColumn="assigned_date">Assigned Date <p-sortIcon field="assigned_date"></p-sortIcon></th>
-                            <th>Status</th>
-                            <th style="width: 120px">Actions</th>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="body" let-assignment>
-                        <tr>
-                            <td>
-                                <div class="flex align-items-center gap-2">
-                                    <p-avatar [image]="getEmployeePicture(assignment.employee_picture)"
-                                              [label]="!assignment.employee_picture ? getInitials(assignment.employee_name) : undefined"
-                                              shape="circle" size="normal"></p-avatar>
-                                    <span class="font-medium">{{ assignment.employee_name }}</span>
-                                </div>
-                            </td>
-                            <td><strong>{{ assignment.workstation_name }}</strong></td>
-                            <td>{{ assignment.process_name || '-' }}</td>
-                            <td>
-                                <i [class]="assignment.is_primary ? 'pi pi-star-fill text-yellow-500' : 'pi pi-star text-gray-300'"></i>
-                            </td>
-                            <td>{{ assignment.assigned_date | date:'dd/MM/yyyy' }}</td>
-                            <td>
-                                <p-tag [value]="assignment.is_active ? 'Active' : 'Inactive'"
-                                       [severity]="assignment.is_active ? 'success' : 'secondary'"></p-tag>
-                            </td>
-                            <td>
-                                <button pButton icon="pi pi-pencil" class="p-button-text p-button-sm"
-                                        (click)="editAssignment(assignment)" pTooltip="Edit"></button>
-                                <button pButton icon="pi pi-trash" class="p-button-text p-button-danger p-button-sm"
-                                        (click)="confirmDeleteAssignment(assignment)" pTooltip="Delete"></button>
-                            </td>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="emptymessage">
-                        <tr>
-                            <td colspan="7" class="text-center p-4">
-                                <i class="pi pi-link text-4xl text-gray-300 mb-2"></i>
-                                <p class="text-gray-500">No assignments found</p>
-                            </td>
-                        </tr>
-                    </ng-template>
-                </p-table>
-            </p-card>
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--hr-primary);">
+                        <i class="pi pi-link"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value">{{ stats().total_assignments }}</div>
+                        <div class="stat-label">Total Assignments</div>
+                    </div>
+                </div>
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--hr-success);">
+                        <i class="pi pi-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-success">{{ stats().employees_with_assignments }}</div>
+                        <div class="stat-label">Employees Assigned</div>
+                    </div>
+                </div>
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--hr-warning);">
+                        <i class="pi pi-star-fill"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-warning">{{ stats().employees_with_primary }}</div>
+                        <div class="stat-label">With Primary WS</div>
+                    </div>
+                </div>
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--hr-info);">
+                        <i class="pi pi-desktop"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-info">{{ workstations.length }}</div>
+                        <div class="stat-label">Workstations</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="hr-section-card">
+                <div class="section-header">
+                    <span class="section-title">
+                        <i class="pi pi-list"></i>
+                        Assignment Directory
+                    </span>
+                    <div class="section-actions">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input pInputText type="text"
+                                   [(ngModel)]="searchTerm"
+                                   (input)="onSearch()"
+                                   placeholder="Search assignments..."
+                                   class="search-input" />
+                        </p-iconfield>
+                        <p-select [options]="productionLines"
+                                  [(ngModel)]="selectedProductionLine"
+                                  (onChange)="onFilterChange()"
+                                  optionLabel="name"
+                                  optionValue="id"
+                                  placeholder="Filter by Line"
+                                  [showClear]="true"
+                                  styleClass="filter-select">
+                        </p-select>
+                        <button pButton pRipple
+                                icon="pi pi-plus"
+                                label="New Assignment"
+                                class="p-button-primary"
+                                (click)="openNewAssignmentDialog()">
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-body">
+                    <!-- Loading State -->
+                    <div *ngIf="loading" class="loading-skeleton">
+                        <div class="skeleton-row" *ngFor="let i of [1,2,3,4,5]">
+                            <p-skeleton shape="circle" size="40px"></p-skeleton>
+                            <p-skeleton width="150px" height="16px"></p-skeleton>
+                            <p-skeleton width="120px" height="16px"></p-skeleton>
+                            <p-skeleton width="100px" height="16px"></p-skeleton>
+                            <p-skeleton width="80px" height="24px" borderRadius="12px"></p-skeleton>
+                            <p-skeleton width="60px" height="16px"></p-skeleton>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <p-table *ngIf="!loading"
+                             [value]="filteredAssignments()"
+                             [paginator]="true"
+                             [rows]="10"
+                             [rowsPerPageOptions]="[5, 10, 25, 50]"
+                             [showCurrentPageReport]="true"
+                             currentPageReportTemplate="Showing {first} to {last} of {totalRecords} assignments"
+                             [rowHover]="true"
+                             dataKey="id"
+                             styleClass="p-datatable-sm hr-table"
+                             [globalFilterFields]="['employee_name', 'employee_badge', 'workstation_name', 'production_line_name']">
+
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th style="width: 250px">Employee</th>
+                                <th pSortableColumn="workstation_name">Workstation <p-sortIcon field="workstation_name"></p-sortIcon></th>
+                                <th>Machine</th>
+                                <th pSortableColumn="production_line_name">Production Line <p-sortIcon field="production_line_name"></p-sortIcon></th>
+                                <th style="width: 100px; text-align: center">Primary</th>
+                                <th pSortableColumn="created_at">Created <p-sortIcon field="created_at"></p-sortIcon></th>
+                                <th style="width: 120px; text-align: center">Actions</th>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="body" let-assignment>
+                            <tr>
+                                <!-- Employee Column -->
+                                <td>
+                                    <div class="hr-employee-info">
+                                        <div class="hr-avatar-badge">
+                                            <p-avatar [image]="getEmployeePicture(assignment.employee_picture)"
+                                                      [label]="!assignment.employee_picture ? getInitials(assignment.employee_name) : undefined"
+                                                      shape="circle"
+                                                      size="large"
+                                                      [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
+                                            </p-avatar>
+                                        </div>
+                                        <div class="employee-details">
+                                            <span class="employee-name">{{ assignment.employee_name }}</span>
+                                            <div class="employee-meta">
+                                                <span class="badge-id">
+                                                    <i class="pi pi-id-card"></i>
+                                                    {{ assignment.employee_badge || 'N/A' }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Workstation Column -->
+                                <td>
+                                    <div class="workstation-info">
+                                        <span class="ws-name">{{ assignment.workstation_name }}</span>
+                                        <span class="ws-code">
+                                            <p-tag [value]="assignment.workstation_code" severity="info" [rounded]="true"></p-tag>
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <!-- Machine Column -->
+                                <td>
+                                    <span *ngIf="assignment.machine_name" class="machine-name">
+                                        <i class="pi pi-cog"></i>
+                                        {{ assignment.machine_name }}
+                                    </span>
+                                    <span *ngIf="!assignment.machine_name" class="no-machine">-</span>
+                                </td>
+
+                                <!-- Production Line Column -->
+                                <td>
+                                    <span class="production-line">{{ assignment.production_line_name || '-' }}</span>
+                                </td>
+
+                                <!-- Primary Column -->
+                                <td class="text-center">
+                                    <div class="primary-indicator" [class.is-primary]="assignment.is_primary"
+                                         (click)="togglePrimary(assignment)"
+                                         [pTooltip]="assignment.is_primary ? 'Primary workstation' : 'Click to set as primary'">
+                                        <i [class]="assignment.is_primary ? 'pi pi-star-fill' : 'pi pi-star'"></i>
+                                    </div>
+                                </td>
+
+                                <!-- Created Date Column -->
+                                <td>
+                                    <div class="date-info">
+                                        <span class="date">{{ assignment.created_at | date:'dd/MM/yyyy' }}</span>
+                                        <span class="created-by" *ngIf="assignment.created_by">
+                                            by {{ assignment.created_by }}
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <!-- Actions Column -->
+                                <td class="text-center">
+                                    <div class="hr-action-buttons">
+                                        <button pButton pRipple
+                                                icon="pi pi-pencil"
+                                                class="p-button-text p-button-rounded p-button-sm"
+                                                (click)="editAssignment(assignment)"
+                                                pTooltip="Edit">
+                                        </button>
+                                        <button pButton pRipple
+                                                icon="pi pi-eye"
+                                                class="p-button-text p-button-rounded p-button-info p-button-sm"
+                                                (click)="viewAssignmentDetails(assignment)"
+                                                pTooltip="View Details">
+                                        </button>
+                                        <button pButton pRipple
+                                                icon="pi pi-trash"
+                                                class="p-button-text p-button-rounded p-button-danger p-button-sm"
+                                                (click)="confirmDeleteAssignment(assignment)"
+                                                pTooltip="Delete">
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </ng-template>
+
+                        <ng-template pTemplate="emptymessage">
+                            <tr>
+                                <td colspan="7">
+                                    <div class="hr-empty-state">
+                                        <i class="pi pi-link empty-icon"></i>
+                                        <h3>No Assignments Found</h3>
+                                        <p>Start by assigning employees to workstations</p>
+                                        <button pButton pRipple
+                                                icon="pi pi-plus"
+                                                label="Create First Assignment"
+                                                class="p-button-primary"
+                                                (click)="openNewAssignmentDialog()">
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </div>
+            </div>
         </div>
 
         <!-- Assignment Dialog -->
-        <p-dialog [(visible)]="showAssignmentDialog" [header]="editingAssignment ? 'Edit Assignment' : 'New Assignment'"
-                  [modal]="true" [style]="{width: '500px'}">
-            <form [formGroup]="assignmentForm" class="grid p-fluid">
-                <div class="col-12">
-                    <label>Employee *</label>
-                    <p-select formControlName="employee" [options]="employees"
-                              optionLabel="fullName" optionValue="Id_Emp" [filter]="true"
-                              placeholder="Select employee"></p-select>
+        <p-dialog [(visible)]="showAssignmentDialog"
+                  [header]="editingAssignment ? 'Edit Assignment' : 'New Assignment'"
+                  [modal]="true"
+                  [style]="{width: '550px'}"
+                  [draggable]="false"
+                  [resizable]="false"
+                  styleClass="hr-dialog">
+            <form [formGroup]="assignmentForm" class="assignment-form">
+                <!-- Employee Selection -->
+                <div class="form-field">
+                    <label for="employee">
+                        <i class="pi pi-user"></i>
+                        Employee <span class="required">*</span>
+                    </label>
+                    <p-select id="employee"
+                              formControlName="employee"
+                              [options]="employees"
+                              optionLabel="searchLabel"
+                              optionValue="Id_Emp"
+                              [filter]="true"
+                              [filterBy]="'BadgeNumber,fullName,Nom_Emp,Prenom_Emp'"
+                              filterPlaceholder="Search by badge, name..."
+                              placeholder="Select an employee"
+                              styleClass="w-full">
+                        <ng-template let-emp pTemplate="item">
+                            <div class="employee-option">
+                                <p-avatar [label]="getInitials(emp.fullName)"
+                                          shape="circle"
+                                          size="normal"
+                                          [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
+                                </p-avatar>
+                                <div class="option-details">
+                                    <span class="option-name">{{ emp.fullName }}</span>
+                                    <span class="option-badge">
+                                        <i class="pi pi-id-card"></i>
+                                        {{ emp.BadgeNumber || 'No Badge' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </ng-template>
+                        <ng-template let-emp pTemplate="selectedItem">
+                            <div class="employee-selected" *ngIf="emp">
+                                <span>{{ emp.fullName }}</span>
+                                <span class="badge-hint">({{ emp.BadgeNumber || 'No Badge' }})</span>
+                            </div>
+                        </ng-template>
+                    </p-select>
+                    <small class="help-text">Search by badge number or employee name</small>
+                    <small class="p-error" *ngIf="assignmentForm.get('employee')?.invalid && assignmentForm.get('employee')?.touched">
+                        Employee is required
+                    </small>
                 </div>
-                <div class="col-12">
-                    <label>Workstation *</label>
-                    <p-select formControlName="workstation" [options]="workstations"
-                              optionLabel="name" optionValue="id" [filter]="true"
-                              placeholder="Select workstation"></p-select>
+
+                <!-- Production Line Selection -->
+                <div class="form-field">
+                    <label for="productionLine">
+                        <i class="pi pi-sitemap"></i>
+                        Production Line
+                    </label>
+                    <p-select id="productionLine"
+                              [(ngModel)]="selectedFormProductionLine"
+                              [ngModelOptions]="{standalone: true}"
+                              [options]="productionLines"
+                              optionLabel="name"
+                              optionValue="id"
+                              [filter]="true"
+                              filterPlaceholder="Search line..."
+                              placeholder="Filter workstations by line"
+                              [showClear]="true"
+                              (onChange)="onFormProductionLineChange()"
+                              styleClass="w-full">
+                    </p-select>
                 </div>
-                <div class="col-12">
-                    <p-checkbox formControlName="is_primary" [binary]="true" label="Primary workstation"></p-checkbox>
+
+                <!-- Workstation Selection -->
+                <div class="form-field">
+                    <label for="workstation">
+                        <i class="pi pi-desktop"></i>
+                        Workstation <span class="required">*</span>
+                    </label>
+                    <p-select id="workstation"
+                              formControlName="workstation"
+                              [options]="filteredFormWorkstations"
+                              optionLabel="name"
+                              optionValue="id"
+                              [filter]="true"
+                              filterPlaceholder="Search workstation..."
+                              placeholder="Select a workstation"
+                              (onChange)="onWorkstationChange()"
+                              styleClass="w-full">
+                        <ng-template let-ws pTemplate="item">
+                            <div class="workstation-option">
+                                <span class="option-name">{{ ws.name }}</span>
+                                <p-tag [value]="ws.code" severity="info" [rounded]="true"></p-tag>
+                            </div>
+                        </ng-template>
+                    </p-select>
+                    <small class="p-error" *ngIf="assignmentForm.get('workstation')?.invalid && assignmentForm.get('workstation')?.touched">
+                        Workstation is required
+                    </small>
+                </div>
+
+                <!-- Machine Selection -->
+                <div class="form-field">
+                    <label for="machine">
+                        <i class="pi pi-cog"></i>
+                        Machine (Optional)
+                    </label>
+                    <p-select id="machine"
+                              formControlName="machine"
+                              [options]="filteredMachines"
+                              optionLabel="name"
+                              optionValue="id"
+                              [filter]="true"
+                              filterPlaceholder="Search machine..."
+                              placeholder="Select a machine"
+                              [showClear]="true"
+                              styleClass="w-full">
+                    </p-select>
+                </div>
+
+                <!-- Primary Checkbox -->
+                <div class="form-field checkbox-field">
+                    <p-checkbox formControlName="is_primary"
+                                [binary]="true"
+                                inputId="isPrimary">
+                    </p-checkbox>
+                    <label for="isPrimary" class="checkbox-label">
+                        <i class="pi pi-star-fill text-warning"></i>
+                        Set as primary workstation
+                    </label>
+                    <small class="help-text">Primary workstation is used for auto-fill when scanning badge</small>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-field">
+                    <label for="notes">
+                        <i class="pi pi-file-edit"></i>
+                        Notes
+                    </label>
+                    <textarea pTextarea
+                              id="notes"
+                              formControlName="notes"
+                              [rows]="3"
+                              placeholder="Add any notes about this assignment..."
+                              class="w-full">
+                    </textarea>
                 </div>
             </form>
+
             <ng-template pTemplate="footer">
-                <button pButton label="Cancel" icon="pi pi-times" class="p-button-text"
-                        (click)="showAssignmentDialog = false"></button>
-                <button pButton label="Save" icon="pi pi-check"
-                        (click)="saveAssignment()" [disabled]="assignmentForm.invalid"></button>
+                <div class="dialog-footer">
+                    <button pButton pRipple
+                            label="Cancel"
+                            icon="pi pi-times"
+                            class="p-button-text"
+                            (click)="showAssignmentDialog = false">
+                    </button>
+                    <button pButton pRipple
+                            [label]="editingAssignment ? 'Update' : 'Create'"
+                            icon="pi pi-check"
+                            class="p-button-primary"
+                            (click)="saveAssignment()"
+                            [disabled]="assignmentForm.invalid"
+                            [loading]="saving">
+                    </button>
+                </div>
             </ng-template>
         </p-dialog>
 
-        <p-toast></p-toast>
+        <!-- Detail Dialog -->
+        <p-dialog [(visible)]="showDetailDialog"
+                  header="Assignment Details"
+                  [modal]="true"
+                  [style]="{width: '500px'}"
+                  [draggable]="false"
+                  styleClass="hr-dialog">
+            <div class="detail-content" *ngIf="selectedAssignment">
+                <div class="detail-header">
+                    <p-avatar [image]="getEmployeePicture(selectedAssignment.employee_picture)"
+                              [label]="!selectedAssignment.employee_picture ? getInitials(selectedAssignment.employee_name) : undefined"
+                              shape="circle"
+                              size="xlarge"
+                              [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
+                    </p-avatar>
+                    <div class="detail-title">
+                        <h3>{{ selectedAssignment.employee_name }}</h3>
+                        <p-tag [value]="selectedAssignment.employee_badge || 'N/A'" severity="secondary"></p-tag>
+                    </div>
+                </div>
+
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Workstation</label>
+                        <span>{{ selectedAssignment.workstation_name }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Code</label>
+                        <p-tag [value]="selectedAssignment.workstation_code" severity="info"></p-tag>
+                    </div>
+                    <div class="detail-item">
+                        <label>Production Line</label>
+                        <span>{{ selectedAssignment.production_line_name || '-' }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Machine</label>
+                        <span>{{ selectedAssignment.machine_name || 'No machine assigned' }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Primary</label>
+                        <p-tag [value]="selectedAssignment.is_primary ? 'Yes' : 'No'"
+                               [severity]="selectedAssignment.is_primary ? 'success' : 'secondary'">
+                        </p-tag>
+                    </div>
+                    <div class="detail-item">
+                        <label>Created</label>
+                        <span>{{ selectedAssignment.created_at | date:'dd/MM/yyyy HH:mm' }}</span>
+                    </div>
+                    <div class="detail-item full-width" *ngIf="selectedAssignment.notes">
+                        <label>Notes</label>
+                        <span>{{ selectedAssignment.notes }}</span>
+                    </div>
+                    <div class="detail-item" *ngIf="selectedAssignment.created_by">
+                        <label>Created By</label>
+                        <span>{{ selectedAssignment.created_by }}</span>
+                    </div>
+                    <div class="detail-item" *ngIf="selectedAssignment.updated_at">
+                        <label>Last Updated</label>
+                        <span>{{ selectedAssignment.updated_at | date:'dd/MM/yyyy HH:mm' }}</span>
+                    </div>
+                </div>
+            </div>
+            <ng-template pTemplate="footer">
+                <button pButton pRipple
+                        label="Close"
+                        class="p-button-text"
+                        (click)="showDetailDialog = false">
+                </button>
+                <button pButton pRipple
+                        label="Edit"
+                        icon="pi pi-pencil"
+                        class="p-button-primary"
+                        (click)="showDetailDialog = false; editAssignment(selectedAssignment!)">
+                </button>
+            </ng-template>
+        </p-dialog>
+
+        <p-toast position="top-right"></p-toast>
         <p-confirmDialog></p-confirmDialog>
     `,
     styles: [`
-        .affectations-container { padding: 1rem; }
+        .affectations-container {
+            padding: 1.5rem;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+
+            .search-input {
+                min-width: 250px;
+            }
+
+            .filter-select {
+                min-width: 180px;
+            }
+        }
+
+        .loading-skeleton {
+            .skeleton-row {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding: 1rem;
+                border-bottom: 1px solid var(--surface-border);
+            }
+        }
+
+        /* Employee Info */
+        .hr-employee-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+
+            .employee-details {
+                .employee-name {
+                    font-weight: 600;
+                    color: var(--text-color);
+                    display: block;
+                }
+
+                .employee-meta {
+                    font-size: 0.8125rem;
+                    color: var(--text-color-secondary);
+                    margin-top: 0.25rem;
+
+                    .badge-id {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.25rem;
+
+                        i {
+                            font-size: 0.75rem;
+                        }
+                    }
+                }
+            }
+        }
+
+        /* Workstation Info */
+        .workstation-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+
+            .ws-name {
+                font-weight: 500;
+                color: var(--text-color);
+            }
+        }
+
+        /* Machine & Production Line */
+        .machine-name {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-color);
+
+            i {
+                color: var(--hr-primary);
+            }
+        }
+
+        .no-machine {
+            color: var(--text-color-secondary);
+        }
+
+        .production-line {
+            color: var(--text-color);
+        }
+
+        /* Primary Indicator */
+        .primary-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--surface-100);
+
+            i {
+                font-size: 1.25rem;
+                color: var(--surface-400);
+                transition: all 0.2s ease;
+            }
+
+            &:hover {
+                background: rgba(245, 158, 11, 0.1);
+                i {
+                    color: var(--hr-warning);
+                }
+            }
+
+            &.is-primary {
+                background: rgba(245, 158, 11, 0.15);
+                i {
+                    color: var(--hr-warning);
+                }
+            }
+        }
+
+        /* Date Info */
+        .date-info {
+            display: flex;
+            flex-direction: column;
+
+            .date {
+                color: var(--text-color);
+                font-size: 0.875rem;
+            }
+
+            .created-by {
+                font-size: 0.75rem;
+                color: var(--text-color-secondary);
+            }
+        }
+
+        /* Form Styles */
+        .assignment-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+
+            .form-field {
+                label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    font-weight: 500;
+                    margin-bottom: 0.5rem;
+                    color: var(--text-color);
+
+                    i {
+                        color: var(--hr-primary);
+                    }
+
+                    .required {
+                        color: var(--hr-danger);
+                    }
+                }
+
+                .help-text {
+                    display: block;
+                    margin-top: 0.25rem;
+                    font-size: 0.75rem;
+                    color: var(--text-color-secondary);
+                }
+
+                &.checkbox-field {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+
+                    .checkbox-label {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        margin-bottom: 0;
+                        cursor: pointer;
+                    }
+
+                    .help-text {
+                        width: 100%;
+                        margin-left: 1.75rem;
+                    }
+                }
+            }
+
+            .employee-option,
+            .workstation-option {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+
+                .option-details {
+                    display: flex;
+                    flex-direction: column;
+
+                    .option-name {
+                        font-weight: 500;
+                    }
+
+                    .option-badge {
+                        font-size: 0.75rem;
+                        color: var(--text-color-secondary);
+                        display: flex;
+                        align-items: center;
+                        gap: 0.25rem;
+
+                        i {
+                            font-size: 0.7rem;
+                        }
+                    }
+                }
+            }
+
+            .employee-selected {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+
+                .badge-hint {
+                    font-size: 0.8rem;
+                    color: var(--text-color-secondary);
+                }
+            }
+        }
+
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        /* Detail Dialog */
+        .detail-content {
+            .detail-header {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding-bottom: 1.5rem;
+                border-bottom: 1px solid var(--surface-border);
+                margin-bottom: 1.5rem;
+
+                .detail-title {
+                    h3 {
+                        margin: 0 0 0.5rem 0;
+                        font-size: 1.25rem;
+                        font-weight: 600;
+                    }
+                }
+            }
+
+            .detail-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.25rem;
+
+                .detail-item {
+                    label {
+                        display: block;
+                        font-size: 0.75rem;
+                        font-weight: 600;
+                        color: var(--text-color-secondary);
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        margin-bottom: 0.25rem;
+                    }
+
+                    span {
+                        color: var(--text-color);
+                    }
+
+                    &.full-width {
+                        grid-column: span 2;
+                    }
+                }
+            }
+        }
+
+        /* Empty State */
+        .hr-empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+
+            .empty-icon {
+                font-size: 4rem;
+                color: var(--surface-300);
+                margin-bottom: 1.5rem;
+            }
+
+            h3 {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: var(--text-color);
+                margin: 0 0 0.5rem 0;
+            }
+
+            p {
+                color: var(--text-color-secondary);
+                margin: 0 0 1.5rem 0;
+            }
+        }
+
+        /* Text colors */
+        .text-warning {
+            color: var(--hr-warning) !important;
+        }
+
+        .text-success {
+            color: var(--hr-success) !important;
+        }
+
+        .text-info {
+            color: var(--hr-info) !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .section-actions {
+                flex-wrap: wrap;
+
+                .search-input,
+                .filter-select {
+                    min-width: 100%;
+                }
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
     `]
 })
 export class AffectationsComponent implements OnInit, OnDestroy {
     private destroy$ = new Subject<void>();
     private assignmentState = inject(AssignmentStateService);
 
-    // Use signal from state service
-    assignments = this.assignmentState.assignments;
-
+    // Data
     employees: any[] = [];
     workstations: HRWorkstation[] = [];
-    loading = false;
+    machines: Machine[] = [];
+    productionLines: ProductionLine[] = [];
 
+    // State
+    loading = false;
+    saving = false;
+    searchTerm = '';
+    selectedProductionLine: number | null = null;
+
+    // Dialog state
     showAssignmentDialog = false;
+    showDetailDialog = false;
     editingAssignment: EmployeeWorkstationAssignment | null = null;
+    selectedAssignment: EmployeeWorkstationAssignment | null = null;
     assignmentForm!: FormGroup;
+
+    // Form helpers
+    selectedFormProductionLine: number | null = null;
+    filteredFormWorkstations: HRWorkstation[] = [];
+    filteredMachines: Machine[] = [];
+
+    // Computed from state
+    stats = this.assignmentState.stats;
+    filteredAssignments = this.assignmentState.filteredAssignments;
 
     constructor(
         private hrService: HRService,
+        private api: ApiService,
         private fb: FormBuilder,
         private messageService: MessageService,
         private confirmationService: ConfirmationService
@@ -194,7 +985,9 @@ export class AffectationsComponent implements OnInit, OnDestroy {
         this.assignmentForm = this.fb.group({
             employee: [null, Validators.required],
             workstation: [null, Validators.required],
-            is_primary: [false]
+            machine: [null],
+            is_primary: [false],
+            notes: ['']
         });
     }
 
@@ -203,17 +996,42 @@ export class AffectationsComponent implements OnInit, OnDestroy {
         forkJoin({
             assignments: this.hrService.getWorkstationAssignments().pipe(catchError(() => of([]))),
             employees: this.hrService.getEmployees().pipe(catchError(() => of([]))),
-            workstations: this.hrService.getWorkstations().pipe(catchError(() => of([])))
-        }).pipe(takeUntil(this.destroy$)).subscribe({
+            workstations: this.hrService.getWorkstations().pipe(catchError(() => of([]))),
+            machines: this.api.get<Machine[]>('production/machines').pipe(catchError(() => of([]))),
+            productionLines: this.api.get<any>('production/lines').pipe(catchError(() => of([])))
+        }).pipe(
+            takeUntil(this.destroy$),
+            finalize(() => this.loading = false)
+        ).subscribe({
             next: (data) => {
-                this.employees = data.employees.map((e: Employee) => ({
+                this.employees = (data.employees as Employee[]).map((e: Employee) => ({
                     ...e,
-                    fullName: `${e.Prenom_Emp} ${e.Nom_Emp}`
+                    fullName: `${e.Prenom_Emp} ${e.Nom_Emp}`,
+                    searchLabel: `${e.BadgeNumber || ''} - ${e.Prenom_Emp} ${e.Nom_Emp}`
                 }));
+
                 this.workstations = data.workstations;
-                this.loading = false;
+                this.filteredFormWorkstations = [...this.workstations];
+
+                const machinesData = (data.machines as any);
+                this.machines = machinesData.results || machinesData || [];
+
+                const linesData = (data.productionLines as any);
+                this.productionLines = (linesData.results || linesData || []).map((l: any) => ({
+                    id: l.id,
+                    name: l.name,
+                    code: l.code
+                }));
             }
         });
+    }
+
+    onSearch(): void {
+        this.assignmentState.setSearchTerm(this.searchTerm);
+    }
+
+    onFilterChange(): void {
+        this.assignmentState.setProductionLineFilter(this.selectedProductionLine);
     }
 
     getEmployeePicture(picture: string | null | undefined): string | undefined {
@@ -222,7 +1040,7 @@ export class AffectationsComponent implements OnInit, OnDestroy {
         return `${environment.mediaUrl}${picture}`;
     }
 
-    getInitials(name: string): string {
+    getInitials(name: string | undefined): string {
         if (!name) return '?';
         const parts = name.split(' ');
         if (parts.length >= 2) {
@@ -231,9 +1049,13 @@ export class AffectationsComponent implements OnInit, OnDestroy {
         return name.substring(0, 2).toUpperCase();
     }
 
+    // Dialog handlers
     openNewAssignmentDialog(): void {
         this.editingAssignment = null;
-        this.assignmentForm.reset({ is_primary: false });
+        this.assignmentForm.reset({ is_primary: false, notes: '' });
+        this.selectedFormProductionLine = null;
+        this.filteredFormWorkstations = [...this.workstations];
+        this.filteredMachines = [];
         this.showAssignmentDialog = true;
     }
 
@@ -242,35 +1064,99 @@ export class AffectationsComponent implements OnInit, OnDestroy {
         this.assignmentForm.patchValue({
             employee: assignment.employee,
             workstation: assignment.workstation,
-            is_primary: assignment.is_primary
+            machine: assignment.machine,
+            is_primary: assignment.is_primary,
+            notes: assignment.notes || ''
         });
+        this.selectedFormProductionLine = assignment.production_line_id || null;
+        this.onFormProductionLineChange();
+        this.onWorkstationChange();
         this.showAssignmentDialog = true;
+    }
+
+    viewAssignmentDetails(assignment: EmployeeWorkstationAssignment): void {
+        this.selectedAssignment = assignment;
+        this.showDetailDialog = true;
+    }
+
+    onFormProductionLineChange(): void {
+        if (this.selectedFormProductionLine) {
+            this.filteredFormWorkstations = this.workstations.filter(
+                ws => ws.production_line === this.selectedFormProductionLine
+            );
+        } else {
+            this.filteredFormWorkstations = [...this.workstations];
+        }
+    }
+
+    onWorkstationChange(): void {
+        const workstationId = this.assignmentForm.get('workstation')?.value;
+        if (workstationId) {
+            this.filteredMachines = this.machines.filter(m => m.workstation === workstationId);
+        } else {
+            this.filteredMachines = [];
+        }
+        // Reset machine if workstation changed
+        if (!this.editingAssignment) {
+            this.assignmentForm.patchValue({ machine: null });
+        }
     }
 
     saveAssignment(): void {
         if (this.assignmentForm.invalid) return;
 
+        this.saving = true;
         const formValue = this.assignmentForm.value as AssignmentCreateRequest;
 
-        if (this.editingAssignment) {
-            this.hrService.updateWorkstationAssignment(this.editingAssignment.id, formValue).subscribe({
-                next: () => {
-                    this.loadData();
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Assignment updated' });
-                    this.showAssignmentDialog = false;
-                },
-                error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update' })
-            });
-        } else {
-            this.hrService.createWorkstationAssignment(formValue).subscribe({
-                next: () => {
-                    this.loadData();
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Assignment created' });
-                    this.showAssignmentDialog = false;
-                },
-                error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to create' })
-            });
-        }
+        const request$ = this.editingAssignment
+            ? this.hrService.updateWorkstationAssignment(this.editingAssignment.id, formValue)
+            : this.hrService.createWorkstationAssignment(formValue);
+
+        request$.pipe(
+            takeUntil(this.destroy$),
+            finalize(() => this.saving = false)
+        ).subscribe({
+            next: () => {
+                this.loadData();
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: this.editingAssignment ? 'Assignment updated successfully' : 'Assignment created successfully'
+                });
+                this.showAssignmentDialog = false;
+            },
+            error: (err) => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: err.error?.detail || 'Failed to save assignment'
+                });
+            }
+        });
+    }
+
+    togglePrimary(assignment: EmployeeWorkstationAssignment): void {
+        if (assignment.is_primary) return; // Already primary
+
+        this.hrService.setPrimaryAssignment(assignment.id).pipe(
+            takeUntil(this.destroy$)
+        ).subscribe({
+            next: () => {
+                this.loadData();
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: 'Primary workstation updated'
+                });
+            },
+            error: () => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: 'Failed to update primary workstation'
+                });
+            }
+        });
     }
 
     confirmDeleteAssignment(assignment: EmployeeWorkstationAssignment): void {
@@ -278,13 +1164,26 @@ export class AffectationsComponent implements OnInit, OnDestroy {
             message: `Remove ${assignment.employee_name} from ${assignment.workstation_name}?`,
             header: 'Confirm Delete',
             icon: 'pi pi-exclamation-triangle',
+            acceptButtonStyleClass: 'p-button-danger',
             accept: () => {
-                this.hrService.deleteWorkstationAssignment(assignment.id).subscribe({
+                this.hrService.deleteWorkstationAssignment(assignment.id).pipe(
+                    takeUntil(this.destroy$)
+                ).subscribe({
                     next: () => {
                         this.loadData();
-                        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Assignment removed' });
+                        this.messageService.add({
+                            severity: 'success',
+                            summary: 'Success',
+                            detail: 'Assignment removed successfully'
+                        });
                     },
-                    error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete' })
+                    error: () => {
+                        this.messageService.add({
+                            severity: 'error',
+                            summary: 'Error',
+                            detail: 'Failed to delete assignment'
+                        });
+                    }
                 });
             }
         });

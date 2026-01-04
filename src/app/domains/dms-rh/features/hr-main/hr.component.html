@@ -28,24 +28,24 @@
     </p-toolbar>
 
     <!-- Main Tabs -->
-    <p-tabs [(value)]="activeTab" (valueChange)="onTabChange($event)">
+    <p-tabs [value]="activeTabIndex" (valueChange)="onTabChange($event)">
         <p-tablist>
-            <p-tab value="0"><i class="pi pi-chart-bar mr-2"></i>Dashboard</p-tab>
-            <p-tab value="1"><i class="pi pi-users mr-2"></i>Employees</p-tab>
-            <p-tab value="2"><i class="pi pi-book mr-2"></i>Formations</p-tab>
-            <p-tab value="3"><i class="pi pi-th-large mr-2"></i>Versatility Matrix</p-tab>
-            <p-tab value="4"><i class="pi pi-refresh mr-2"></i>Recyclage</p-tab>
-            <p-tab value="5"><i class="pi pi-sitemap mr-2"></i>Teams & Trainers</p-tab>
-            <p-tab value="6"><i class="pi pi-user-edit mr-2"></i>Users & Access</p-tab>
-            <p-tab value="7"><i class="pi pi-id-card mr-2"></i>Licenses Manager</p-tab>
-            <p-tab value="8"><i class="pi pi-desktop mr-2"></i>Workstations</p-tab>
-            <p-tab value="9"><i class="pi pi-link mr-2"></i>Affectations</p-tab>
-            <p-tab value="10"><i class="pi pi-verified mr-2"></i>Qualifications</p-tab>
+            <p-tab [value]="0"><i class="pi pi-chart-bar mr-2"></i>Dashboard</p-tab>
+            <p-tab [value]="1"><i class="pi pi-users mr-2"></i>Employees</p-tab>
+            <p-tab [value]="2"><i class="pi pi-book mr-2"></i>Formations</p-tab>
+            <p-tab [value]="3"><i class="pi pi-th-large mr-2"></i>Versatility Matrix</p-tab>
+            <p-tab [value]="4"><i class="pi pi-refresh mr-2"></i>Recyclage</p-tab>
+            <p-tab [value]="5"><i class="pi pi-sitemap mr-2"></i>Teams & Trainers</p-tab>
+            <p-tab [value]="6"><i class="pi pi-user-edit mr-2"></i>Users & Access</p-tab>
+            <p-tab [value]="7"><i class="pi pi-id-card mr-2"></i>Licenses Manager</p-tab>
+            <p-tab [value]="8"><i class="pi pi-desktop mr-2"></i>Workstations</p-tab>
+            <p-tab [value]="9"><i class="pi pi-link mr-2"></i>Affectations</p-tab>
+            <p-tab [value]="10"><i class="pi pi-verified mr-2"></i>Qualifications</p-tab>
         </p-tablist>
 
         <p-tabpanels>
             <!-- TAB 0: Dashboard -->
-            <p-tabpanel value="0">
+            <p-tabpanel [value]="0">
                 <!-- Loading Skeleton for KPI Cards -->
                 <div class="kpi-row" *ngIf="loadingStats">
                     <div class="modern-kpi-card" *ngFor="let i of [1,2,3,4]">
@@ -141,12 +141,34 @@
                                 <span class="score-label">Average Versatility Level</span>
                             </div>
                         </p-card>
+
+                        <p-card header="Recyclage Alerts">
+                            <div class="recyclage-alerts-card">
+                                <div class="alert-value" [class.danger]="recyclageStats?.overdue > 0">
+                                    <i class="pi pi-exclamation-triangle"></i>
+                                    <span>{{ recyclageStats?.total || 0 }}</span>
+                                </div>
+                                <div class="alert-details">
+                                    <span class="alert-label">Employees requiring recyclage</span>
+                                    <div class="alert-breakdown" *ngIf="recyclageStats">
+                                        <span class="text-red-500" *ngIf="recyclageStats.overdue > 0">
+                                            {{ recyclageStats.overdue }} overdue
+                                        </span>
+                                        <span class="text-orange-500" *ngIf="recyclageStats.dueSoon > 0">
+                                            {{ recyclageStats.dueSoon }} due soon
+                                        </span>
+                                    </div>
+                                </div>
+                                <button pButton pRipple label="View Details" icon="pi pi-arrow-right" iconPos="right"
+                                    class="p-button-text p-button-sm mt-2" (click)="goToRecyclageTab()"></button>
+                            </div>
+                        </p-card>
                     </div>
                 </div>
             </p-tabpanel>
 
             <!-- TAB 1: Employee Directory -->
-            <p-tabpanel value="1">
+            <p-tabpanel [value]="1">
                 <!-- Modern Filter Toolbar -->
                 <p-toolbar styleClass="mb-3 surface-ground border-round">
                     <ng-template #start>
@@ -328,7 +350,7 @@
             </p-tabpanel>
 
             <!-- TAB 2: Formations -->
-            <p-tabpanel value="2">
+            <p-tabpanel [value]="2">
                 <div class="formations-tab">
                     <!-- Stats Mini Cards Row - Responsive Grid -->
                     <div class="stats-mini-grid">
@@ -622,7 +644,7 @@
             </p-tabpanel>
 
             <!-- TAB 3: Versatility Matrix -->
-            <p-tabpanel value="3">
+            <p-tabpanel [value]="3">
                 <div class="tab-header">
                     <h3>Versatility Matrix</h3>
                     <div class="legend">
@@ -639,7 +661,7 @@
                             <tr>
                                 <th class="employee-header">Employee</th>
                                 <th *ngFor="let ws of uniqueVersatilityWorkstations" class="ws-header">
-                                    {{ ws.desc_workstation }}
+                                    {{ ws.name }}
                                 </th>
                             </tr>
                         </thead>
@@ -654,10 +676,10 @@
                                 </td>
                                 <td *ngFor="let ws of uniqueVersatilityWorkstations" class="level-cell">
                                     <div class="level-indicator"
-                                        [style.background-color]="getVersatilityColor(getVersatilityLevel(emp.Id_Emp, ws.id_workstation))"
-                                        [pTooltip]="qualificationLevels[getVersatilityLevel(emp.Id_Emp, ws.id_workstation)].label"
-                                        (click)="updateVersatility(emp.Id_Emp, ws.id_workstation, (getVersatilityLevel(emp.Id_Emp, ws.id_workstation) + 1) % 5)">
-                                        {{ getVersatilityLevel(emp.Id_Emp, ws.id_workstation) }}
+                                        [style.background-color]="getVersatilityColor(getVersatilityLevel(emp.Id_Emp, ws.id))"
+                                        [pTooltip]="qualificationLevels[getVersatilityLevel(emp.Id_Emp, ws.id)].label"
+                                        (click)="updateVersatility(emp.Id_Emp, ws.id, (getVersatilityLevel(emp.Id_Emp, ws.id) + 1) % 5)">
+                                        {{ getVersatilityLevel(emp.Id_Emp, ws.id) }}
                                     </div>
                                 </td>
                             </tr>
@@ -667,7 +689,7 @@
             </p-tabpanel>
 
             <!-- TAB 4: Recyclage -->
-            <p-tabpanel value="4">
+            <p-tabpanel [value]="4">
                 <!-- KPI Stats Cards - Same style as Dashboard -->
                 <div class="kpi-row">
                     <!-- Total Alertes -->
@@ -1246,7 +1268,7 @@
             </p-tabpanel>
 
             <!-- TAB 5: Teams & Trainers -->
-            <p-tabpanel value="5">
+            <p-tabpanel [value]="5">
                 <div class="teams-trainers-grid">
                     <!-- Teams -->
                     <p-card header="Teams">
@@ -1381,7 +1403,7 @@
             </p-tabpanel>
 
             <!-- TAB 6: Users & Access -->
-            <p-tabpanel value="6">
+            <p-tabpanel [value]="6">
                 <div class="users-access-container">
                     <!-- Users Section -->
                     <div class="tab-header">
@@ -1494,7 +1516,7 @@
             </p-tabpanel>
 
             <!-- TAB 7: Licenses Manager -->
-            <p-tabpanel value="7">
+            <p-tabpanel [value]="7">
                 <div class="licenses-container">
                     <div class="tab-header">
                         <h3>Licenses Manager</h3>
@@ -1639,7 +1661,7 @@
             </p-tabpanel>
 
             <!-- TAB 8: Workstations -->
-            <p-tabpanel value="8">
+            <p-tabpanel [value]="8">
                 <div class="workstations-container">
                     <div class="tab-header">
                         <h3>Workstation Management</h3>
@@ -1702,7 +1724,7 @@
             </p-tabpanel>
 
             <!-- TAB 9: Affectations (Workstation Assignments) -->
-            <p-tabpanel value="9">
+            <p-tabpanel [value]="9">
                 <div class="affectations-container">
                     <div class="tab-header">
                         <h3>Employee Workstation Assignments</h3>
@@ -1779,7 +1801,7 @@
             </p-tabpanel>
 
             <!-- TAB 10: Qualifications List -->
-            <p-tabpanel value="10">
+            <p-tabpanel [value]="10">
                 <!-- Stats Cards -->
                 <div class="grid mb-4">
                     <div class="col-12 md:col-6 lg:col-2">

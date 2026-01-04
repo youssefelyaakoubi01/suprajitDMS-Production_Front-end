@@ -173,13 +173,16 @@ export interface Qualification {
     trainer: number | null;
     // Joined fields (read-only from API)
     employee_name?: string;
+    employee_badge?: string;
+    employee_picture?: string;
     formation_name?: string;
     project_name?: string;
+    trainer_name?: string;
     Employee?: Employee;
     Formation?: Formation;
-    TrainerName?: string;
     // Legacy field aliases for backward compatibility
     id_qualif?: number;
+    TrainerName?: string;
 }
 
 export type QualificationLevel = 0 | 1 | 2 | 3 | 4;
@@ -261,22 +264,22 @@ export interface HRProcess {
 }
 
 export interface HRWorkstation {
-    id_workstation: number;
-    desc_workstation: string;
-    id_process: number;
-    Id_ProdLine: number;
-    id_machine?: number;
-    kpi_index?: number;
-    id_formation?: number;
-    processIndex?: number;
-    Process?: HRProcess;
-    // Enhanced fields
+    // Backend fields from production/workstations
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    production_line: number;
+    production_line_name?: string;
+    zone?: number;
+    process_order?: number;
     process_mode?: 'manual' | 'semi_auto' | 'full_auto';
     typ_order?: string;
     cycle_time_seconds?: number;
     max_operators?: number;
     is_critical?: boolean;
-    description?: string;
+    is_active?: boolean;
+    machines_count?: number;
 }
 
 // ==================== RECYCLAGE (RETRAINING) ====================

@@ -145,6 +145,7 @@ interface DeclarationTypeOption {
                                   placeholder="Select Workstation"
                                   [filter]="true"
                                   filterBy="Name_Workstation"
+                                  appendTo="body"
                                   styleClass="w-full"
                                   (onChange)="onWorkstationChange()">
                         </p-select>
@@ -161,6 +162,7 @@ interface DeclarationTypeOption {
                                   [filter]="true"
                                   filterBy="name"
                                   [showClear]="true"
+                                  appendTo="body"
                                   styleClass="w-full"
                                   [disabled]="!form.get('workstation')?.value">
                         </p-select>
@@ -179,6 +181,7 @@ interface DeclarationTypeOption {
                               placeholder="Select Problem Type"
                               [filter]="true"
                               filterBy="Name_DowntimeProblems"
+                              appendTo="body"
                               styleClass="w-full">
                     </p-select>
                 </div>

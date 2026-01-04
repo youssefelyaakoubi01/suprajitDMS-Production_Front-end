@@ -9,6 +9,8 @@ export interface Team {
     name: string;
     code: string;
     description?: string;
+    memberCount?: number;
+    leader?: string;
     // Legacy
     teamID?: number;
     teamName?: string;

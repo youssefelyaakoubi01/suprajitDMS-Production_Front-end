@@ -3,7 +3,8 @@
  * Domain: Human Resources Management
  */
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { ApiService } from '@core/services/api.service';
 import {
     Employee,
@@ -44,8 +45,47 @@ export class DmsEmployeeService {
         return this.api.post<Employee>(this.endpoint, employee);
     }
 
+    /**
+     * Create an employee with photo upload
+     * Creates employee first, then uploads photo separately
+     */
+    createEmployeeWithPhoto(employee: Partial<Employee>, photo: File): Observable<Employee> {
+        return this.createEmployee(employee).pipe(
+            switchMap((createdEmployee: Employee) => {
+                // After creating employee, upload the photo
+                const empId = createdEmployee.Id_Emp || (createdEmployee as unknown as { id: number }).id;
+                return this.uploadPhoto(empId, photo);
+            })
+        );
+    }
+
     updateEmployee(id: number, employee: Partial<Employee>): Observable<Employee> {
         return this.api.put<Employee>(`${this.endpoint}/${id}`, employee);
+    }
+
+    /**
+     * Update an employee with photo upload
+     * Updates employee first, then uploads photo separately
+     */
+    updateEmployeeWithPhoto(id: number, employee: Partial<Employee>, photo: File | null): Observable<Employee> {
+        return this.updateEmployee(id, employee).pipe(
+            switchMap((updatedEmployee: Employee) => {
+                if (photo) {
+                    // After updating employee, upload the new photo
+                    return this.uploadPhoto(id, photo);
+                }
+                return of(updatedEmployee);
+            })
+        );
+    }
+
+    /**
+     * Upload employee photo using dedicated endpoint
+     */
+    private uploadPhoto(employeeId: number, photo: File): Observable<Employee> {
+        const formData = new FormData();
+        formData.append('picture', photo, photo.name);
+        return this.api.post<Employee>(`${this.endpoint}/${employeeId}/upload-photo`, formData);
     }
 
     deleteEmployee(id: number): Observable<void> {

@@ -1,0 +1,866 @@
+/**
+ * HR Module Theme Styles
+ * Domain: DMS-RH
+ *
+ * Centralized styles for the HR module following Sakai template design patterns
+ */
+
+// ============================================
+// HR Color Palette
+// ============================================
+:root {
+    // Primary HR Color (Purple theme)
+    --hr-primary: #8B5CF6;
+    --hr-primary-light: #A78BFA;
+    --hr-primary-lighter: #C4B5FD;
+    --hr-primary-dark: #7C3AED;
+    --hr-primary-darker: #6D28D9;
+
+    // HR Gradient
+    --hr-gradient: linear-gradient(135deg, var(--hr-primary) 0%, var(--hr-primary-dark) 100%);
+    --hr-gradient-light: linear-gradient(135deg, var(--hr-primary-lighter) 0%, var(--hr-primary-light) 100%);
+
+    // Status Colors
+    --hr-success: #10B981;
+    --hr-success-light: #D1FAE5;
+    --hr-warning: #F59E0B;
+    --hr-warning-light: #FEF3C7;
+    --hr-danger: #EF4444;
+    --hr-danger-light: #FEE2E2;
+    --hr-info: #3B82F6;
+    --hr-info-light: #DBEAFE;
+
+    // Qualification Level Colors
+    --qual-level-0: #9CA3AF;  // Not qualified - Gray
+    --qual-level-1: #F59E0B;  // In training - Orange
+    --qual-level-2: #3B82F6;  // Under supervision - Blue
+    --qual-level-3: #10B981;  // Autonomous - Green
+    --qual-level-4: #8B5CF6;  // Expert/Trainer - Purple
+}
+
+// ============================================
+// Page Header
+// ============================================
+.hr-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--surface-border);
+
+    .header-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--hr-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .title-text {
+            h1 {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: var(--text-color);
+                margin: 0;
+            }
+
+            .subtitle {
+                font-size: 0.875rem;
+                color: var(--text-color-secondary);
+                margin-top: 0.25rem;
+            }
+        }
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+}
+
+// ============================================
+// KPI Cards
+// ============================================
+.hr-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.hr-kpi-card {
+    background: var(--surface-card);
+    border-radius: 16px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--surface-border);
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        border-radius: 16px 0 0 16px;
+    }
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px -8px rgba(139, 92, 246, 0.2);
+    }
+
+    &.kpi-primary::before { background: var(--hr-primary); }
+    &.kpi-success::before { background: var(--hr-success); }
+    &.kpi-warning::before { background: var(--hr-warning); }
+    &.kpi-danger::before { background: var(--hr-danger); }
+    &.kpi-info::before { background: var(--hr-info); }
+
+    .kpi-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .kpi-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-color-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+
+        &.icon-primary {
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--hr-primary);
+        }
+        &.icon-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--hr-success);
+        }
+        &.icon-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--hr-warning);
+        }
+        &.icon-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--hr-danger);
+        }
+        &.icon-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--hr-info);
+        }
+    }
+
+    .kpi-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--text-color);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .kpi-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.5rem;
+        border-radius: 20px;
+
+        &.trend-up {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--hr-success);
+        }
+
+        &.trend-down {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--hr-danger);
+        }
+    }
+
+    .kpi-progress {
+        margin-top: 1rem;
+        height: 6px;
+        background: var(--surface-border);
+        border-radius: 3px;
+        overflow: hidden;
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+
+            &.fill-primary { background: var(--hr-primary); }
+            &.fill-success { background: var(--hr-success); }
+            &.fill-warning { background: var(--hr-warning); }
+            &.fill-danger { background: var(--hr-danger); }
+            &.fill-info { background: var(--hr-info); }
+        }
+    }
+}
+
+// ============================================
+// Stats Cards (Smaller variant)
+// ============================================
+.hr-stat-card {
+    background: var(--surface-card);
+    border-radius: 12px;
+    padding: 1.25rem;
+    border: 1px solid var(--surface-border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+
+    &:hover {
+        border-color: var(--hr-primary-light);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+
+        &.overdue {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--hr-danger);
+        }
+        &.due-soon {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--hr-warning);
+        }
+        &.upcoming {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--hr-info);
+        }
+        &.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--hr-success);
+        }
+    }
+
+    .stat-content {
+        flex: 1;
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-color);
+            line-height: 1;
+
+            &.text-danger { color: var(--hr-danger); }
+            &.text-warning { color: var(--hr-warning); }
+            &.text-info { color: var(--hr-info); }
+            &.text-success { color: var(--hr-success); }
+        }
+
+        .stat-label {
+            font-size: 0.8125rem;
+            color: var(--text-color-secondary);
+            margin-top: 0.25rem;
+        }
+    }
+}
+
+// ============================================
+// Data Cards (Employee, Team, Formation cards)
+// ============================================
+.hr-data-card {
+    background: var(--surface-card);
+    border-radius: 16px;
+    border: 1px solid var(--surface-border);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+        border-color: var(--hr-primary-light);
+    }
+
+    .card-header {
+        padding: 1rem 1.25rem;
+        background: var(--surface-50);
+        border-bottom: 1px solid var(--surface-border);
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0;
+        }
+    }
+
+    .card-body {
+        padding: 1.25rem;
+        flex: 1;
+    }
+
+    .card-footer {
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid var(--surface-border);
+        background: var(--surface-50);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+}
+
+// ============================================
+// Employee Avatar with Badge
+// ============================================
+.hr-avatar-badge {
+    position: relative;
+    display: inline-flex;
+
+    .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--hr-gradient);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1rem;
+        border: 2px solid var(--surface-card);
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        &.avatar-sm {
+            width: 36px;
+            height: 36px;
+            font-size: 0.875rem;
+        }
+
+        &.avatar-lg {
+            width: 64px;
+            height: 64px;
+            font-size: 1.5rem;
+        }
+    }
+
+    .badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid var(--surface-card);
+
+        &.badge-active { background: var(--hr-success); }
+        &.badge-inactive { background: var(--hr-danger); }
+        &.badge-training { background: var(--hr-warning); }
+    }
+}
+
+// ============================================
+// Employee Info Display
+// ============================================
+.hr-employee-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .employee-details {
+        .employee-name {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.9375rem;
+        }
+
+        .employee-meta {
+            font-size: 0.8125rem;
+            color: var(--text-color-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.125rem;
+
+            .separator {
+                width: 3px;
+                height: 3px;
+                border-radius: 50%;
+                background: var(--text-color-secondary);
+            }
+        }
+    }
+}
+
+// ============================================
+// Qualification Level Badge
+// ============================================
+.hr-qual-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: white;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+
+    &:hover {
+        transform: scale(1.1);
+    }
+
+    &.level-0 { background: var(--qual-level-0); }
+    &.level-1 { background: var(--qual-level-1); }
+    &.level-2 { background: var(--qual-level-2); }
+    &.level-3 { background: var(--qual-level-3); }
+    &.level-4 { background: var(--qual-level-4); }
+
+    &.badge-sm {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+        border-radius: 6px;
+    }
+
+    &.badge-lg {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+        border-radius: 10px;
+    }
+}
+
+// ============================================
+// Custom Table Styles
+// ============================================
+.hr-table {
+    &.p-datatable {
+        .p-datatable-thead > tr > th {
+            background: var(--surface-50);
+            color: var(--text-color);
+            font-weight: 600;
+            font-size: 0.8125rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-color: var(--surface-border);
+        }
+
+        .p-datatable-tbody > tr {
+            transition: background-color 0.2s ease;
+
+            &:hover {
+                background: var(--surface-hover);
+            }
+
+            > td {
+                border-color: var(--surface-border);
+                padding: 1rem;
+            }
+        }
+
+        .p-datatable-footer {
+            background: var(--surface-50);
+            border-color: var(--surface-border);
+        }
+    }
+}
+
+// ============================================
+// Toolbar Styles
+// ============================================
+.hr-toolbar {
+    background: var(--surface-card) !important;
+    border: 1px solid var(--surface-border) !important;
+    border-radius: 12px !important;
+    padding: 1rem 1.25rem !important;
+
+    .toolbar-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        i {
+            color: var(--hr-primary);
+        }
+    }
+
+    .toolbar-search {
+        position: relative;
+
+        input {
+            padding-left: 2.5rem;
+            border-radius: 8px;
+            min-width: 280px;
+
+            &:focus {
+                border-color: var(--hr-primary);
+                box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
+            }
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-color-secondary);
+        }
+    }
+}
+
+// ============================================
+// Section Card (for grouping content)
+// ============================================
+.hr-section-card {
+    background: var(--surface-card);
+    border-radius: 16px;
+    border: 1px solid var(--surface-border);
+    overflow: hidden;
+
+    .section-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--surface-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+
+            i {
+                color: var(--hr-primary);
+            }
+        }
+
+        .section-badge {
+            background: var(--hr-primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    }
+
+    .section-body {
+        padding: 1.5rem;
+    }
+
+    .section-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--surface-border);
+        background: var(--surface-50);
+    }
+}
+
+// ============================================
+// Legend Component
+// ============================================
+.hr-legend {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    background: var(--surface-50);
+    border-radius: 10px;
+
+    .legend-title {
+        font-weight: 600;
+        color: var(--text-color);
+        font-size: 0.875rem;
+    }
+
+    .legend-items {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .legend-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .legend-label {
+            font-size: 0.8125rem;
+            color: var(--text-color-secondary);
+        }
+    }
+}
+
+// ============================================
+// Empty State
+// ============================================
+.hr-empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+
+    .empty-icon {
+        font-size: 4rem;
+        color: var(--text-color-secondary);
+        opacity: 0.5;
+        margin-bottom: 1.5rem;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0 0 0.5rem 0;
+    }
+
+    p {
+        color: var(--text-color-secondary);
+        margin: 0 0 1.5rem 0;
+    }
+}
+
+// ============================================
+// Loading Overlay
+// ============================================
+.hr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    min-height: 300px;
+
+    .loading-spinner {
+        margin-bottom: 1rem;
+    }
+
+    .loading-text {
+        font-size: 1rem;
+        color: var(--text-color-secondary);
+        font-weight: 500;
+    }
+}
+
+// ============================================
+// Action Buttons Group
+// ============================================
+.hr-action-buttons {
+    display: flex;
+    gap: 0.25rem;
+
+    .p-button {
+        &.p-button-text {
+            &:hover {
+                background: var(--surface-hover);
+            }
+        }
+    }
+}
+
+// ============================================
+// Info Row (for displaying key-value pairs)
+// ============================================
+.hr-info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+
+    i {
+        font-size: 0.875rem;
+        color: var(--hr-primary);
+    }
+}
+
+// ============================================
+// Days Indicator (for recyclage/expiration)
+// ============================================
+.hr-days-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+
+    &.overdue {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--hr-danger);
+    }
+
+    &.due-soon {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--hr-warning);
+    }
+
+    &.upcoming {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--hr-info);
+    }
+
+    &.ok {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--hr-success);
+    }
+}
+
+// ============================================
+// Chart Container
+// ============================================
+.hr-chart-container {
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+// ============================================
+// Filter Pills
+// ============================================
+.hr-filter-pills {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    .filter-pill {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid var(--surface-border);
+        background: var(--surface-card);
+        color: var(--text-color-secondary);
+
+        &:hover {
+            border-color: var(--hr-primary-light);
+            color: var(--hr-primary);
+        }
+
+        &.active {
+            background: var(--hr-primary);
+            border-color: var(--hr-primary);
+            color: white;
+        }
+    }
+}
+
+// ============================================
+// Responsive Adjustments
+// ============================================
+@media (max-width: 768px) {
+    .hr-page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+
+        .header-actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+    }
+
+    .hr-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hr-toolbar {
+        flex-direction: column;
+        gap: 1rem;
+
+        .toolbar-search input {
+            min-width: 100%;
+        }
+    }
+}
+
+// ============================================
+// Dark Mode Adjustments
+// ============================================
+:root[data-p-theme="dark"],
+.p-dark {
+    --hr-gradient-light: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.2) 100%);
+
+    .hr-kpi-card {
+        &:hover {
+            box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.4);
+        }
+    }
+
+    .hr-data-card {
+        .card-header,
+        .card-footer {
+            background: var(--surface-100);
+        }
+    }
+
+    .hr-section-card {
+        .section-footer {
+            background: var(--surface-100);
+        }
+    }
+}

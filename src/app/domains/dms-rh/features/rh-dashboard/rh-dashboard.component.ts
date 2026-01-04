@@ -2,7 +2,7 @@
  * RH Dashboard Component
  * Domain: DMS-RH
  *
- * Displays HR KPIs, statistics, and charts
+ * Displays HR KPIs, statistics, and charts with modern Sakai template styling
  */
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -15,6 +15,10 @@ import { ChartModule } from 'primeng/chart';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
+import { ButtonModule } from 'primeng/button';
+import { TooltipModule } from 'primeng/tooltip';
+import { AvatarModule } from 'primeng/avatar';
+import { RippleModule } from 'primeng/ripple';
 
 // Domain imports
 import { DmsRhDashboardService, HRDashboardStats, HRKpi, HRQuickStats } from '@domains/dms-rh';
@@ -23,9 +27,10 @@ interface KpiCard {
     label: string;
     value: number;
     icon: string;
-    color: string;
+    color: 'primary' | 'success' | 'warning' | 'danger' | 'info';
     trend: number;
     progress: number;
+    subtitle?: string;
 }
 
 @Component({
@@ -37,241 +42,393 @@ interface KpiCard {
         ChartModule,
         ProgressBarModule,
         SkeletonModule,
-        TagModule
+        TagModule,
+        ButtonModule,
+        TooltipModule,
+        AvatarModule,
+        RippleModule
     ],
     template: `
         <div class="rh-dashboard">
-            <!-- Loading Skeleton -->
-            <div class="kpi-row" *ngIf="loading">
-                <div class="modern-kpi-card" *ngFor="let i of [1,2,3,4]">
-                    <div class="flex justify-content-between mb-3">
-                        <p-skeleton width="60%" height="1rem"></p-skeleton>
-                        <p-skeleton shape="circle" size="3rem"></p-skeleton>
+            <!-- Page Header -->
+            <div class="hr-page-header">
+                <div class="header-title">
+                    <div class="header-icon">
+                        <i class="pi pi-users"></i>
                     </div>
-                    <p-skeleton width="40%" height="2rem" styleClass="mb-2"></p-skeleton>
-                    <p-skeleton width="80%" height="0.5rem"></p-skeleton>
+                    <div class="title-text">
+                        <h1>HR Dashboard</h1>
+                        <span class="subtitle">Overview of human resources metrics</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button pButton pRipple
+                            icon="pi pi-refresh"
+                            class="p-button-text p-button-rounded"
+                            (click)="loadStats()"
+                            [loading]="loading"
+                            pTooltip="Refresh data">
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Skeleton -->
+            <div class="hr-kpi-grid" *ngIf="loading">
+                <div class="hr-kpi-card kpi-primary" *ngFor="let i of [1,2,3,4]">
+                    <div class="kpi-header">
+                        <p-skeleton width="80px" height="14px"></p-skeleton>
+                        <p-skeleton width="48px" height="48px" borderRadius="12px"></p-skeleton>
+                    </div>
+                    <p-skeleton width="80px" height="40px" styleClass="mb-2"></p-skeleton>
+                    <p-skeleton width="100%" height="6px" borderRadius="3px"></p-skeleton>
                 </div>
             </div>
 
             <!-- KPI Cards -->
-            <div class="kpi-row" *ngIf="!loading && kpiCards.length">
-                <div class="modern-kpi-card" *ngFor="let kpi of kpiCards"
-                     (click)="onKpiClick(kpi)">
+            <div class="hr-kpi-grid" *ngIf="!loading && kpiCards.length">
+                <div class="hr-kpi-card"
+                     [ngClass]="'kpi-' + kpi.color"
+                     *ngFor="let kpi of kpiCards"
+                     (click)="onKpiClick(kpi)"
+                     pRipple>
                     <div class="kpi-header">
                         <span class="kpi-label">{{ kpi.label }}</span>
-                        <div class="kpi-icon-wrapper" [ngClass]="'bg-' + kpi.color + '-100'">
-                            <i [ngClass]="kpi.icon + ' text-' + kpi.color + '-500'"></i>
+                        <div class="kpi-icon" [ngClass]="'icon-' + kpi.color">
+                            <i [class]="kpi.icon"></i>
                         </div>
                     </div>
-                    <div class="kpi-body">
-                        <span class="kpi-value">{{ kpi.value }}</span>
-                        <div class="kpi-trend" [class.positive]="kpi.trend > 0" [class.negative]="kpi.trend < 0">
-                            <i [ngClass]="kpi.trend >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"></i>
-                            <span>{{ kpi.trend >= 0 ? '+' : '' }}{{ kpi.trend }}% vs last month</span>
-                        </div>
+                    <div class="kpi-value">{{ kpi.value | number }}</div>
+                    <div class="kpi-trend" [ngClass]="kpi.trend >= 0 ? 'trend-up' : 'trend-down'">
+                        <i [class]="kpi.trend >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"></i>
+                        {{ kpi.trend >= 0 ? '+' : '' }}{{ kpi.trend }}%
                     </div>
-                    <p-progressBar [value]="kpi.progress" [showValue]="false" styleClass="h-1 mt-3"></p-progressBar>
+                    <div class="kpi-progress">
+                        <div class="progress-fill"
+                             [ngClass]="'fill-' + kpi.color"
+                             [style.width.%]="kpi.progress"></div>
+                    </div>
                 </div>
             </div>
 
             <!-- Charts Row -->
-            <div class="charts-row" *ngIf="!loading && stats">
-                <p-card header="Employees by Department">
-                    <div class="chart-container">
-                        <p-chart type="doughnut" [data]="employeesByDeptChart" [options]="pieChartOptions"></p-chart>
+            <div class="grid" *ngIf="!loading && stats">
+                <div class="col-12 lg:col-4">
+                    <div class="hr-section-card">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-building"></i>
+                                Employees by Department
+                            </span>
+                        </div>
+                        <div class="section-body">
+                            <div class="hr-chart-container">
+                                <p-chart type="doughnut"
+                                         [data]="employeesByDeptChart"
+                                         [options]="doughnutOptions"
+                                         [style]="{'width': '100%', 'height': '100%'}">
+                                </p-chart>
+                            </div>
+                        </div>
                     </div>
-                </p-card>
+                </div>
 
-                <p-card header="Employees by Category">
-                    <div class="chart-container">
-                        <p-chart type="pie" [data]="employeesByCategoryChart" [options]="pieChartOptions"></p-chart>
+                <div class="col-12 lg:col-4">
+                    <div class="hr-section-card">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-tags"></i>
+                                Employees by Category
+                            </span>
+                        </div>
+                        <div class="section-body">
+                            <div class="hr-chart-container">
+                                <p-chart type="pie"
+                                         [data]="employeesByCategoryChart"
+                                         [options]="pieOptions"
+                                         [style]="{'width': '100%', 'height': '100%'}">
+                                </p-chart>
+                            </div>
+                        </div>
                     </div>
-                </p-card>
+                </div>
 
-                <p-card header="Qualification Rate">
-                    <div class="chart-container">
-                        <p-chart type="bar" [data]="qualificationChart" [options]="barChartOptions"></p-chart>
+                <div class="col-12 lg:col-4">
+                    <div class="hr-section-card">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-chart-bar"></i>
+                                Qualification Rate
+                            </span>
+                        </div>
+                        <div class="section-body">
+                            <div class="hr-chart-container">
+                                <p-chart type="bar"
+                                         [data]="qualificationChart"
+                                         [options]="barOptions"
+                                         [style]="{'width': '100%', 'height': '100%'}">
+                                </p-chart>
+                            </div>
+                        </div>
                     </div>
-                </p-card>
+                </div>
             </div>
 
             <!-- Stats Row -->
-            <div class="stats-row" *ngIf="!loading && stats">
-                <p-card header="Versatility Score">
-                    <div class="versatility-score">
-                        <div class="score-circle">
-                            <span class="score-value">{{ stats.averageVersatility | number:'1.1-1' }}</span>
-                            <span class="score-max">/ 4</span>
+            <div class="grid mt-3" *ngIf="!loading && stats">
+                <div class="col-12 md:col-4">
+                    <div class="hr-section-card">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-star"></i>
+                                Versatility Score
+                            </span>
                         </div>
-                        <p-progressBar [value]="(stats.averageVersatility / 4) * 100" [showValue]="false"></p-progressBar>
-                        <span class="score-label">Average Versatility Level</span>
+                        <div class="section-body">
+                            <div class="versatility-display">
+                                <div class="score-ring">
+                                    <svg viewBox="0 0 120 120" class="score-svg">
+                                        <circle cx="60" cy="60" r="50" fill="none"
+                                                stroke="var(--surface-border)" stroke-width="10"/>
+                                        <circle cx="60" cy="60" r="50" fill="none"
+                                                stroke="var(--hr-primary)" stroke-width="10"
+                                                [attr.stroke-dasharray]="getVersatilityDashArray()"
+                                                stroke-linecap="round"
+                                                transform="rotate(-90 60 60)"/>
+                                    </svg>
+                                    <div class="score-center">
+                                        <span class="score-value">{{ stats.averageVersatility | number:'1.1-1' }}</span>
+                                        <span class="score-max">/ 4</span>
+                                    </div>
+                                </div>
+                                <span class="score-label">Average Versatility Level</span>
+                            </div>
+                        </div>
                     </div>
-                </p-card>
+                </div>
 
-                <p-card header="Recyclage Alerts">
-                    <div class="recyclage-info">
-                        <span class="alert-count" [class.danger]="stats.employeesRequiringRecyclage > 5">
-                            {{ stats.employeesRequiringRecyclage }}
-                        </span>
-                        <span class="alert-label">Employees requiring recyclage</span>
-                        <button class="p-button p-button-text p-button-sm mt-2" (click)="onViewRecyclage()">
-                            View Details <i class="pi pi-arrow-right ml-1"></i>
-                        </button>
+                <div class="col-12 md:col-4">
+                    <div class="hr-section-card">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-exclamation-triangle"></i>
+                                Recyclage Alerts
+                            </span>
+                            <span class="section-badge" *ngIf="stats.employeesRequiringRecyclage > 0">
+                                {{ stats.employeesRequiringRecyclage }}
+                            </span>
+                        </div>
+                        <div class="section-body">
+                            <div class="recyclage-display">
+                                <div class="recyclage-value" [class.danger]="stats.employeesRequiringRecyclage > 5">
+                                    {{ stats.employeesRequiringRecyclage }}
+                                </div>
+                                <span class="recyclage-label">Employees requiring recyclage</span>
+                                <button pButton pRipple
+                                        label="View Details"
+                                        icon="pi pi-arrow-right"
+                                        iconPos="right"
+                                        class="p-button-text p-button-sm mt-3"
+                                        (click)="onViewRecyclage()">
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </p-card>
+                </div>
 
-                <p-card header="Qualification Completion">
-                    <div class="completion-info">
-                        <span class="completion-rate">{{ stats.qualificationCompletionRate }}%</span>
-                        <p-progressBar [value]="stats.qualificationCompletionRate" [showValue]="false"></p-progressBar>
-                        <span class="completion-label">Qualification completion rate</span>
+                <div class="col-12 md:col-4">
+                    <div class="hr-section-card">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-verified"></i>
+                                Qualification Completion
+                            </span>
+                        </div>
+                        <div class="section-body">
+                            <div class="completion-display">
+                                <div class="completion-value">{{ stats.qualificationCompletionRate | number:'1.0-0' }}%</div>
+                                <div class="completion-bar">
+                                    <div class="completion-fill"
+                                         [style.width.%]="stats.qualificationCompletionRate">
+                                    </div>
+                                </div>
+                                <span class="completion-label">of employees fully qualified</span>
+                            </div>
+                        </div>
                     </div>
-                </p-card>
+                </div>
+            </div>
+
+            <!-- Recent Hires -->
+            <div class="hr-section-card mt-3" *ngIf="!loading && stats?.recentHires?.length">
+                <div class="section-header">
+                    <span class="section-title">
+                        <i class="pi pi-user-plus"></i>
+                        Recent Hires
+                    </span>
+                    <p-tag [value]="(stats?.recentHires?.length || 0) + ' new'" severity="info"></p-tag>
+                </div>
+                <div class="section-body">
+                    <div class="recent-hires-grid">
+                        <div class="hire-card" *ngFor="let hire of (stats?.recentHires || []).slice(0, 6)">
+                            <div class="hr-avatar-badge">
+                                <p-avatar [label]="getInitials(hire)"
+                                          shape="circle"
+                                          size="large"
+                                          [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
+                                </p-avatar>
+                                <span class="badge badge-active"></span>
+                            </div>
+                            <div class="hire-info">
+                                <span class="hire-name">{{ hire.Prenom_Emp }} {{ hire.Nom_Emp }}</span>
+                                <span class="hire-dept">{{ hire.Departement_Emp }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `,
     styles: [`
         .rh-dashboard {
-            padding: 1rem;
-        }
-
-        .kpi-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .modern-kpi-card {
-            background: var(--surface-card);
-            border-radius: 12px;
             padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            cursor: pointer;
-            transition: all 0.2s;
-
-            &:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-            }
         }
 
-        .kpi-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-        }
-
-        .kpi-label {
-            font-size: 0.875rem;
-            color: var(--text-color-secondary);
-            font-weight: 500;
-        }
-
-        .kpi-icon-wrapper {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            i {
-                font-size: 1.5rem;
-            }
-        }
-
-        .kpi-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-color);
-        }
-
-        .kpi-trend {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.75rem;
-            margin-top: 0.5rem;
-
-            &.positive {
-                color: var(--green-500);
-            }
-
-            &.negative {
-                color: var(--red-500);
-            }
-        }
-
-        .charts-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .chart-container {
-            height: 250px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
-        }
-
-        .versatility-score,
-        .recyclage-info,
-        .completion-info {
+        /* Versatility Display */
+        .versatility-display {
             text-align: center;
-            padding: 1rem;
+            padding: 1rem 0;
         }
 
-        .score-circle {
-            display: flex;
-            align-items: baseline;
-            justify-content: center;
-            margin-bottom: 1rem;
+        .score-ring {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            margin: 0 auto 1rem;
+        }
+
+        .score-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .score-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
         }
 
         .score-value {
-            font-size: 3rem;
+            font-size: 2rem;
             font-weight: 700;
-            color: var(--primary-color);
+            color: var(--hr-primary);
+            display: block;
         }
 
         .score-max {
-            font-size: 1.25rem;
-            color: var(--text-color-secondary);
-        }
-
-        .score-label,
-        .alert-label,
-        .completion-label {
-            display: block;
-            margin-top: 0.5rem;
             font-size: 0.875rem;
             color: var(--text-color-secondary);
         }
 
-        .alert-count {
-            font-size: 3rem;
+        .score-label {
+            font-size: 0.875rem;
+            color: var(--text-color-secondary);
+        }
+
+        /* Recyclage Display */
+        .recyclage-display {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .recyclage-value {
+            font-size: 3.5rem;
             font-weight: 700;
-            color: var(--orange-500);
+            color: var(--hr-warning);
+            line-height: 1;
 
             &.danger {
-                color: var(--red-500);
+                color: var(--hr-danger);
             }
         }
 
-        .completion-rate {
+        .recyclage-label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-color-secondary);
+            margin-top: 0.5rem;
+        }
+
+        /* Completion Display */
+        .completion-display {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .completion-value {
             font-size: 3rem;
             font-weight: 700;
-            color: var(--green-500);
+            color: var(--hr-success);
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+
+        .completion-bar {
+            height: 12px;
+            background: var(--surface-border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .completion-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--hr-success) 0%, #34D399 100%);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        .completion-label {
+            font-size: 0.875rem;
+            color: var(--text-color-secondary);
+        }
+
+        /* Recent Hires Grid */
+        .recent-hires-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .hire-card {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--surface-50);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background: var(--surface-100);
+            }
+        }
+
+        .hire-info {
+            display: flex;
+            flex-direction: column;
+
+            .hire-name {
+                font-weight: 600;
+                color: var(--text-color);
+                font-size: 0.9375rem;
+            }
+
+            .hire-dept {
+                font-size: 0.8125rem;
+                color: var(--text-color-secondary);
+            }
         }
     `]
 })
@@ -290,16 +447,34 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
     employeesByCategoryChart: any;
     qualificationChart: any;
 
-    pieChartOptions = {
+    doughnutOptions = {
+        cutout: '60%',
         plugins: {
             legend: {
-                position: 'bottom'
+                position: 'bottom',
+                labels: {
+                    usePointStyle: true,
+                    padding: 16
+                }
             }
         },
         maintainAspectRatio: false
     };
 
-    barChartOptions = {
+    pieOptions = {
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    usePointStyle: true,
+                    padding: 16
+                }
+            }
+        },
+        maintainAspectRatio: false
+    };
+
+    barOptions = {
         plugins: {
             legend: {
                 display: false
@@ -307,7 +482,15 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
         },
         scales: {
             y: {
-                beginAtZero: true
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.05)'
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                }
             }
         },
         maintainAspectRatio: false
@@ -335,7 +518,6 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this.destroy$))
             .subscribe({
                 next: (stats: any) => {
-                    // Map snake_case API response to camelCase model
                     this.stats = this.mapApiResponse(stats);
                     this.buildKpiCards();
                     this.buildCharts();
@@ -364,40 +546,44 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
     private buildKpiCards(): void {
         if (!this.stats) return;
 
-        const totalEmployees = this.stats.totalEmployees || 1; // Avoid division by zero
+        const totalEmployees = this.stats.totalEmployees || 1;
 
         this.kpiCards = [
             {
                 label: 'Total Employees',
                 value: this.stats.totalEmployees || 0,
                 icon: 'pi pi-users',
-                color: 'blue',
+                color: 'primary',
                 trend: 5,
-                progress: 100
+                progress: 100,
+                subtitle: 'All registered employees'
             },
             {
                 label: 'Active Employees',
                 value: this.stats.activeEmployees || 0,
                 icon: 'pi pi-check-circle',
-                color: 'green',
+                color: 'success',
                 trend: 3,
-                progress: ((this.stats.activeEmployees || 0) / totalEmployees) * 100
+                progress: ((this.stats.activeEmployees || 0) / totalEmployees) * 100,
+                subtitle: 'Currently working'
             },
             {
                 label: 'Recyclage Required',
                 value: this.stats.employeesRequiringRecyclage || 0,
                 icon: 'pi pi-refresh',
-                color: 'orange',
+                color: this.stats.employeesRequiringRecyclage > 5 ? 'danger' : 'warning',
                 trend: -2,
-                progress: ((this.stats.employeesRequiringRecyclage || 0) / totalEmployees) * 100
+                progress: ((this.stats.employeesRequiringRecyclage || 0) / totalEmployees) * 100,
+                subtitle: 'Need retraining'
             },
             {
                 label: 'Qualification Rate',
                 value: Math.round(this.stats.qualificationCompletionRate || 0),
                 icon: 'pi pi-chart-line',
-                color: 'purple',
+                color: 'info',
                 trend: 8,
-                progress: this.stats.qualificationCompletionRate || 0
+                progress: this.stats.qualificationCompletionRate || 0,
+                subtitle: '% fully qualified'
             }
         ];
     }
@@ -406,31 +592,32 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
         if (!this.stats) return;
 
         const colors = [
-            '#2563EB', '#10B981', '#F59E0B', '#EF4444',
-            '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
+            '#8B5CF6', '#10B981', '#F59E0B', '#EF4444',
+            '#3B82F6', '#EC4899', '#06B6D4', '#84CC16'
         ];
 
-        // Employees by Department - with null check
         const deptData = this.stats.employeesByDepartment || [];
         this.employeesByDeptChart = {
-            labels: deptData.map((d: any) => d.department),
+            labels: deptData.map((d: any) => d.department || d.Departement_Emp),
             datasets: [{
-                data: deptData.map((d: any) => d.count),
-                backgroundColor: colors.slice(0, deptData.length)
+                data: deptData.map((d: any) => d.count || d.total),
+                backgroundColor: colors.slice(0, deptData.length),
+                borderWidth: 0,
+                hoverOffset: 8
             }]
         };
 
-        // Employees by Category - with null check
         const categoryData = this.stats.employeesByCategory || [];
         this.employeesByCategoryChart = {
-            labels: categoryData.map((c: any) => c.category),
+            labels: categoryData.map((c: any) => c.category || c.Categorie_Emp),
             datasets: [{
-                data: categoryData.map((c: any) => c.count),
-                backgroundColor: colors.slice(0, categoryData.length)
+                data: categoryData.map((c: any) => c.count || c.total),
+                backgroundColor: colors.slice(0, categoryData.length),
+                borderWidth: 0,
+                hoverOffset: 8
             }]
         };
 
-        // Qualification Chart
         const qualRate = this.stats.qualificationCompletionRate || 0;
         this.qualificationChart = {
             labels: ['Qualified', 'In Training', 'Not Qualified'],
@@ -440,9 +627,25 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
                     Math.round((100 - qualRate) * 0.4),
                     Math.round((100 - qualRate) * 0.6)
                 ],
-                backgroundColor: ['#10B981', '#F59E0B', '#EF4444']
+                backgroundColor: ['#10B981', '#F59E0B', '#EF4444'],
+                borderWidth: 0,
+                borderRadius: 4,
+                barThickness: 40
             }]
         };
+    }
+
+    getVersatilityDashArray(): string {
+        if (!this.stats) return '0, 314';
+        const circumference = 2 * Math.PI * 50;
+        const progress = (this.stats.averageVersatility / 4) * circumference;
+        return `${progress}, ${circumference}`;
+    }
+
+    getInitials(employee: any): string {
+        const first = employee?.Prenom_Emp?.charAt(0) || '';
+        const last = employee?.Nom_Emp?.charAt(0) || '';
+        return (first + last).toUpperCase() || '?';
     }
 
     onKpiClick(kpi: KpiCard): void {

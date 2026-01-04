@@ -145,7 +145,8 @@ export class HrComponent implements OnInit, OnDestroy {
     private destroy$ = new Subject<void>();
 
     // Active Tab
-    activeTab = '0';
+    activeTab = '0';  // Legacy - kept for compatibility
+    activeTabIndex = 0;  // Numeric index for PrimeNG tabs
 
     // Loading States
     loading = false;
@@ -170,11 +171,11 @@ export class HrComponent implements OnInit, OnDestroy {
         if (!this.versatilityMatrix) return [];
         const seen = new Set<string>();
         return this.versatilityMatrix.workstations.filter(ws => {
-            const name = ws.desc_workstation?.toLowerCase().trim() || '';
-            if (seen.has(name)) {
+            const wsName = ws.name?.toLowerCase().trim() || '';
+            if (seen.has(wsName)) {
                 return false;
             }
-            seen.add(name);
+            seen.add(wsName);
             return true;
         });
     }
@@ -538,6 +539,7 @@ export class HrComponent implements OnInit, OnDestroy {
         this.route.data.pipe(takeUntil(this.destroy$)).subscribe(data => {
             if (data['tab']) {
                 this.activeTab = this.tabMapping[data['tab']] || '0';
+                this.activeTabIndex = parseInt(this.activeTab, 10);
                 this.loadDataForActiveTab();
             }
         });
@@ -1730,11 +1732,10 @@ export class HrComponent implements OnInit, OnDestroy {
                         EmpStatus: 'Active'
                     })),
                     workstations: data.workstations.map((w: any) => ({
-                        id_workstation: w.id_workstation,
-                        name_workstation: w.name,
-                        code_workstation: w.code,
-                        desc_workstation: w.desc_workstation || w.name,
-                        id_process: null
+                        id: w.id || w.id_workstation,
+                        name: w.name || w.desc_workstation,
+                        code: w.code || '',
+                        production_line: w.production_line || 0
                     })),
                     cells: data.cells.map((c: any) => ({
                         employeeId: c.employeeId,
@@ -3362,9 +3363,11 @@ export class HrComponent implements OnInit, OnDestroy {
     }
 
     onTabChange(newValue: string | number | undefined): void {
-        const tabValue = newValue?.toString() || '0';
+        const tabIndex = typeof newValue === 'number' ? newValue : parseInt(newValue?.toString() || '0', 10);
+        const tabValue = tabIndex.toString();
 
-        // Update activeTab explicitly for loadDataForActiveTab
+        // Update both activeTab and activeTabIndex
+        this.activeTabIndex = tabIndex;
         this.activeTab = tabValue;
 
         // Force chart recreation when returning to dashboard tab
@@ -3381,6 +3384,17 @@ export class HrComponent implements OnInit, OnDestroy {
         }
 
         // Load data for the active tab (lazy loading)
+        this.loadDataForActiveTab();
+    }
+
+    /**
+     * Navigate to Recyclage tab from dashboard
+     */
+    goToRecyclageTab(): void {
+        console.log('goToRecyclageTab called, changing to tab 4');
+        this.activeTabIndex = 4;
+        this.activeTab = '4';
+        this.cdr.detectChanges();
         this.loadDataForActiveTab();
     }
 

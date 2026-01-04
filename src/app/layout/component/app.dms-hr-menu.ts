@@ -67,6 +67,11 @@ export class AppDmsHrMenu {
                         label: 'Workstations',
                         icon: 'pi pi-fw pi-desktop',
                         routerLink: ['/dms-hr/workstations']
+                    },
+                    {
+                        label: 'Affectations',
+                        icon: 'pi pi-fw pi-link',
+                        routerLink: ['/dms-hr/affectations']
                     }
                 ]
             },

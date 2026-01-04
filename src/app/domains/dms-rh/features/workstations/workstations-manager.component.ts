@@ -23,6 +23,13 @@ import { InputTextModule } from 'primeng/inputtext';
 
 // Domain imports
 import { DmsQualificationService, HRWorkstation, HRProcess } from '@domains/dms-rh';
+import { ApiService } from '@core/services/api.service';
+
+interface ProductionLine {
+    id: number;
+    name: string;
+    code: string;
+}
 
 @Component({
     selector: 'app-workstations-manager',
@@ -53,10 +60,10 @@ import { DmsQualificationService, HRWorkstation, HRProcess } from '@domains/dms-
                     <p-tabpanel value="workstations">
                         <p-toolbar styleClass="mb-3 surface-ground border-round">
                             <ng-template #start>
-                                <p-select [options]="processes"
-                                          [(ngModel)]="selectedProcess"
-                                          (onChange)="onProcessFilterChange()"
-                                          placeholder="Filter by Process"
+                                <p-select [options]="productionLines"
+                                          [(ngModel)]="selectedProductionLine"
+                                          (onChange)="onProductionLineFilterChange()"
+                                          placeholder="Filter by Production Line"
                                           optionLabel="name"
                                           optionValue="id"
                                           [showClear]="true">
@@ -78,10 +85,10 @@ import { DmsQualificationService, HRWorkstation, HRProcess } from '@domains/dms-
 
                             <ng-template pTemplate="header">
                                 <tr>
-                                    <th pSortableColumn="desc_workstation">Name</th>
-                                    <th>Process</th>
+                                    <th pSortableColumn="name">Name</th>
+                                    <th pSortableColumn="code">Code</th>
+                                    <th>Production Line</th>
                                     <th>Mode</th>
-                                    <th>KPI Index</th>
                                     <th pSortableColumn="cycle_time_seconds">Cycle Time</th>
                                     <th>Critical</th>
                                     <th>Actions</th>
@@ -91,15 +98,15 @@ import { DmsQualificationService, HRWorkstation, HRProcess } from '@domains/dms-
                             <ng-template pTemplate="body" let-ws>
                                 <tr>
                                     <td>
-                                        <span class="font-semibold">{{ ws.desc_workstation }}</span>
+                                        <span class="font-semibold">{{ ws.name }}</span>
                                     </td>
-                                    <td>{{ ws.Process?.name || '-' }}</td>
+                                    <td>{{ ws.code }}</td>
+                                    <td>{{ ws.production_line_name || '-' }}</td>
                                     <td>
                                         <p-tag [value]="getModeLabel(ws.process_mode)"
                                                [severity]="getModeSeverity(ws.process_mode)">
                                         </p-tag>
                                     </td>
-                                    <td>{{ ws.kpi_index || '-' }}</td>
                                     <td>{{ ws.cycle_time_seconds ? ws.cycle_time_seconds + 's' : '-' }}</td>
                                     <td>
                                         <i *ngIf="ws.is_critical" class="pi pi-exclamation-triangle text-orange-500"></i>
@@ -232,10 +239,14 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
     private destroy$ = new Subject<void>();
 
     activeTab = 'workstations';
-    selectedProcess: number | null = null;
+    selectedProductionLine: number | null = null;
     filteredWorkstations: HRWorkstation[] = [];
+    productionLines: ProductionLine[] = [];
 
-    constructor(private qualificationService: DmsQualificationService) {}
+    constructor(
+        private qualificationService: DmsQualificationService,
+        private api: ApiService
+    ) {}
 
     ngOnInit(): void {
         if (this.workstations.length === 0) {
@@ -247,6 +258,8 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
         if (this.processes.length === 0) {
             this.loadProcesses();
         }
+
+        this.loadProductionLines();
     }
 
     ngOnDestroy(): void {
@@ -256,7 +269,7 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
 
     loadWorkstations(): void {
         this.loading = true;
-        const params = this.selectedProcess ? { processId: this.selectedProcess } : undefined;
+        const params = this.selectedProductionLine ? { productionLineId: this.selectedProductionLine } : undefined;
 
         this.qualificationService.getHRWorkstations(params)
             .pipe(takeUntil(this.destroy$))
@@ -280,10 +293,28 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
             });
     }
 
-    onProcessFilterChange(): void {
-        if (this.selectedProcess) {
+    loadProductionLines(): void {
+        this.api.get<ProductionLine[]>('production/lines')
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+                next: (data: any) => {
+                    const lines = data.results || data;
+                    this.productionLines = lines.map((l: any) => ({
+                        id: l.id,
+                        name: l.name,
+                        code: l.code
+                    }));
+                },
+                error: () => {
+                    this.productionLines = [];
+                }
+            });
+    }
+
+    onProductionLineFilterChange(): void {
+        if (this.selectedProductionLine) {
             this.filteredWorkstations = this.workstations.filter(
-                ws => ws.id_process === this.selectedProcess
+                ws => ws.production_line === this.selectedProductionLine
             );
         } else {
             this.filteredWorkstations = [...this.workstations];
@@ -309,7 +340,9 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
     }
 
     getWorkstationCount(process: HRProcess): number {
-        return this.workstations.filter(ws => ws.id_process === process.id).length;
+        // Note: Workstations are linked to ProductionLines, not Processes
+        // This returns 0 as the relationship doesn't exist in the current data model
+        return 0;
     }
 
     onAddWorkstation(): void {

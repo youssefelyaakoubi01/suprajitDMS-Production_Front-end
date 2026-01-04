@@ -2,7 +2,7 @@
  * Versatility Matrix Component
  * Domain: DMS-RH
  *
- * Displays and manages the employee versatility/qualification matrix
+ * Displays and manages the employee versatility/qualification matrix with modern styling
  */
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -21,6 +21,8 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { AvatarModule } from 'primeng/avatar';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { RippleModule } from 'primeng/ripple';
+import { BadgeModule } from 'primeng/badge';
 
 // Domain imports
 import {
@@ -49,289 +51,382 @@ import {
         SkeletonModule,
         TagModule,
         AvatarModule,
-        ProgressSpinnerModule
+        ProgressSpinnerModule,
+        RippleModule,
+        BadgeModule
     ],
     template: `
         <div class="versatility-matrix">
-            <!-- Toolbar -->
-            <p-toolbar styleClass="mb-3 surface-ground border-round">
-                <ng-template #start>
-                    <span class="text-xl font-semibold">Versatility Matrix</span>
-                </ng-template>
-                <ng-template #center>
-                    <p-select [options]="productionLines"
-                              [(ngModel)]="selectedProductionLine"
-                              (onChange)="loadMatrix()"
-                              placeholder="Select Production Line"
-                              optionLabel="name"
-                              optionValue="id"
-                              styleClass="mr-2"
-                              [style]="{'min-width': '200px'}">
-                    </p-select>
-                    <p-select [options]="processes"
-                              [(ngModel)]="selectedProcess"
-                              (onChange)="loadMatrix()"
-                              placeholder="Select Process"
-                              optionLabel="name"
-                              optionValue="id"
-                              [showClear]="true"
-                              [style]="{'min-width': '200px'}">
-                    </p-select>
-                </ng-template>
-                <ng-template #end>
-                    <button pButton icon="pi pi-download" label="Export"
-                            class="p-button-secondary" (click)="onExport()">
+            <!-- Page Header -->
+            <div class="hr-page-header">
+                <div class="header-title">
+                    <div class="header-icon" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                        <i class="pi pi-th-large"></i>
+                    </div>
+                    <div class="title-text">
+                        <h1>Versatility Matrix</h1>
+                        <span class="subtitle">Employee skill and qualification overview</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button pButton pRipple
+                            icon="pi pi-download"
+                            label="Export"
+                            class="p-button-outlined"
+                            (click)="onExport()">
                     </button>
-                </ng-template>
-            </p-toolbar>
+                </div>
+            </div>
 
-            <!-- Legend -->
-            <p-card styleClass="mb-3">
-                <div class="legend">
-                    <span class="legend-title">Qualification Levels:</span>
-                    <div class="legend-items">
-                        <div *ngFor="let level of qualificationLevels" class="legend-item">
-                            <span class="level-badge" [style.background]="getLevelColor(level.value)">
-                                {{ level.value }}
-                            </span>
-                            <span class="level-label">{{ level.label }}</span>
+            <!-- Stats Cards -->
+            <div class="stats-row" *ngIf="matrix">
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--hr-primary);">
+                        <i class="pi pi-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value">{{ matrix.employees.length || 0 }}</div>
+                        <div class="stat-label">Employees</div>
+                    </div>
+                </div>
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--hr-info);">
+                        <i class="pi pi-cog"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-info">{{ uniqueWorkstations.length }}</div>
+                        <div class="stat-label">Workstations</div>
+                    </div>
+                </div>
+                <div class="hr-stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--hr-success);">
+                        <i class="pi pi-chart-line"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value text-success">{{ getGlobalAverage() | number:'1.1-1' }}</div>
+                        <div class="stat-label">Avg. Level</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="hr-section-card">
+                <div class="section-header">
+                    <span class="section-title">
+                        <i class="pi pi-filter"></i>
+                        Filters
+                    </span>
+                </div>
+                <div class="section-body">
+                    <div class="filter-row">
+                        <div class="filter-item">
+                            <label>Production Line</label>
+                            <p-select [options]="productionLines"
+                                      [(ngModel)]="selectedProductionLine"
+                                      (onChange)="loadMatrix()"
+                                      placeholder="Select Production Line"
+                                      optionLabel="name"
+                                      optionValue="id"
+                                      styleClass="w-full">
+                            </p-select>
+                        </div>
+                        <div class="filter-item">
+                            <label>Process</label>
+                            <p-select [options]="processes"
+                                      [(ngModel)]="selectedProcess"
+                                      (onChange)="loadMatrix()"
+                                      placeholder="All Processes"
+                                      optionLabel="name"
+                                      optionValue="id"
+                                      [showClear]="true"
+                                      styleClass="w-full">
+                            </p-select>
                         </div>
                     </div>
                 </div>
-            </p-card>
+            </div>
 
-            <!-- Loading State -->
-            <div *ngIf="loading" class="matrix-loading">
-                <div class="loading-overlay">
-                    <p-progressSpinner strokeWidth="4" animationDuration=".5s"></p-progressSpinner>
-                    <span class="loading-text">Loading Versatility Matrix...</span>
+            <!-- Legend Card -->
+            <div class="hr-legend">
+                <span class="legend-title">Qualification Levels:</span>
+                <div class="legend-items">
+                    <div *ngFor="let level of qualificationLevels" class="legend-item">
+                        <span class="legend-badge hr-qual-badge" [ngClass]="'level-' + level.value">
+                            {{ level.value }}
+                        </span>
+                        <span class="legend-label">{{ level.label }}</span>
+                    </div>
                 </div>
             </div>
 
+            <!-- Loading State -->
+            <div *ngIf="loading" class="hr-loading">
+                <p-progressSpinner strokeWidth="4" animationDuration=".5s"></p-progressSpinner>
+                <span class="loading-text">Loading Versatility Matrix...</span>
+            </div>
+
             <!-- Matrix Table -->
-            <div *ngIf="!loading && matrix" class="matrix-container">
-                <p-table [value]="matrix.employees"
-                         [scrollable]="true"
-                         scrollHeight="500px"
-                         [frozenColumns]="frozenCols"
-                         styleClass="p-datatable-sm p-datatable-gridlines matrix-table">
+            <div class="hr-section-card" *ngIf="!loading && matrix">
+                <div class="section-header">
+                    <span class="section-title">
+                        <i class="pi pi-table"></i>
+                        Qualification Matrix
+                    </span>
+                    <p-badge [value]="(matrix.employees.length || 0) + ' x ' + uniqueWorkstations.length" severity="info"></p-badge>
+                </div>
+                <div class="section-body p-0">
+                    <div class="matrix-container">
+                        <p-table [value]="matrix.employees"
+                                 [scrollable]="true"
+                                 scrollHeight="500px"
+                                 styleClass="hr-table matrix-table">
 
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th class="frozen-col employee-header" style="width: 200px; min-width: 200px">
-                                Employee
-                            </th>
-                            <th *ngFor="let ws of uniqueWorkstations"
-                                class="workstation-header"
-                                [pTooltip]="ws.desc_workstation"
-                                style="width: 80px; min-width: 80px; text-align: center">
-                                {{ ws.desc_workstation | slice:0:10 }}
-                            </th>
-                            <th style="width: 100px; text-align: center">Average</th>
-                        </tr>
-                    </ng-template>
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th class="frozen-col employee-header">
+                                        Employee
+                                    </th>
+                                    <th *ngFor="let ws of uniqueWorkstations"
+                                        class="workstation-header"
+                                        [pTooltip]="ws.name">
+                                        <span class="ws-label">{{ ws.name | slice:0:10 }}</span>
+                                    </th>
+                                    <th class="average-header">Avg</th>
+                                </tr>
+                            </ng-template>
 
-                    <ng-template pTemplate="body" let-employee>
-                        <tr>
-                            <td class="frozen-col employee-cell">
-                                <div class="employee-info">
-                                    <p-avatar [label]="getInitials(employee)"
-                                              shape="circle"
-                                              size="normal">
-                                    </p-avatar>
-                                    <div class="employee-name">
-                                        <span class="name">{{ employee.Nom_Emp }} {{ employee.Prenom_Emp }}</span>
-                                        <span class="id">ID: {{ employee.Id_Emp }}</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td *ngFor="let ws of uniqueWorkstations"
-                                class="level-cell"
-                                (click)="onCellClick(employee, ws)"
-                                [pTooltip]="getCellTooltip(employee, ws)">
-                                <span class="level-badge"
-                                      [style.background]="getCellColor(employee, ws)"
-                                      [class.editable]="editable">
-                                    {{ getCellLevel(employee, ws) }}
-                                </span>
-                            </td>
-                            <td class="average-cell">
-                                <span class="average-value">{{ getEmployeeAverage(employee) | number:'1.1-1' }}</span>
-                            </td>
-                        </tr>
-                    </ng-template>
+                            <ng-template pTemplate="body" let-employee>
+                                <tr>
+                                    <td class="frozen-col employee-cell">
+                                        <div class="hr-employee-info">
+                                            <div class="hr-avatar-badge">
+                                                <p-avatar [label]="getInitials(employee)"
+                                                          shape="circle"
+                                                          size="normal"
+                                                          [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
+                                                </p-avatar>
+                                            </div>
+                                            <div class="employee-details">
+                                                <span class="employee-name">{{ employee.Nom_Emp }} {{ employee.Prenom_Emp }}</span>
+                                                <span class="employee-meta">ID: {{ employee.Id_Emp }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td *ngFor="let ws of uniqueWorkstations"
+                                        class="level-cell"
+                                        (click)="onCellClick(employee, ws)"
+                                        pRipple>
+                                        <span class="hr-qual-badge"
+                                              [ngClass]="'level-' + getCellLevel(employee, ws)"
+                                              [class.editable]="editable"
+                                              [pTooltip]="getCellTooltip(employee, ws)">
+                                            {{ getCellLevel(employee, ws) }}
+                                        </span>
+                                    </td>
+                                    <td class="average-cell">
+                                        <span class="average-value" [ngClass]="getAverageClass(getEmployeeAverage(employee))">
+                                            {{ getEmployeeAverage(employee) | number:'1.1-1' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </ng-template>
 
-                    <ng-template pTemplate="footer">
-                        <tr>
-                            <td class="frozen-col font-bold">Workstation Average</td>
-                            <td *ngFor="let ws of uniqueWorkstations" class="text-center font-bold">
-                                {{ getWorkstationAverage(ws) | number:'1.1-1' }}
-                            </td>
-                            <td class="text-center font-bold">
-                                {{ getGlobalAverage() | number:'1.1-1' }}
-                            </td>
-                        </tr>
-                    </ng-template>
-                </p-table>
+                            <ng-template pTemplate="footer">
+                                <tr class="footer-row">
+                                    <td class="frozen-col font-bold">Workstation Average</td>
+                                    <td *ngFor="let ws of uniqueWorkstations" class="text-center">
+                                        <span class="footer-average">{{ getWorkstationAverage(ws) | number:'1.1-1' }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="global-average">{{ getGlobalAverage() | number:'1.1-1' }}</span>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </div>
+                </div>
             </div>
 
             <!-- Empty State -->
-            <div *ngIf="!loading && !matrix" class="empty-state">
-                <i class="pi pi-th-large text-6xl text-color-secondary mb-3"></i>
+            <div *ngIf="!loading && !matrix" class="hr-empty-state">
+                <i class="empty-icon pi pi-th-large"></i>
                 <h3>Select a production line</h3>
-                <p class="text-color-secondary">Choose a production line to view the versatility matrix</p>
+                <p>Choose a production line to view the versatility matrix</p>
             </div>
         </div>
     `,
     styles: [`
         .versatility-matrix {
-            padding: 1rem;
+            padding: 1.5rem;
         }
 
-        .legend {
-            display: flex;
-            align-items: center;
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
-            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
         }
 
-        .legend-title {
-            font-weight: 600;
-            color: var(--text-color);
+        /* Filter Row */
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
         }
 
-        .legend-items {
+        .filter-item {
             display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 0.5rem;
-        }
 
-        .level-badge {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
-
-            &.editable {
-                cursor: pointer;
-                transition: transform 0.15s;
-
-                &:hover {
-                    transform: scale(1.1);
-                }
+            label {
+                font-weight: 600;
+                font-size: 0.875rem;
+                color: var(--text-color);
             }
         }
 
-        .level-label {
-            font-size: 0.875rem;
-            color: var(--text-color-secondary);
-        }
-
+        /* Matrix Container */
         .matrix-container {
             overflow-x: auto;
         }
 
+        /* Table Styles */
         .matrix-table {
             min-width: 100%;
-        }
 
-        .frozen-col {
-            background: var(--surface-card) !important;
-            z-index: 1;
-        }
-
-        .employee-header {
-            font-weight: 600;
-        }
-
-        .workstation-header {
-            font-size: 0.75rem;
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            transform: rotate(180deg);
-            height: 100px;
-            padding: 0.5rem 0.25rem !important;
-        }
-
-        .employee-cell {
-            padding: 0.5rem !important;
-        }
-
-        .employee-info {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .employee-name {
-            display: flex;
-            flex-direction: column;
-
-            .name {
-                font-weight: 500;
-                font-size: 0.875rem;
+            .frozen-col {
+                position: sticky;
+                left: 0;
+                background: var(--surface-card) !important;
+                z-index: 2;
+                min-width: 220px;
             }
 
-            .id {
-                font-size: 0.75rem;
-                color: var(--text-color-secondary);
+            .employee-header {
+                font-weight: 600;
+                width: 220px;
+            }
+
+            .workstation-header {
+                width: 70px;
+                min-width: 70px;
+                text-align: center;
+                padding: 0.5rem 0.25rem !important;
+                vertical-align: bottom;
+
+                .ws-label {
+                    display: block;
+                    writing-mode: vertical-rl;
+                    text-orientation: mixed;
+                    transform: rotate(180deg);
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    max-height: 100px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+            }
+
+            .average-header {
+                width: 80px;
+                text-align: center;
+                font-weight: 600;
+            }
+
+            .employee-cell {
+                padding: 0.75rem !important;
+            }
+
+            .level-cell {
+                text-align: center;
+                padding: 0.5rem !important;
+                cursor: pointer;
+                transition: background-color 0.2s ease;
+
+                &:hover {
+                    background: var(--surface-hover);
+                }
+            }
+
+            .average-cell {
+                text-align: center;
+                padding: 0.75rem !important;
+            }
+
+            .average-value {
+                font-weight: 700;
+                font-size: 0.9375rem;
+                padding: 0.25rem 0.5rem;
+                border-radius: 6px;
+
+                &.level-low {
+                    color: var(--qual-level-0);
+                    background: rgba(156, 163, 175, 0.1);
+                }
+
+                &.level-medium {
+                    color: var(--qual-level-2);
+                    background: rgba(59, 130, 246, 0.1);
+                }
+
+                &.level-high {
+                    color: var(--qual-level-3);
+                    background: rgba(16, 185, 129, 0.1);
+                }
+
+                &.level-expert {
+                    color: var(--qual-level-4);
+                    background: rgba(139, 92, 246, 0.1);
+                }
+            }
+
+            .footer-row {
+                background: var(--surface-50);
+
+                td {
+                    border-top: 2px solid var(--surface-border);
+                }
+            }
+
+            .footer-average {
+                font-weight: 600;
+                color: var(--text-color);
+            }
+
+            .global-average {
+                font-weight: 700;
+                font-size: 1rem;
+                color: var(--hr-primary);
             }
         }
 
-        .level-cell {
-            text-align: center;
-            padding: 0.5rem !important;
+        /* Editable Badge */
+        :host ::ng-deep .hr-qual-badge.editable {
             cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
 
             &:hover {
-                background: var(--surface-hover);
+                transform: scale(1.15);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
             }
         }
 
-        .average-cell {
-            text-align: center;
-        }
+        /* Table Customization */
+        :host ::ng-deep {
+            .p-datatable .p-datatable-thead > tr > th {
+                background: var(--surface-50);
+                padding: 1rem 0.5rem;
+            }
 
-        .average-value {
-            font-weight: 600;
-            color: var(--primary-color);
-        }
+            .p-datatable .p-datatable-tbody > tr > td {
+                padding: 0.5rem;
+            }
 
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-        }
-
-        .matrix-loading {
-            padding: 2rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 400px;
-        }
-
-        .loading-overlay {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .loading-text {
-            font-size: 1.1rem;
-            color: var(--text-color-secondary);
-            font-weight: 500;
+            .p-datatable .p-datatable-tfoot > tr > td {
+                padding: 0.75rem 0.5rem;
+            }
         }
     `]
 })
@@ -349,7 +444,6 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
 
     selectedProductionLine: number | null = null;
     selectedProcess: number | null = null;
-    frozenCols = [{ field: 'employee', header: 'Employee' }];
 
     qualificationLevels = [
         { value: 0 as QualificationLevel, label: QualificationLevelLabels[0] },
@@ -365,11 +459,11 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
         if (!this.matrix) return [];
         const seen = new Set<string>();
         return this.matrix.workstations.filter(ws => {
-            const name = ws.desc_workstation?.toLowerCase().trim() || '';
-            if (seen.has(name)) {
+            const wsName = ws.name?.toLowerCase().trim() || '';
+            if (seen.has(wsName)) {
                 return false;
             }
-            seen.add(name);
+            seen.add(wsName);
             return true;
         });
     }
@@ -423,22 +517,13 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
     }
 
     getCellLevel(employee: Employee, workstation: HRWorkstation): number {
-        const cell = this.getCell(employee.Id_Emp, workstation.id_workstation);
+        const cell = this.getCell(employee.Id_Emp, workstation.id);
         return cell?.level ?? 0;
-    }
-
-    getCellColor(employee: Employee, workstation: HRWorkstation): string {
-        const level = this.getCellLevel(employee, workstation) as QualificationLevel;
-        return QualificationLevelColors[level] || QualificationLevelColors[0];
-    }
-
-    getLevelColor(level: QualificationLevel): string {
-        return QualificationLevelColors[level];
     }
 
     getCellTooltip(employee: Employee, workstation: HRWorkstation): string {
         const level = this.getCellLevel(employee, workstation) as QualificationLevel;
-        return `${employee.Nom_Emp} ${employee.Prenom_Emp} - ${workstation.desc_workstation}: ${QualificationLevelLabels[level]}`;
+        return `${employee.Nom_Emp} ${employee.Prenom_Emp} - ${workstation.name}: ${QualificationLevelLabels[level]}`;
     }
 
     getInitials(employee: Employee): string {
@@ -491,6 +576,13 @@ export class VersatilityMatrixComponent implements OnInit, OnDestroy {
         });
 
         return count > 0 ? total / count : 0;
+    }
+
+    getAverageClass(average: number): string {
+        if (average < 1) return 'level-low';
+        if (average < 2) return 'level-medium';
+        if (average < 3) return 'level-high';
+        return 'level-expert';
     }
 
     onCellClick(employee: Employee, workstation: HRWorkstation): void {

@@ -4,3 +4,6 @@
 @use './layout/layout.scss';
 @use 'primeicons/primeicons.css';
 @use './demo/demo.scss';
+
+/* Domain-specific themes */
+@use '../app/domains/dms-rh/styles/hr-theme';
