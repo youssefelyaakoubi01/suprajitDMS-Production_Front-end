@@ -49,6 +49,12 @@ import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '..
 import { environment } from '../../../environments/environment';
 import { TeamAssignmentStateService } from '../../core/state/team-assignment-state.service';
 
+// Export libraries
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
 @Component({
     selector: 'app-production',
     standalone: true,
@@ -192,6 +198,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
     teamConfirmed = false;
     currentHourTeam: EmployeeWithAssignment[] = [];
     employeeScanForHour = '';
+
+    // Shift Report Dialog
+    showShiftReportDialog = false;
 
     // Real-time tracking
     currentTime: Date = new Date();
@@ -460,9 +469,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                 : 0;
                         this.session.hours[hourIndex].hourlyProductionId = prod.Id_HourlyProd;
 
-                        // Map shift_type_code from backend to hourType
-                        // Use shift_type_code if available, otherwise use hour_type or default
-                        const backendHourType = (prod as any).shift_type_code || (prod as any).hour_type;
+                        // Map hour_type from backend to hourType
+                        // Prefer hour_type (explicit value) over shift_type_code (derived from FK)
+                        const backendHourType = (prod as any).hour_type || (prod as any).shift_type_code;
+                        console.log(`Hour ${prod.Hour_HourlyProd}: backend hour_type=${(prod as any).hour_type}, shift_type_code=${(prod as any).shift_type_code}`);
                         if (backendHourType && this.isHourTypeInOptions(backendHourType)) {
                             this.session.hours[hourIndex].hourType = backendHourType as HourType;
                         }
@@ -621,10 +631,12 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                         qualificationLevel: employee.current_qualification ? 1 : 0
                                     };
 
-                                    // Avoid duplicates in session team
+                                    // Avoid duplicates in session team AND sync to teamState
                                     if (!this.session.team.find(t => t.Id_Emp === newMember.Id_Emp)) {
                                         this.session.team.push(newMember);
-                                        console.log('Added team member:', newMember);
+                                        // IMPORTANT: Also sync to teamState for reactive UI updates
+                                        this.teamState.addMember(newMember);
+                                        console.log('Added team member to session and teamState:', newMember);
                                     }
                                 },
                                 error: (err) => {
@@ -637,14 +649,30 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     // After all requests complete, check if we found any assignments
                     if (completedRequests === hourlyProductionIds.length && totalAssignmentsFound === 0 && headcount > 0) {
                         // No team assignments in database but headcount was recorded
-                        // Allow team editing and show info message
-                        this.session.isTeamComplete = false;
-                        this.messageService.add({
-                            severity: 'info',
-                            summary: 'Team Data Not Available',
-                            detail: `This production was recorded with ${headcount} team members, but individual assignments were not saved. You can re-assign the team if needed.`,
-                            life: 8000
-                        });
+                        // Try to restore team from localStorage first
+                        const localStorageTeam = this.teamState.loadFromLocalStorage();
+                        if (localStorageTeam && localStorageTeam.length > 0) {
+                            console.log('No DB assignments, but found team in localStorage:', localStorageTeam.length, 'members');
+                            this.session.team = localStorageTeam;
+                            this.session.isTeamComplete = true;
+                            // Sync to teamState for reactive UI updates
+                            this.teamState.setTeam(localStorageTeam);
+                            this.messageService.add({
+                                severity: 'success',
+                                summary: 'Team Restored',
+                                detail: `${localStorageTeam.length} team members restored from local session.`,
+                                life: 5000
+                            });
+                        } else {
+                            // No localStorage team either - show info message
+                            this.session.isTeamComplete = false;
+                            this.messageService.add({
+                                severity: 'info',
+                                summary: 'Team Data Not Available',
+                                detail: `This production was recorded with ${headcount} team members, but individual assignments were not saved. You can re-assign the team if needed.`,
+                                life: 8000
+                            });
+                        }
                     }
                 },
                 error: (err) => {
@@ -656,13 +684,26 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     saveTeamAssignmentsForHour(hourlyProductionId: number): void {
+        // Use currentHourTeam if available, otherwise fallback to main team
+        const teamToSave = this.currentHourTeam.length > 0
+            ? this.currentHourTeam
+            : this.teamState.team();
+
+        console.log('saveTeamAssignmentsForHour called. Team to save:', teamToSave.length, 'members');
+
+        if (teamToSave.length === 0) {
+            console.warn('No team members to save for hourly production:', hourlyProductionId);
+            return;
+        }
+
         // First, get existing assignments for this hourly production
         this.productionService.getTeamAssignments(hourlyProductionId).subscribe({
             next: (existingAssignments) => {
                 const existingEmployeeIds = new Set(existingAssignments.map(a => a.employee || a.Id_Emp));
+                console.log('Existing assignments:', existingAssignments.length, 'New to add:', teamToSave.filter(m => !existingEmployeeIds.has(m.Id_Emp)).length);
 
-                // Only create assignments for employees not already assigned (use currentHourTeam for per-hour tracking)
-                this.currentHourTeam.forEach(member => {
+                // Only create assignments for employees not already assigned
+                teamToSave.forEach(member => {
                     if (existingEmployeeIds.has(member.Id_Emp)) {
                         console.log(`Employee ${member.Id_Emp} already assigned, skipping...`);
                         return;
@@ -712,8 +753,19 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     private createAllTeamAssignments(hourlyProductionId: number): void {
-        // Use currentHourTeam for per-hour team tracking
-        this.currentHourTeam.forEach(member => {
+        // Use currentHourTeam if available, otherwise fallback to main team
+        const teamToCreate = this.currentHourTeam.length > 0
+            ? this.currentHourTeam
+            : this.teamState.team();
+
+        console.log('createAllTeamAssignments called. Team size:', teamToCreate.length);
+
+        if (teamToCreate.length === 0) {
+            console.warn('No team members to create assignments for production:', hourlyProductionId);
+            return;
+        }
+
+        teamToCreate.forEach(member => {
             const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
             const workstationId = workstation?.Id_Workstation || this.workstations[0]?.Id_Workstation;
 
@@ -1018,6 +1070,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
     // ==================== TEAM ASSIGNMENT ====================
 
     addEmployee(): void {
+        console.log('addEmployee() called, badge input:', this.employeeIdScan);
+
         // Trim whitespace from scanned badge (common issue with barcode scanners)
         const cleanBadgeId = this.employeeIdScan?.trim() || '';
 
@@ -1030,11 +1084,15 @@ export class ProductionComponent implements OnInit, OnDestroy {
             return;
         }
 
+        console.log('Searching for badge:', cleanBadgeId);
+
         // Step 1: Get employee by badge
         this.employeeService.getEmployeeByBadge(cleanBadgeId).subscribe({
             next: (employee: any) => {
+                console.log('Employee found:', employee);
                 // Use signal-based state service for duplicate check
                 const alreadyAssigned = this.teamState.isEmployeeInTeam(employee.id);
+                console.log('Already assigned:', alreadyAssigned, 'Employee ID:', employee.id);
                 if (alreadyAssigned) {
                     this.messageService.add({
                         severity: 'warn',
@@ -1044,7 +1102,39 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     return;
                 }
 
-                // Step 2: Get primary assignment from HR module
+                // Check if employee is NOT an operator (non-operators don't need workstation/qualification checks)
+                const category = (employee.category || employee.Categorie_Emp || '').toLowerCase();
+                const isOperator = category === 'operator' || category === 'operateur' || category === 'op';
+                console.log('Employee category:', category, 'isOperator:', isOperator);
+
+                if (!isOperator) {
+                    // Non-operator: Add directly without workstation/qualification checks
+                    const roleFromCategory = this.getRoleFromCategory(category);
+                    console.log('Non-operator detected, role:', roleFromCategory);
+                    const newAssignment: EmployeeWithAssignment = {
+                        Id_Emp: employee.id,
+                        Nom_Emp: employee.last_name,
+                        Prenom_Emp: employee.first_name,
+                        DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+                        Genre_Emp: employee.gender,
+                        Categorie_Emp: employee.category,
+                        DateEmbauche_Emp: new Date(employee.hire_date),
+                        Departement_Emp: employee.department,
+                        Picture: this.getEmployeePictureUrl(employee.picture),
+                        EmpStatus: employee.status,
+                        BadgeNumber: employee.badge_number || employee.BadgeNumber,
+                        badgeId: cleanBadgeId,
+                        workstation: employee.department || 'N/A',
+                        qualification: employee.category || 'Staff',
+                        qualificationLevel: 3, // Non-operators are considered qualified
+                        role: roleFromCategory
+                    };
+
+                    this.finalizeEmployeeAssignment(newAssignment, employee, cleanBadgeId);
+                    return;
+                }
+
+                // Step 2: For operators - Get primary assignment from HR module
                 this.hrService.getPrimaryAssignment(employee.id).subscribe({
                     next: (primaryAssignment: EmployeePrimaryAssignment) => {
                         // Build the assignment with default workstation/machine
@@ -1059,6 +1149,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                             Departement_Emp: employee.department,
                             Picture: this.getEmployeePictureUrl(employee.picture),
                             EmpStatus: employee.status,
+                            BadgeNumber: employee.badge_number || employee.BadgeNumber,
+                            badgeId: cleanBadgeId, // Save the scanned badge ID
                             workstation: primaryAssignment.workstation_name,
                             workstationId: primaryAssignment.workstation_id,
                             machine: primaryAssignment.machine_name || undefined,
@@ -1120,8 +1212,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
      * Uses signal-based state management for immediate UI updates.
      */
     private finalizeEmployeeAssignment(assignment: EmployeeWithAssignment, employee: any, badgeId: string): void {
+        console.log('finalizeEmployeeAssignment called with:', {
+            employeeId: assignment.Id_Emp,
+            name: `${assignment.Prenom_Emp} ${assignment.Nom_Emp}`,
+            workstation: assignment.workstation,
+            role: assignment.role
+        });
+
         // Use signal-based state service for immediate UI update
         const success = this.teamState.addMember(assignment);
+        console.log('addMember result:', success, 'Team size after:', this.teamState.team().length);
 
         if (!success) {
             this.messageService.add({
@@ -1134,6 +1234,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Sync with session object for localStorage persistence
         this.session.team = [...this.teamState.team()];
+        console.log('session.team synced, length:', this.session.team.length);
 
         const fullName = `${employee.first_name} ${employee.last_name}`;
 
@@ -1145,6 +1246,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Save session to localStorage
         this.saveSessionToStorage();
+        console.log('Session saved. teamState.team().length:', this.teamState.team().length);
 
         // Reset form
         this.employeeIdScan = '';
@@ -1209,6 +1311,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             Departement_Emp: employee.department,
             Picture: this.getEmployeePictureUrl(employee.picture),
             EmpStatus: employee.status,
+            BadgeNumber: employee.badge_number || employee.BadgeNumber,
+            badgeId: this.employeeIdScan.trim(), // Save the scanned badge ID
             workstation: this.selectedWorkstation!.Name_Workstation,
             workstationId: this.selectedWorkstation!.Id_Workstation,
             machine: this.selectedMachineForAssignment?.name,
@@ -1235,6 +1339,26 @@ export class ProductionComponent implements OnInit, OnDestroy {
     getRoleLabel(role: ProductionRole): string {
         const roleOption = this.roleOptions.find(r => r.value === role);
         return roleOption?.label || role;
+    }
+
+    /**
+     * Determine the production role based on employee category
+     */
+    getRoleFromCategory(category: string): ProductionRole {
+        const cat = (category || '').toLowerCase();
+        if (cat.includes('leader') || cat.includes('chef') || cat.includes('supervisor')) {
+            return 'line_leader';
+        }
+        if (cat.includes('quality') || cat.includes('qualite') || cat.includes('qualité')) {
+            return 'quality_agent';
+        }
+        if (cat.includes('maintenance') || cat.includes('tech')) {
+            return 'maintenance_tech';
+        }
+        if (cat.includes('pqc') || cat.includes('control')) {
+            return 'pqc';
+        }
+        return 'operator';
     }
 
     getRoleSeverity(role: ProductionRole | undefined): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
@@ -1484,8 +1608,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
         if (this.shiftTypes.length > 0) {
             return this.shiftTypes[0].code as HourType;
         }
-        // Last fallback
-        return 'normal' as HourType;
+        // Return empty string if no shift types loaded yet - will be synced later
+        return '' as HourType;
     }
 
     syncHoursWithShiftTypes(): void {
@@ -1498,15 +1622,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         console.log('Valid shift type codes:', validCodes);
         console.log('Current hour types:', this.session.hours.map(h => h.hourType));
+        console.log('Default type will be:', defaultType);
 
         let updated = false;
         this.session.hours.forEach(hour => {
-            // Only update if hourType is empty/undefined, don't overwrite existing valid values
-            if (!hour.hourType) {
+            // Only update if hourType is empty/undefined/invalid, don't overwrite existing valid values
+            const hourTypeStr = hour.hourType as string;
+            if (!hourTypeStr || hourTypeStr.trim() === '') {
                 hour.hourType = defaultType;
                 updated = true;
-                console.log(`Hour ${hour.hour}: Set default type ${defaultType}`);
+                console.log(`Hour ${hour.hour}: Set default type ${defaultType} (was empty)`);
             } else if (!validCodes.includes(hour.hourType)) {
+                // Only reset truly invalid types (like 'normal' which might not exist in DB)
                 console.log(`Hour ${hour.hour}: Invalid type "${hour.hourType}", setting to ${defaultType}`);
                 hour.hourType = defaultType;
                 updated = true;
@@ -1743,6 +1870,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                             Departement_Emp: employee.department,
                             Picture: this.getEmployeePictureUrl(employee.picture),
                             EmpStatus: employee.status,
+                            BadgeNumber: employee.badge_number || employee.BadgeNumber,
+                            badgeId: badgeId, // Save the scanned badge ID
                             workstation: assignment.workstation_name,
                             workstationId: assignment.workstation_id,
                             machine: assignment.machine_name || undefined,
@@ -1775,6 +1904,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                             Departement_Emp: employee.department,
                             Picture: this.getEmployeePictureUrl(employee.picture),
                             EmpStatus: employee.status,
+                            BadgeNumber: employee.badge_number || employee.BadgeNumber,
+                            badgeId: badgeId, // Save the scanned badge ID
                             workstation: 'Not Assigned',
                             qualification: 'Not Qualified',
                             qualificationLevel: 0,
@@ -1874,12 +2005,34 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Mark hour as in progress
         hour.status = 'in_progress';
 
-        // Find the ShiftType based on the hour_type code
-        const shiftType = this.shiftTypes.find(st => st.code === (hour.hourType || 'normal'));
+        // Find the ShiftType based on the hour_type code (case-insensitive)
+        const shiftType = this.shiftTypes.find(st =>
+            st.code.toLowerCase() === (hour.hourType || '').toLowerCase()
+        );
 
-        // Validate hour_type - must be one of the valid choices in the backend model
-        const validHourTypes = ['normal', 'setup', 'break', 'extra_hour_break'];
-        const hourTypeToSend = validHourTypes.includes(hour.hourType) ? hour.hourType : 'normal';
+        // Backend expects lowercase hour_type values: 'normal', 'setup', 'break', 'extra_hour_break'
+        // Map the ShiftType code to valid backend values
+        const validBackendHourTypes = ['normal', 'setup', 'break', 'extra_hour_break'];
+        let hourTypeToSend = 'normal'; // default
+
+        if (hour.hourType) {
+            const lowerHourType = hour.hourType.toLowerCase();
+            // Check if it's already a valid backend value
+            if (validBackendHourTypes.includes(lowerHourType)) {
+                hourTypeToSend = lowerHourType;
+            } else {
+                // Try to map from ShiftType name/code to valid backend value
+                if (lowerHourType.includes('setup')) {
+                    hourTypeToSend = 'setup';
+                } else if (lowerHourType.includes('break') && lowerHourType.includes('extra')) {
+                    hourTypeToSend = 'extra_hour_break';
+                } else if (lowerHourType.includes('break')) {
+                    hourTypeToSend = 'break';
+                } else {
+                    hourTypeToSend = 'normal';
+                }
+            }
+        }
 
         const productionData: any = {
             date: this.session.date,
@@ -1946,15 +2099,38 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Math.round((hour.scrap! / hour.scrapTarget) * 10000) / 100 : 0;
                 hour.status = 'completed';
 
-                // Save the per-hour team
-                hour.team = [...this.currentHourTeam];
+                // Save the per-hour team - use currentHourTeam if available, otherwise fallback to main team
+                const teamToSaveForHour = this.currentHourTeam.length > 0
+                    ? this.currentHourTeam
+                    : this.teamState.team();
+                hour.team = [...teamToSaveForHour];
 
                 // Save session to localStorage
                 this.saveSessionToStorage();
 
                 // Save team assignments for this hourly production
-                if (typeof hour.hourlyProductionId === 'number' && this.currentHourTeam.length > 0) {
-                    this.saveTeamAssignmentsForHour(hour.hourlyProductionId);
+                // Check both currentHourTeam and main team from state
+                const hasTeamToSave = this.currentHourTeam.length > 0 || this.teamState.team().length > 0;
+                console.log('Team save check:', {
+                    hourlyProductionId: hour.hourlyProductionId,
+                    typeofId: typeof hour.hourlyProductionId,
+                    hasTeamToSave,
+                    currentHourTeamLength: this.currentHourTeam.length,
+                    mainTeamLength: this.teamState.team().length
+                });
+
+                // Accept both number and numeric string IDs
+                const prodId = typeof hour.hourlyProductionId === 'number'
+                    ? hour.hourlyProductionId
+                    : (typeof hour.hourlyProductionId === 'string' && !isNaN(Number(hour.hourlyProductionId))
+                        ? Number(hour.hourlyProductionId)
+                        : null);
+
+                if (prodId && hasTeamToSave) {
+                    console.log('Calling saveTeamAssignmentsForHour with ID:', prodId);
+                    this.saveTeamAssignmentsForHour(prodId);
+                } else {
+                    console.warn('Skipping team assignment save:', { prodId, hasTeamToSave });
                 }
 
                 // Save all downtimes (new ones without id, update ones with id)
@@ -2534,16 +2710,38 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     saveSessionToStorage(): void {
         try {
+            // Get current team from state service to ensure we save the latest
+            const currentTeam = this.teamState.team();
+
+            // Also keep session.team in sync
+            this.session.team = [...currentTeam];
+
             const sessionData = {
                 session: {
                     ...this.session,
-                    date: this.session.date instanceof Date ? this.session.date.toISOString() : this.session.date
+                    date: this.session.date instanceof Date ? this.session.date.toISOString() : this.session.date,
+                    // Explicitly save the team from state service
+                    team: currentTeam,
+                    // Explicitly save isTeamComplete
+                    isTeamComplete: this.session.isTeamComplete
                 },
                 formValues: this.shiftSetupForm.value,
                 timestamp: new Date().toISOString()
             };
+
+            // Log what we're saving for debugging
+            console.log('Saving session to localStorage:', {
+                teamLength: currentTeam.length,
+                isTeamComplete: this.session.isTeamComplete,
+                isSetupComplete: this.session.isSetupComplete,
+                hoursCount: this.session.hours.length
+            });
+
             localStorage.setItem(this.SESSION_STORAGE_KEY, JSON.stringify(sessionData));
-            console.log('Session saved to localStorage. Hour types:', this.session.hours.map(h => ({ hour: h.hour, type: h.hourType })));
+
+            // Log for debugging
+            const hourTeamCounts = this.session.hours.map(h => ({ hour: h.hour, teamCount: (h.team || []).length }));
+            console.log('Session saved to localStorage. Main team:', currentTeam.length, 'employees. Per-hour teams:', hourTeamCounts);
         } catch (error) {
             console.error('Error saving session:', error);
         }
@@ -2575,19 +2773,48 @@ export class ProductionComponent implements OnInit, OnDestroy {
             this.session = {
                 ...parsed.session,
                 date: new Date(parsed.session.date),
+                // Ensure team array is preserved
+                team: parsed.session.team || [],
                 // Ensure hours array has all required properties with defaults
                 hours: (parsed.session.hours || []).map((h: any) => ({
                     ...h,
                     downtimes: h.downtimes || [],
                     totalDowntime: h.totalDowntime || 0,
-                    hourType: h.hourType // Preserve hour type from saved session (will be synced after shiftTypes load)
+                    hourType: h.hourType, // Preserve hour type from saved session (will be synced after shiftTypes load)
+                    team: h.team || [] // Preserve per-hour team assignments
                 }))
             };
 
+            // Log restored session state for debugging
+            console.log('Session restored - isSetupComplete:', this.session.isSetupComplete);
+            console.log('Session restored - isTeamComplete:', this.session.isTeamComplete);
+            console.log('Session restored - team array:', this.session.team);
+            console.log('Session restored - team length:', this.session.team?.length || 0);
+
             // Sync team with state service for reactive UI updates
             if (this.session.team && this.session.team.length > 0) {
+                console.log('Restoring main team to teamState:', this.session.team.length, 'employees');
                 this.teamState.setTeam(this.session.team);
+
+                // Ensure isTeamComplete is set if team has members
+                if (!this.session.isTeamComplete) {
+                    console.log('Setting isTeamComplete to true because team has members');
+                    this.session.isTeamComplete = true;
+                }
+            } else {
+                console.log('No team members to restore from localStorage');
+                // Try to load from teamState's localStorage as fallback
+                const fallbackTeam = this.teamState.loadFromLocalStorage();
+                if (fallbackTeam && fallbackTeam.length > 0) {
+                    console.log('Fallback: Loaded team from teamState localStorage:', fallbackTeam.length, 'employees');
+                    this.session.team = fallbackTeam;
+                    this.session.isTeamComplete = true;
+                }
             }
+
+            // Log per-hour teams for debugging
+            const hourTeamCounts = this.session.hours.map(h => ({ hour: h.hour, teamCount: (h.team || []).length }));
+            console.log('Restored per-hour teams:', hourTeamCounts);
 
             // Restore form values after reference data is loaded
             setTimeout(() => {
@@ -2664,6 +2891,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                         newHour.hourlyProductionId = oldHour.hourlyProductionId;
                                         // Preserve hour type (shift type) from saved session
                                         newHour.hourType = oldHour.hourType || this.getDefaultHourType();
+                                        // Preserve per-hour team assignments
+                                        newHour.team = oldHour.team || [];
                                     }
                                 });
 
@@ -2699,5 +2928,446 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     hasSavedSession(): boolean {
         return localStorage.getItem(this.SESSION_STORAGE_KEY) !== null;
+    }
+
+    // ==================== SHIFT REPORT ====================
+
+    /**
+     * Open the shift report dialog
+     */
+    openShiftReport(): void {
+        this.showShiftReportDialog = true;
+    }
+
+    /**
+     * Close the shift report dialog
+     */
+    closeShiftReport(): void {
+        this.showShiftReportDialog = false;
+    }
+
+    /**
+     * Get all unique employees across all hours
+     */
+    getAllShiftEmployees(): EmployeeWithAssignment[] {
+        const employeeMap = new Map<number, EmployeeWithAssignment>();
+
+        // Add employees from each completed hour
+        this.session.hours.forEach(hour => {
+            if (hour.team && hour.team.length > 0) {
+                hour.team.forEach(emp => {
+                    if (!employeeMap.has(emp.Id_Emp)) {
+                        employeeMap.set(emp.Id_Emp, emp);
+                    }
+                });
+            }
+        });
+
+        // Also include current team state if no hours have team data
+        if (employeeMap.size === 0) {
+            this.teamState.team().forEach(emp => {
+                employeeMap.set(emp.Id_Emp, emp);
+            });
+        }
+
+        return Array.from(employeeMap.values());
+    }
+
+    /**
+     * Get hours worked by a specific employee
+     */
+    getEmployeeHoursWorked(employeeId: number): number[] {
+        const hoursWorked: number[] = [];
+
+        this.session.hours.forEach((hour, index) => {
+            if (hour.team && hour.team.some(emp => emp.Id_Emp === employeeId)) {
+                hoursWorked.push(index + 1);
+            }
+        });
+
+        return hoursWorked;
+    }
+
+    /**
+     * Format hours list for display (e.g., "H1, H2, H3")
+     */
+    formatHoursList(hours: number[]): string {
+        if (hours.length === 0) return 'Aucune heure';
+        return hours.map(h => `H${h}`).join(', ');
+    }
+
+    /**
+     * Get report summary statistics
+     */
+    getReportSummary(): {
+        totalEmployees: number;
+        totalHoursCompleted: number;
+        totalOutput: number;
+        totalScrap: number;
+        totalDowntime: number;
+        overallEfficiency: number;
+    } {
+        return {
+            totalEmployees: this.getAllShiftEmployees().length,
+            totalHoursCompleted: this.completedHours,
+            totalOutput: this.shiftTotalOutput,
+            totalScrap: this.shiftTotalScrap,
+            totalDowntime: this.shiftTotalDowntime,
+            overallEfficiency: this.shiftOverallEfficiency
+        };
+    }
+
+    /**
+     * Get team count for a specific hour
+     */
+    getHourTeamCount(hour: HourlyProductionState): number {
+        return hour.team?.length || 0;
+    }
+
+    /**
+     * Check if an employee worked a specific hour
+     */
+    employeeWorkedHour(hour: HourlyProductionState, employeeId: number): boolean {
+        return hour.team?.some(emp => emp.Id_Emp === employeeId) || false;
+    }
+
+    // ==================== REPORT EXPORT FUNCTIONS ====================
+
+    /**
+     * Generate filename for exports
+     */
+    private getExportFilename(extension: string): string {
+        const date = this.session.date ? new Date(this.session.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const shift = this.session.shift?.name || 'Shift';
+        const line = this.session.productionLine?.name || 'Line';
+        return `Rapport_${line}_${shift}_${date}.${extension}`;
+    }
+
+    /**
+     * Prepare hourly data for export
+     */
+    private getHourlyExportData(): any[] {
+        return this.session.hours.map((hour, index) => ({
+            'Heure': `H${index + 1}`,
+            'Plage Horaire': hour.timeRange,
+            'Type': hour.hourType === 'normal' ? 'Normal' : (hour.hourType === 'setup' ? 'Setup' : (hour.hourType === 'break' ? 'Pause' : 'Extra Break')),
+            'Statut': hour.status === 'completed' ? 'Termine' : (hour.status === 'in_progress' ? 'En cours' : 'Non demarre'),
+            'Output': hour.output ?? '-',
+            'Target': hour.target,
+            'Efficacite (%)': hour.efficiency ?? '-',
+            'Scrap': hour.scrap ?? '-',
+            'Downtime (min)': hour.totalDowntime,
+            'Equipe': this.getHourTeamCount(hour)
+        }));
+    }
+
+    /**
+     * Prepare employee data for export
+     */
+    private getEmployeeExportData(): any[] {
+        return this.getAllShiftEmployees().map(emp => ({
+            'Nom': `${emp.Prenom_Emp} ${emp.Nom_Emp}`,
+            'Badge': emp.badgeId || emp.BadgeNumber || `EMP-${emp.Id_Emp}`,
+            'Categorie': emp.Categorie_Emp || emp.role || 'Operator',
+            'Poste': emp.workstation || 'Non assigne',
+            'Heures Travaillees': this.formatHoursList(this.getEmployeeHoursWorked(emp.Id_Emp)),
+            'Total Heures': this.getEmployeeHoursWorked(emp.Id_Emp).length
+        }));
+    }
+
+    /**
+     * Export report to CSV format
+     */
+    exportToCSV(): void {
+        try {
+            // Summary section
+            const summary = [
+                ['RAPPORT DETAILLE DU SHIFT'],
+                [''],
+                ['Informations Generales'],
+                ['Shift', this.session.shift?.name || 'N/A'],
+                ['Date', this.session.date ? new Date(this.session.date).toLocaleDateString('fr-FR') : 'N/A'],
+                ['Ligne', this.session.productionLine?.name || 'N/A'],
+                ['Piece', this.session.part?.PN_Part || 'N/A'],
+                [''],
+                ['Resume'],
+                ['Production Totale', `${this.shiftTotalOutput} / ${this.shiftTotalTarget}`],
+                ['Efficacite', `${this.shiftOverallEfficiency}%`],
+                ['Scrap Total', this.shiftTotalScrap],
+                ['Downtime Total', `${this.shiftTotalDowntime} min`],
+                ['']
+            ];
+
+            // Hourly data section
+            const hourlyData = this.getHourlyExportData();
+            const hourlyHeaders = Object.keys(hourlyData[0] || {});
+            const hourlyRows = hourlyData.map(row => hourlyHeaders.map(h => row[h]));
+
+            // Employee data section
+            const employeeData = this.getEmployeeExportData();
+            const employeeHeaders = Object.keys(employeeData[0] || {});
+            const employeeRows = employeeData.map(row => employeeHeaders.map(h => row[h]));
+
+            // Combine all sections
+            const csvContent = [
+                ...summary.map(row => row.join(',')),
+                'DETAIL PAR HEURE',
+                hourlyHeaders.join(','),
+                ...hourlyRows.map(row => row.join(',')),
+                '',
+                'EMPLOYES ET HEURES TRAVAILLEES',
+                employeeHeaders.join(','),
+                ...employeeRows.map(row => row.join(','))
+            ].join('\n');
+
+            // Add BOM for Excel UTF-8 compatibility
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
+            saveAs(blob, this.getExportFilename('csv'));
+
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Export CSV',
+                detail: 'Rapport exporte en CSV avec succes'
+            });
+        } catch (error) {
+            console.error('Error exporting to CSV:', error);
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Erreur',
+                detail: 'Erreur lors de l\'export CSV'
+            });
+        }
+    }
+
+    /**
+     * Export report to Excel format
+     */
+    exportToExcel(): void {
+        try {
+            const workbook = XLSX.utils.book_new();
+
+            // Summary sheet
+            const summaryData = [
+                ['RAPPORT DETAILLE DU SHIFT'],
+                [''],
+                ['Informations Generales'],
+                ['Shift', this.session.shift?.name || 'N/A'],
+                ['Date', this.session.date ? new Date(this.session.date).toLocaleDateString('fr-FR') : 'N/A'],
+                ['Ligne', this.session.productionLine?.name || 'N/A'],
+                ['Piece', this.session.part?.PN_Part || 'N/A'],
+                [''],
+                ['Resume'],
+                ['Production Totale', `${this.shiftTotalOutput} / ${this.shiftTotalTarget}`],
+                ['Efficacite', `${this.shiftOverallEfficiency}%`],
+                ['Scrap Total', this.shiftTotalScrap],
+                ['Downtime Total', `${this.shiftTotalDowntime} min`]
+            ];
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+            summarySheet['!cols'] = [{ wch: 20 }, { wch: 30 }];
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resume');
+
+            // Hourly data sheet
+            const hourlyData = this.getHourlyExportData();
+            const hourlySheet = XLSX.utils.json_to_sheet(hourlyData);
+            hourlySheet['!cols'] = [
+                { wch: 8 }, { wch: 15 }, { wch: 10 }, { wch: 12 },
+                { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 15 }, { wch: 8 }
+            ];
+            XLSX.utils.book_append_sheet(workbook, hourlySheet, 'Detail Horaire');
+
+            // Employee data sheet
+            const employeeData = this.getEmployeeExportData();
+            const employeeSheet = XLSX.utils.json_to_sheet(employeeData);
+            employeeSheet['!cols'] = [
+                { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 12 }
+            ];
+            XLSX.utils.book_append_sheet(workbook, employeeSheet, 'Employes');
+
+            // Generate and save file
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            saveAs(blob, this.getExportFilename('xlsx'));
+
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Export Excel',
+                detail: 'Rapport exporte en Excel avec succes'
+            });
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Erreur',
+                detail: 'Erreur lors de l\'export Excel'
+            });
+        }
+    }
+
+    /**
+     * Export report to PDF format
+     */
+    exportToPDF(): void {
+        try {
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            let yPos = 20;
+
+            // Title
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text('RAPPORT DETAILLE DU SHIFT', pageWidth / 2, yPos, { align: 'center' });
+            yPos += 15;
+
+            // General info
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Informations Generales', 14, yPos);
+            yPos += 8;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            const infoLines = [
+                `Shift: ${this.session.shift?.name || 'N/A'}`,
+                `Date: ${this.session.date ? new Date(this.session.date).toLocaleDateString('fr-FR') : 'N/A'}`,
+                `Ligne: ${this.session.productionLine?.name || 'N/A'}`,
+                `Piece: ${this.session.part?.PN_Part || 'N/A'}`
+            ];
+            infoLines.forEach(line => {
+                doc.text(line, 14, yPos);
+                yPos += 6;
+            });
+            yPos += 5;
+
+            // Summary
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Resume', 14, yPos);
+            yPos += 8;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            const summaryLines = [
+                `Production Totale: ${this.shiftTotalOutput} / ${this.shiftTotalTarget}`,
+                `Efficacite: ${this.shiftOverallEfficiency}%`,
+                `Scrap Total: ${this.shiftTotalScrap} pcs`,
+                `Downtime Total: ${this.shiftTotalDowntime} min`
+            ];
+            summaryLines.forEach(line => {
+                doc.text(line, 14, yPos);
+                yPos += 6;
+            });
+            yPos += 10;
+
+            // Hourly table
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Detail par Heure', 14, yPos);
+            yPos += 5;
+
+            const hourlyData = this.session.hours.map((hour, index) => [
+                `H${index + 1}`,
+                hour.timeRange,
+                hour.hourType === 'normal' ? 'Normal' : (hour.hourType === 'setup' ? 'Setup' : 'Pause'),
+                hour.status === 'completed' ? 'OK' : (hour.status === 'in_progress' ? 'En cours' : '-'),
+                hour.output?.toString() ?? '-',
+                hour.target.toString(),
+                hour.efficiency ? `${hour.efficiency}%` : '-',
+                hour.scrap?.toString() ?? '-',
+                hour.totalDowntime.toString()
+            ]);
+
+            autoTable(doc, {
+                startY: yPos,
+                head: [['Heure', 'Plage', 'Type', 'Statut', 'Output', 'Target', 'Eff.', 'Scrap', 'DT']],
+                body: hourlyData,
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185], fontSize: 8 },
+                bodyStyles: { fontSize: 8 },
+                columnStyles: {
+                    0: { cellWidth: 15 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 18 },
+                    3: { cellWidth: 18 },
+                    4: { cellWidth: 18 },
+                    5: { cellWidth: 18 },
+                    6: { cellWidth: 15 },
+                    7: { cellWidth: 18 },
+                    8: { cellWidth: 15 }
+                },
+                margin: { left: 14 }
+            });
+
+            // Get final Y position after table
+            yPos = (doc as any).lastAutoTable.finalY + 15;
+
+            // Check if we need a new page for employees
+            if (yPos > 200) {
+                doc.addPage();
+                yPos = 20;
+            }
+
+            // Employee table
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Employes et Heures Travaillees', 14, yPos);
+            yPos += 5;
+
+            const employeeData = this.getAllShiftEmployees().map(emp => [
+                `${emp.Prenom_Emp} ${emp.Nom_Emp}`,
+                emp.badgeId || emp.BadgeNumber || `EMP-${emp.Id_Emp}`,
+                emp.Categorie_Emp || emp.role || 'Operator',
+                emp.workstation || 'N/A',
+                this.formatHoursList(this.getEmployeeHoursWorked(emp.Id_Emp)),
+                this.getEmployeeHoursWorked(emp.Id_Emp).length.toString()
+            ]);
+
+            autoTable(doc, {
+                startY: yPos,
+                head: [['Nom', 'Badge', 'Categorie', 'Poste', 'Heures', 'Total']],
+                body: employeeData,
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185], fontSize: 8 },
+                bodyStyles: { fontSize: 8 },
+                columnStyles: {
+                    0: { cellWidth: 35 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 25 },
+                    3: { cellWidth: 35 },
+                    4: { cellWidth: 40 },
+                    5: { cellWidth: 15 }
+                },
+                margin: { left: 14 }
+            });
+
+            // Footer
+            const pageCount = doc.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'italic');
+                doc.text(
+                    `Genere le ${new Date().toLocaleDateString('fr-FR')} a ${new Date().toLocaleTimeString('fr-FR')} - Page ${i}/${pageCount}`,
+                    pageWidth / 2,
+                    doc.internal.pageSize.getHeight() - 10,
+                    { align: 'center' }
+                );
+            }
+
+            // Save file
+            doc.save(this.getExportFilename('pdf'));
+
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Export PDF',
+                detail: 'Rapport exporte en PDF avec succes'
+            });
+        } catch (error) {
+            console.error('Error exporting to PDF:', error);
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Erreur',
+                detail: 'Erreur lors de l\'export PDF'
+            });
+        }
     }
 }

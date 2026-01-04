@@ -330,12 +330,13 @@
 
             <p-divider></p-divider>
 
-            <p-table [value]="team" [tableStyle]="{ 'min-width': '60rem' }">
+            <p-table [value]="team" [tableStyle]="{ 'min-width': '70rem' }">
                 <ng-template pTemplate="header">
                     <tr>
                         <th>Photo</th>
                         <th>Name</th>
-                        <th>Employee ID</th>
+                        <th>Badge</th>
+                        <th>Categorie</th>
                         <th>Workstation</th>
                         <th>Machine</th>
                         <th>Qualification</th>
@@ -348,7 +349,10 @@
                             <p-avatar [image]="emp.Picture" shape="circle" size="large"></p-avatar>
                         </td>
                         <td><span class="employee-name">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span></td>
-                        <td><span class="employee-id">{{ emp.Id_Emp }}</span></td>
+                        <td><span class="employee-badge">{{ emp.badgeId || emp.BadgeNumber || ('EMP-' + emp.Id_Emp) }}</span></td>
+                        <td>
+                            <p-tag [value]="emp.Categorie_Emp || emp.role || 'Operator'" [severity]="getRoleSeverity(emp.role)"></p-tag>
+                        </td>
                         <td>{{ emp.workstation }}</td>
                         <td>
                             <span *ngIf="emp.machine">{{ emp.machine }}</span>
@@ -364,7 +368,7 @@
                 </ng-template>
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="7" class="text-center">
+                        <td colspan="8" class="text-center">
                             <div class="empty-state">
                                 <i class="pi pi-users empty-icon"></i>
                                 <p class="empty-title">No employees assigned yet</p>
@@ -539,6 +543,16 @@
                     <span class="metric-label">Total Downtime:</span>
                     <span class="metric-value downtime">{{ shiftTotalDowntime }} minutes</span>
                 </div>
+            </div>
+            <div class="footer-actions">
+                <p-button
+                    label="Rapport Detaille"
+                    icon="pi pi-file-pdf"
+                    severity="info"
+                    [outlined]="true"
+                    (click)="openShiftReport()"
+                    [disabled]="completedHours === 0">
+                </p-button>
             </div>
         </div>
     </p-card>
@@ -977,6 +991,242 @@
                 severity="warn"
                 (click)="confirmQualificationWarning()">
             </p-button>
+        </div>
+    </ng-template>
+</p-dialog>
+
+<!-- ==================== SHIFT REPORT DIALOG ==================== -->
+<p-dialog
+    header="Rapport Detaille du Shift"
+    [(visible)]="showShiftReportDialog"
+    [modal]="true"
+    [style]="{ width: '90vw', maxWidth: '1200px' }"
+    [maximizable]="true"
+    [draggable]="false"
+    [resizable]="false"
+    styleClass="shift-report-dialog">
+
+    <ng-template pTemplate="header">
+        <div class="flex align-items-center gap-3">
+            <i class="pi pi-file-pdf text-2xl text-primary"></i>
+            <div>
+                <h3 class="m-0">Rapport Detaille du Shift</h3>
+                <span class="text-sm text-color-secondary">
+                    {{ session.shift?.name || 'N/A' }} - {{ session.date | date:'dd/MM/yyyy' }}
+                </span>
+            </div>
+        </div>
+    </ng-template>
+
+    <!-- Report Summary Section -->
+    <div class="report-summary-section mb-4">
+        <h4 class="section-title"><i class="pi pi-chart-bar"></i> Resume du Shift</h4>
+        <div class="grid">
+            <div class="col-6 md:col-2">
+                <div class="summary-stat">
+                    <span class="stat-label">Ligne</span>
+                    <span class="stat-value">{{ session.productionLine?.name || 'N/A' }}</span>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
+                <div class="summary-stat">
+                    <span class="stat-label">Piece</span>
+                    <span class="stat-value">{{ session.part?.PN_Part || 'N/A' }}</span>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
+                <div class="summary-stat">
+                    <span class="stat-label">Production</span>
+                    <span class="stat-value text-primary">{{ shiftTotalOutput }} / {{ shiftTotalTarget }}</span>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
+                <div class="summary-stat">
+                    <span class="stat-label">Efficacite</span>
+                    <p-tag [value]="shiftOverallEfficiency + '%'" [severity]="getEfficiencySeverity(shiftOverallEfficiency)"></p-tag>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
+                <div class="summary-stat">
+                    <span class="stat-label">Scrap</span>
+                    <span class="stat-value text-orange-500">{{ shiftTotalScrap }} pcs</span>
+                </div>
+            </div>
+            <div class="col-6 md:col-2">
+                <div class="summary-stat">
+                    <span class="stat-label">Downtime</span>
+                    <span class="stat-value text-red-500">{{ shiftTotalDowntime }} min</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <p-divider></p-divider>
+
+    <!-- Hourly Breakdown Section -->
+    <div class="hourly-breakdown-section mb-4">
+        <h4 class="section-title"><i class="pi pi-clock"></i> Detail par Heure</h4>
+
+        <p-table [value]="session.hours" styleClass="p-datatable-sm p-datatable-striped" [scrollable]="true">
+            <ng-template pTemplate="header">
+                <tr>
+                    <th style="width: 100px">Heure</th>
+                    <th style="width: 120px">Plage Horaire</th>
+                    <th style="width: 100px">Type</th>
+                    <th class="text-center" style="width: 80px">Statut</th>
+                    <th class="text-center" style="width: 100px">Output</th>
+                    <th class="text-center" style="width: 80px">Target</th>
+                    <th class="text-center" style="width: 100px">Efficacite</th>
+                    <th class="text-center" style="width: 80px">Scrap</th>
+                    <th class="text-center" style="width: 100px">Downtime</th>
+                    <th class="text-center" style="width: 80px">Equipe</th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-hour let-i="rowIndex">
+                <tr [ngClass]="{'row-completed': hour.status === 'completed', 'row-in-progress': hour.status === 'in_progress'}">
+                    <td><strong>H{{ i + 1 }}</strong></td>
+                    <td>{{ hour.timeRange }}</td>
+                    <td>
+                        <p-tag
+                            [value]="hour.hourType === 'normal' ? 'Normal' : (hour.hourType === 'setup' ? 'Setup' : (hour.hourType === 'break' ? 'Pause' : 'Extra Break'))"
+                            [severity]="hour.hourType === 'normal' ? 'info' : (hour.hourType === 'setup' ? 'warn' : 'secondary')"
+                            [rounded]="true">
+                        </p-tag>
+                    </td>
+                    <td class="text-center">
+                        <i [class]="'pi ' + getHourStatusIcon(hour.status)"
+                           [ngClass]="{
+                               'text-gray-400': hour.status === 'not_started',
+                               'text-blue-500': hour.status === 'in_progress',
+                               'text-green-500': hour.status === 'completed'
+                           }">
+                        </i>
+                    </td>
+                    <td class="text-center">
+                        <strong *ngIf="hour.output !== null">{{ hour.output }}</strong>
+                        <span *ngIf="hour.output === null" class="text-gray-400">-</span>
+                    </td>
+                    <td class="text-center">{{ hour.target }}</td>
+                    <td class="text-center">
+                        <p-tag *ngIf="hour.efficiency !== null"
+                               [value]="hour.efficiency + '%'"
+                               [severity]="getEfficiencySeverity(hour.efficiency)">
+                        </p-tag>
+                        <span *ngIf="hour.efficiency === null" class="text-gray-400">-</span>
+                    </td>
+                    <td class="text-center">
+                        <span *ngIf="hour.scrap !== null" class="text-orange-500">{{ hour.scrap }}</span>
+                        <span *ngIf="hour.scrap === null" class="text-gray-400">-</span>
+                    </td>
+                    <td class="text-center">
+                        <span *ngIf="hour.totalDowntime > 0" class="text-red-500">{{ hour.totalDowntime }} min</span>
+                        <span *ngIf="hour.totalDowntime === 0" class="text-gray-400">-</span>
+                    </td>
+                    <td class="text-center">
+                        <p-tag [value]="getHourTeamCount(hour) + ' emp'" severity="secondary" [rounded]="true"></p-tag>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </div>
+
+    <p-divider></p-divider>
+
+    <!-- Employee Work Hours Section -->
+    <div class="employee-hours-section">
+        <h4 class="section-title"><i class="pi pi-users"></i> Employes et Heures Travaillees</h4>
+
+        <p-table [value]="getAllShiftEmployees()" styleClass="p-datatable-sm" [scrollable]="true" scrollHeight="300px">
+            <ng-template pTemplate="header">
+                <tr>
+                    <th style="width: 60px">Photo</th>
+                    <th>Nom</th>
+                    <th>Badge</th>
+                    <th>Categorie</th>
+                    <th>Poste</th>
+                    <th>Heures Travaillees</th>
+                    <th class="text-center" style="width: 100px">Total Heures</th>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-emp>
+                <tr>
+                    <td>
+                        <p-avatar [image]="emp.Picture" shape="circle" size="normal"></p-avatar>
+                    </td>
+                    <td>
+                        <strong>{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</strong>
+                    </td>
+                    <td>
+                        <span class="text-color-secondary">{{ emp.badgeId || emp.BadgeNumber || ('EMP-' + emp.Id_Emp) }}</span>
+                    </td>
+                    <td>
+                        <p-tag [value]="emp.Categorie_Emp || emp.role || 'Operator'" [severity]="getRoleSeverity(emp.role)" [rounded]="true"></p-tag>
+                    </td>
+                    <td>{{ emp.workstation || 'Non assigne' }}</td>
+                    <td>
+                        <div class="hours-worked-grid">
+                            <span *ngFor="let hour of session.hours; let i = index"
+                                  class="hour-badge"
+                                  [ngClass]="{
+                                      'hour-worked': employeeWorkedHour(hour, emp.Id_Emp),
+                                      'hour-not-worked': !employeeWorkedHour(hour, emp.Id_Emp)
+                                  }">
+                                H{{ i + 1 }}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <p-tag [value]="getEmployeeHoursWorked(emp.Id_Emp).length + 'h'" severity="info"></p-tag>
+                    </td>
+                </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+                <tr>
+                    <td colspan="7" class="text-center text-color-secondary p-4">
+                        <i class="pi pi-users text-3xl mb-2"></i>
+                        <p>Aucun employe enregistre pour ce shift</p>
+                    </td>
+                </tr>
+            </ng-template>
+        </p-table>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <div class="flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="text-color-secondary text-sm">
+                <i class="pi pi-info-circle"></i>
+                Genere le {{ currentTime | date:'dd/MM/yyyy HH:mm' }}
+            </span>
+            <div class="flex gap-2 flex-wrap">
+                <p-button
+                    label="CSV"
+                    icon="pi pi-file"
+                    severity="success"
+                    [outlined]="true"
+                    (click)="exportToCSV()"
+                    pTooltip="Telecharger en format CSV">
+                </p-button>
+                <p-button
+                    label="Excel"
+                    icon="pi pi-file-excel"
+                    severity="success"
+                    (click)="exportToExcel()"
+                    pTooltip="Telecharger en format Excel">
+                </p-button>
+                <p-button
+                    label="PDF"
+                    icon="pi pi-file-pdf"
+                    severity="danger"
+                    (click)="exportToPDF()"
+                    pTooltip="Telecharger en format PDF">
+                </p-button>
+                <p-button
+                    label="Fermer"
+                    icon="pi pi-times"
+                    severity="secondary"
+                    (click)="closeShiftReport()">
+                </p-button>
+            </div>
         </div>
     </ng-template>
 </p-dialog>

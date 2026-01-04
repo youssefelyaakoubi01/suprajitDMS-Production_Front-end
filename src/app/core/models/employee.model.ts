@@ -355,6 +355,7 @@ export interface EmployeeWithAssignment extends Employee {
     role?: ProductionRole;
     team?: Team;
     category?: EmployeeCategory;
+    badgeId?: string; // Badge ID used for scanning
 }
 
 export interface EmployeeDetail extends Employee {
