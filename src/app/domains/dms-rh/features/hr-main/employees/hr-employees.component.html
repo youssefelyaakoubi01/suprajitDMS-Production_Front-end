@@ -368,32 +368,90 @@
 <!-- Import Dialog -->
 <p-dialog
     [(visible)]="showImportDialog"
-    header="Import Employees"
+    header="Importer des Employés"
     [modal]="true"
-    [style]="{width: '500px'}">
+    [closable]="!importing"
+    [style]="{width: '550px'}">
 
     <div class="import-container">
+        <!-- Info Section -->
         <div class="import-info">
             <i class="pi pi-info-circle"></i>
-            <p>Upload an Excel file (.xlsx) with employee data. Download the template for the correct format.</p>
+            <div>
+                <p>Téléchargez un fichier Excel (.xlsx ou .xls) avec les données des employés.</p>
+                <small>Formats acceptés: colonnes en français (Id_Emp, Nom_Emp...) ou anglais (Badge ID, First Name...)</small>
+            </div>
         </div>
+
+        <!-- File Upload -->
         <p-fileUpload
-            mode="advanced"
+            #fileUpload
+            mode="basic"
             accept=".xlsx,.xls"
-            [maxFileSize]="5000000"
-            (onUpload)="onFileUpload($event)"
-            chooseLabel="Choose File"
-            uploadLabel="Import"
-            cancelLabel="Cancel">
-            <ng-template pTemplate="empty">
-                <div class="upload-placeholder">
-                    <i class="pi pi-cloud-upload"></i>
-                    <p>Drag and drop file here or click to browse</p>
-                </div>
-            </ng-template>
+            [maxFileSize]="10000000"
+            chooseLabel="Choisir un fichier"
+            (onSelect)="onFileSelect($event)"
+            [disabled]="importing"
+            styleClass="w-full">
         </p-fileUpload>
-        <p-button label="Download Template" icon="pi pi-download" [text]="true" styleClass="mt-3"></p-button>
+
+        <!-- Selected File Info -->
+        <div *ngIf="selectedFile && !importing" class="selected-file">
+            <i class="pi pi-file-excel"></i>
+            <span>{{ selectedFile.name }}</span>
+            <span class="file-size">({{ (selectedFile.size / 1024).toFixed(1) }} KB)</span>
+        </div>
+
+        <!-- Progress Spinner -->
+        <div *ngIf="importing" class="import-progress">
+            <p-progressSpinner [style]="{width: '40px', height: '40px'}" strokeWidth="4"></p-progressSpinner>
+            <span>Import en cours...</span>
+        </div>
+
+        <!-- Results -->
+        <div *ngIf="importResult && !importing" class="import-results">
+            <div class="results-summary">
+                <p-tag *ngIf="importResult.imported > 0" severity="success" [value]="importResult.imported + ' créés'"></p-tag>
+                <p-tag *ngIf="importResult.updated > 0" severity="info" [value]="importResult.updated + ' mis à jour'"></p-tag>
+                <p-tag *ngIf="importResult.errors?.length > 0" severity="warn" [value]="importResult.errors.length + ' erreurs'"></p-tag>
+            </div>
+            <div *ngIf="importResult.errors?.length > 0" class="errors-list">
+                <p class="errors-title"><i class="pi pi-exclamation-triangle"></i> Erreurs détectées:</p>
+                <ul>
+                    <li *ngFor="let err of importResult.errors">{{ err }}</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Template Download -->
+        <div class="template-section">
+            <p-button
+                label="Télécharger le Template"
+                icon="pi pi-download"
+                [text]="true"
+                (click)="downloadTemplate()">
+            </p-button>
+        </div>
     </div>
+
+    <ng-template pTemplate="footer">
+        <div class="dialog-footer">
+            <p-button
+                label="Fermer"
+                icon="pi pi-times"
+                [text]="true"
+                [disabled]="importing"
+                (click)="closeImportDialog()">
+            </p-button>
+            <p-button
+                label="Importer"
+                icon="pi pi-upload"
+                [loading]="importing"
+                [disabled]="!selectedFile || importing"
+                (click)="importFile()">
+            </p-button>
+        </div>
+    </ng-template>
 </p-dialog>
 
 <!-- Toast & Confirm Dialog -->

@@ -24,6 +24,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { BadgeModule } from 'primeng/badge';
 import { ChartModule } from 'primeng/chart';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { DividerModule } from 'primeng/divider';
@@ -102,6 +103,7 @@ import { AssignmentStateService } from '@core/state/assignment-state.service';
         BadgeModule,
         ChartModule,
         ProgressBarModule,
+        ProgressSpinnerModule,
         TextareaModule,
         InputNumberModule,
         DividerModule,
@@ -225,6 +227,11 @@ export class HrComponent implements OnInit, OnDestroy {
     showFormateurDialog = false;
     showImportDialog = false;
     showUserDialog = false;
+
+    // Import states
+    importing = false;
+    selectedImportFile: File | null = null;
+    importResult: { imported: number; updated: number; errors: string[]; success: boolean } | null = null;
     showDepartmentDialog = false;
     showLicenseDialog = false;
     showLicenseTypeDialog = false;
@@ -2803,49 +2810,122 @@ export class HrComponent implements OnInit, OnDestroy {
     // ==================== IMPORT/EXPORT ====================
     openImportDialog(): void {
         this.showImportDialog = true;
+        this.selectedImportFile = null;
+        this.importResult = null;
+        this.importing = false;
+    }
+
+    closeImportDialog(): void {
+        this.showImportDialog = false;
+        this.selectedImportFile = null;
+        this.importResult = null;
+        this.importing = false;
+    }
+
+    onImportFileSelect(event: any): void {
+        if (event.files && event.files.length > 0) {
+            this.selectedImportFile = event.files[0];
+            this.importResult = null;
+        }
     }
 
     onFileUpload(event: any): void {
-        const file = event.files[0];
-        if (file) {
-            this.messageService.add({ severity: 'info', summary: 'Upload', detail: `File ${file.name} uploaded. Processing...` });
+        if (event.files && event.files.length > 0) {
+            this.selectedImportFile = event.files[0];
+            this.importEmployees();
+        }
+    }
 
-            this.hrService.importEmployeesExcel(file).subscribe({
-                next: (result) => {
-                    if (result.success) {
-                        this.messageService.add({
-                            severity: 'success',
-                            summary: 'Success',
-                            detail: `${result.imported} employees imported successfully`
-                        });
-                        if (result.errors && result.errors.length > 0) {
-                            this.messageService.add({
-                                severity: 'warn',
-                                summary: 'Warnings',
-                                detail: `${result.errors.length} rows had errors`
-                            });
-                        }
-                        this.showImportDialog = false;
-                        this.loadEmployees();
-                        this.loadDashboardStats();
-                    } else {
-                        this.messageService.add({
-                            severity: 'error',
-                            summary: 'Error',
-                            detail: 'Import failed'
-                        });
-                    }
-                },
-                error: (err) => {
-                    const errorDetail = this.parseApiError(err);
+    importEmployees(): void {
+        if (!this.selectedImportFile) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Attention',
+                detail: 'Veuillez sélectionner un fichier'
+            });
+            return;
+        }
+
+        this.importing = true;
+        this.importResult = null;
+
+        this.hrService.importEmployeesExcel(this.selectedImportFile).subscribe({
+            next: (result) => {
+                this.importing = false;
+                this.importResult = result;
+
+                if (result.success) {
                     this.messageService.add({
-                        severity: 'error',
-                        summary: 'Error',
-                        detail: errorDetail
+                        severity: 'success',
+                        summary: 'Import réussi',
+                        detail: `${result.imported || 0} créés, ${result.updated || 0} mis à jour`,
+                        life: 5000
+                    });
+                    this.loadEmployees();
+                    this.loadDashboardStats();
+                }
+
+                if (result.errors && result.errors.length > 0) {
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Avertissements',
+                        detail: `${result.errors.length} erreur(s) détectée(s)`,
+                        life: 5000
                     });
                 }
+            },
+            error: (err) => {
+                this.importing = false;
+                const errorDetail = this.parseApiError(err);
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: errorDetail,
+                    life: 5000
+                });
+            }
+        });
+    }
+
+    downloadImportTemplate(): void {
+        const XLSX = (window as any).XLSX;
+        if (!XLSX) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Erreur',
+                detail: 'Bibliothèque XLSX non disponible'
             });
+            return;
         }
+
+        const headers = ['Badge ID', 'First Name', 'Last Name', 'Gender', 'Date of Birth', 'Category', 'Department', 'Hire Date', 'Status'];
+        const sampleData = ['EMP001', 'John', 'Doe', 'M', '1990-01-15', 'Operator', 'Production', '2024-01-01', 'Active'];
+        const instructions = [
+            '',
+            'Instructions:',
+            '- Gender: M or F',
+            '- Category: Operator, Team Leader, Supervisor, Manager, Technician, Engineer',
+            '- Status: Active, Inactive, On Leave, Terminated',
+            '- Dates: YYYY-MM-DD format',
+            '',
+            'French columns also accepted: Id_Emp, Nom_Emp, Prenom_Emp, etc.'
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, sampleData, [], ...instructions.map((i: string) => [i])]);
+        ws['!cols'] = [
+            { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 8 },
+            { wch: 14 }, { wch: 15 }, { wch: 20 }, { wch: 14 }, { wch: 12 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        XLSX.writeFile(wb, 'employee_import_template.xlsx');
+
+        this.messageService.add({
+            severity: 'info',
+            summary: 'Template',
+            detail: 'Template téléchargé avec succès'
+        });
     }
 
     exportEmployees(): void {

@@ -147,4 +147,11 @@ export class DmsEmployeeService {
     getEmployeesByBadge(badgeNumber: string): Observable<Employee> {
         return this.api.get<Employee>(`${this.endpoint}/by-badge`, { badge: badgeNumber });
     }
+
+    // ==================== IMPORT/EXPORT ====================
+    importEmployees(file: File): Observable<{ imported: number; updated: number; skipped: number; errors: string[]; success: boolean }> {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.api.post<{ imported: number; updated: number; skipped: number; errors: string[]; success: boolean }>(`${this.endpoint}/import`, formData);
+    }
 }

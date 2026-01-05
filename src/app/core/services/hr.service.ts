@@ -134,10 +134,10 @@ export class HRService {
         );
     }
 
-    importEmployeesExcel(file: File): Observable<{ imported: number; errors: string[]; success: boolean }> {
+    importEmployeesExcel(file: File): Observable<{ imported: number; updated: number; skipped: number; errors: string[]; success: boolean }> {
         const formData = new FormData();
         formData.append('file', file);
-        return this.api.post<{ imported: number; errors: string[]; success: boolean }>(`${this.endpoint}/import`, formData);
+        return this.api.post<{ imported: number; updated: number; skipped: number; errors: string[]; success: boolean }>(`${this.endpoint}/import`, formData);
     }
 
     exportEmployeesExcel(params?: { department?: string; status?: string }): Observable<Blob> {

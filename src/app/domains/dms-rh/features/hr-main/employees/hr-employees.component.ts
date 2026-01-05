@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import * as XLSX from 'xlsx';
 
 // PrimeNG Modules
 import { TableModule, Table } from 'primeng/table';
@@ -15,13 +16,14 @@ import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { AvatarModule } from 'primeng/avatar';
-import { FileUploadModule } from 'primeng/fileupload';
+import { FileUploadModule, FileUpload } from 'primeng/fileupload';
 import { InputGroupModule } from 'primeng/inputgroup';
 import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
 import { ToolbarModule } from 'primeng/toolbar';
 import { SplitButtonModule } from 'primeng/splitbutton';
 import { BadgeModule } from 'primeng/badge';
 import { ChipModule } from 'primeng/chip';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 
 import { HRService } from '@core/services/hr.service';
@@ -52,7 +54,8 @@ import { Employee, Team, Department, EmployeeCategory, Trajet } from '@core/mode
         ToolbarModule,
         SplitButtonModule,
         BadgeModule,
-        ChipModule
+        ChipModule,
+        ProgressSpinnerModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './hr-employees.component.html',
@@ -60,6 +63,7 @@ import { Employee, Team, Department, EmployeeCategory, Trajet } from '@core/mode
 })
 export class HrEmployeesComponent implements OnInit {
     @ViewChild('dt') dt!: Table;
+    @ViewChild('fileUpload') fileUpload!: FileUpload;
 
     // Data
     employees: Employee[] = [];
@@ -84,6 +88,11 @@ export class HrEmployeesComponent implements OnInit {
     // Loading states
     loading = false;
     saving = false;
+
+    // Import states
+    importing = false;
+    selectedFile: File | null = null;
+    importResult: { imported: number; updated: number; errors: string[]; success: boolean } | null = null;
 
     // Filters
     searchText = '';
@@ -296,41 +305,179 @@ export class HrEmployeesComponent implements OnInit {
     // Import/Export
     openImportDialog(): void {
         this.showImportDialog = true;
+        this.selectedFile = null;
+        this.importResult = null;
+    }
+
+    closeImportDialog(): void {
+        this.showImportDialog = false;
+        this.selectedFile = null;
+        this.importResult = null;
+        if (this.fileUpload) {
+            this.fileUpload.clear();
+        }
+    }
+
+    onFileSelect(event: any): void {
+        if (event.files && event.files.length > 0) {
+            this.selectedFile = event.files[0];
+            this.importResult = null;
+        }
     }
 
     onFileUpload(event: any): void {
-        const file = event.files[0];
-        if (file) {
-            this.messageService.add({
-                severity: 'info',
-                summary: 'Processing',
-                detail: `Importing ${file.name}...`
-            });
-            setTimeout(() => {
-                this.messageService.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: '15 employees imported successfully'
-                });
-                this.showImportDialog = false;
-                this.loadEmployees();
-            }, 2000);
+        if (event.files && event.files.length > 0) {
+            this.selectedFile = event.files[0];
+            this.importFile();
         }
+    }
+
+    importFile(): void {
+        if (!this.selectedFile) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Attention',
+                detail: 'Veuillez sélectionner un fichier'
+            });
+            return;
+        }
+
+        this.importing = true;
+        this.importResult = null;
+
+        this.hrService.importEmployeesExcel(this.selectedFile).subscribe({
+            next: (result) => {
+                this.importing = false;
+                this.importResult = result;
+
+                if (result.success) {
+                    const totalProcessed = (result.imported || 0) + (result.updated || 0);
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Import réussi',
+                        detail: `${result.imported || 0} créés, ${result.updated || 0} mis à jour`,
+                        life: 5000
+                    });
+                    this.loadEmployees();
+                }
+
+                if (result.errors && result.errors.length > 0) {
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Avertissements',
+                        detail: `${result.errors.length} erreur(s) détectée(s)`,
+                        life: 5000
+                    });
+                }
+            },
+            error: (err) => {
+                this.importing = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: err.error?.error || 'Échec de l\'import',
+                    life: 5000
+                });
+            }
+        });
+    }
+
+    downloadTemplate(): void {
+        const headers = [
+            'Badge ID',
+            'First Name',
+            'Last Name',
+            'Gender',
+            'Date of Birth',
+            'Category',
+            'Department',
+            'Hire Date',
+            'Status'
+        ];
+        const sampleData = [
+            'EMP001',
+            'John',
+            'Doe',
+            'M',
+            '1990-01-15',
+            'Operator',
+            'Production',
+            '2024-01-01',
+            'Active'
+        ];
+        const instructions = [
+            '',
+            'Instructions:',
+            '- Gender: M or F',
+            '- Category: Operator, Team Leader, Supervisor, Manager, Technician, Engineer',
+            '- Status: Active, Inactive, On Leave, Terminated',
+            '- Dates: YYYY-MM-DD format',
+            '',
+            'French columns also accepted: Id_Emp, Nom_Emp, Prenom_Emp, etc.'
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, sampleData, [], ...instructions.map(i => [i])]);
+
+        // Set column widths
+        ws['!cols'] = [
+            { wch: 12 }, // Badge ID
+            { wch: 15 }, // First Name
+            { wch: 15 }, // Last Name
+            { wch: 8 },  // Gender
+            { wch: 14 }, // Date of Birth
+            { wch: 15 }, // Category
+            { wch: 20 }, // Department
+            { wch: 14 }, // Hire Date
+            { wch: 12 }  // Status
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        XLSX.writeFile(wb, 'employee_import_template.xlsx');
+
+        this.messageService.add({
+            severity: 'info',
+            summary: 'Template',
+            detail: 'Template téléchargé avec succès'
+        });
     }
 
     exportExcel(): void {
         this.messageService.add({
             severity: 'info',
             summary: 'Export',
-            detail: 'Exporting to Excel...'
+            detail: 'Export en cours...'
+        });
+
+        const exportData = this.employees.map(emp => ({
+            'Badge ID': emp.BadgeNumber || '',
+            'First Name': emp.Prenom_Emp,
+            'Last Name': emp.Nom_Emp,
+            'Gender': emp.Genre_Emp,
+            'Department': emp.Departement_Emp,
+            'Category': emp.category_fk?.name || emp.Categorie_Emp || '',
+            'Team': emp.team?.name || '',
+            'Status': emp.EmpStatus,
+            'Hire Date': emp.DateEmbauche_Emp ? new Date(emp.DateEmbauche_Emp).toLocaleDateString() : ''
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        XLSX.writeFile(wb, `employees_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${this.employees.length} employés exportés`
         });
     }
 
     exportPDF(): void {
         this.messageService.add({
             severity: 'info',
-            summary: 'Export',
-            detail: 'Exporting to PDF...'
+            summary: 'Export PDF',
+            detail: 'Fonctionnalité en cours de développement'
         });
     }
 

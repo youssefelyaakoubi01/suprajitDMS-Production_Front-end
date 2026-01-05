@@ -27,7 +27,11 @@ import { ToastModule } from 'primeng/toast';
 import { MenuModule } from 'primeng/menu';
 import { RippleModule } from 'primeng/ripple';
 import { BadgeModule } from 'primeng/badge';
+import { DialogModule } from 'primeng/dialog';
+import { FileUploadModule } from 'primeng/fileupload';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageService, MenuItem } from 'primeng/api';
+import * as XLSX from 'xlsx';
 
 // Domain imports
 import { DmsEmployeeService, DmsExportService, DmsTeamService, Employee, Department, EmployeeCategory, Team } from '@domains/dms-rh';
@@ -59,6 +63,9 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
         MenuModule,
         RippleModule,
         BadgeModule,
+        DialogModule,
+        FileUploadModule,
+        ProgressSpinnerModule,
         EmployeeFormDialogComponent,
         EmployeeDetailDialogComponent,
         ConfirmDialogModule
@@ -78,6 +85,12 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button pButton pRipple
+                            icon="pi pi-upload"
+                            label="Import"
+                            class="p-button-outlined p-button-secondary"
+                            (click)="openImportDialog()">
+                    </button>
                     <button pButton pRipple
                             icon="pi pi-plus"
                             label="Nouvel Employé"
@@ -401,6 +414,86 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
             </p-confirmDialog>
 
             <p-toast></p-toast>
+
+            <!-- Import Dialog -->
+            <p-dialog [(visible)]="showImportDialog"
+                      header="Importer des Employés"
+                      [modal]="true"
+                      [closable]="!importing"
+                      [style]="{width: '550px'}">
+                <div class="import-container">
+                    <div class="import-info">
+                        <i class="pi pi-info-circle"></i>
+                        <div>
+                            <p>Téléchargez un fichier Excel (.xlsx ou .xls) avec les données des employés.</p>
+                            <small>Formats acceptés: colonnes en français (Id_Emp, Nom_Emp...) ou anglais (Badge ID, First Name...)</small>
+                        </div>
+                    </div>
+
+                    <p-fileUpload
+                        mode="basic"
+                        accept=".xlsx,.xls"
+                        [maxFileSize]="10000000"
+                        chooseLabel="Choisir un fichier"
+                        (onSelect)="onImportFileSelect($event)"
+                        [disabled]="importing"
+                        styleClass="w-full">
+                    </p-fileUpload>
+
+                    <div *ngIf="selectedImportFile && !importing" class="selected-file">
+                        <i class="pi pi-file-excel"></i>
+                        <span>{{ selectedImportFile.name }}</span>
+                        <span class="file-size">({{ (selectedImportFile.size / 1024).toFixed(1) }} KB)</span>
+                    </div>
+
+                    <div *ngIf="importing" class="import-progress">
+                        <p-progressSpinner [style]="{width: '40px', height: '40px'}" strokeWidth="4"></p-progressSpinner>
+                        <span>Import en cours...</span>
+                    </div>
+
+                    <div *ngIf="importResult && !importing" class="import-results">
+                        <div class="results-summary">
+                            <p-tag *ngIf="importResult.imported > 0" severity="success" [value]="importResult.imported + ' créés'"></p-tag>
+                            <p-tag *ngIf="importResult.updated > 0" severity="info" [value]="importResult.updated + ' mis à jour'"></p-tag>
+                            <p-tag *ngIf="importResult.errors && importResult.errors.length > 0" severity="warn" [value]="importResult.errors.length + ' erreurs'"></p-tag>
+                        </div>
+                        <div *ngIf="importResult.errors && importResult.errors.length > 0" class="errors-list">
+                            <p class="errors-title"><i class="pi pi-exclamation-triangle"></i> Erreurs:</p>
+                            <ul>
+                                <li *ngFor="let err of importResult.errors">{{ err }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="template-section">
+                        <button pButton pRipple
+                                label="Télécharger le Template"
+                                icon="pi pi-download"
+                                class="p-button-text"
+                                (click)="downloadTemplate()">
+                        </button>
+                    </div>
+                </div>
+
+                <ng-template pTemplate="footer">
+                    <div class="dialog-footer">
+                        <button pButton pRipple
+                                label="Fermer"
+                                icon="pi pi-times"
+                                class="p-button-text"
+                                [disabled]="importing"
+                                (click)="closeImportDialog()">
+                        </button>
+                        <button pButton pRipple
+                                label="Importer"
+                                icon="pi pi-upload"
+                                [loading]="importing"
+                                [disabled]="!selectedImportFile || importing"
+                                (click)="importEmployees()">
+                        </button>
+                    </div>
+                </ng-template>
+            </p-dialog>
         </div>
     `,
     styles: [`
@@ -569,6 +662,122 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
                 width: 100%;
             }
         }
+
+        /* Import Dialog Styles */
+        .import-container {
+            .import-info {
+                display: flex;
+                align-items: flex-start;
+                gap: 0.75rem;
+                padding: 1rem;
+                background: var(--blue-50);
+                border-radius: 10px;
+                margin-bottom: 1.5rem;
+                text-align: left;
+
+                > i {
+                    color: var(--blue-500);
+                    font-size: 1.25rem;
+                    flex-shrink: 0;
+                }
+
+                p {
+                    margin: 0 0 0.25rem 0;
+                    color: var(--blue-700);
+                    font-size: 0.9rem;
+                }
+
+                small {
+                    color: var(--blue-600);
+                    font-size: 0.8rem;
+                }
+            }
+
+            .selected-file {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                padding: 0.75rem 1rem;
+                background: var(--green-50);
+                border: 1px solid var(--green-200);
+                border-radius: 8px;
+                margin-top: 1rem;
+                color: var(--green-700);
+
+                i { color: var(--green-600); font-size: 1.25rem; }
+                .file-size { color: var(--green-500); font-size: 0.85rem; }
+            }
+
+            .import-progress {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+                padding: 2rem;
+                color: var(--text-color-secondary);
+            }
+
+            .import-results {
+                margin-top: 1.5rem;
+                padding: 1rem;
+                background: var(--surface-50);
+                border-radius: 10px;
+
+                .results-summary {
+                    display: flex;
+                    justify-content: center;
+                    gap: 0.75rem;
+                    flex-wrap: wrap;
+                }
+
+                .errors-list {
+                    margin-top: 1rem;
+                    text-align: left;
+                    background: var(--red-50);
+                    border-radius: 8px;
+                    padding: 1rem;
+
+                    .errors-title {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        margin: 0 0 0.75rem 0;
+                        font-weight: 600;
+                        color: var(--red-600);
+                        font-size: 0.9rem;
+                    }
+
+                    ul {
+                        margin: 0;
+                        padding-left: 1.25rem;
+                        li {
+                            color: var(--red-700);
+                            font-size: 0.85rem;
+                            margin-bottom: 0.35rem;
+                        }
+                    }
+                }
+            }
+
+            .template-section {
+                margin-top: 1.5rem;
+                padding-top: 1rem;
+                border-top: 1px solid var(--surface-border);
+                text-align: center;
+            }
+        }
+
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
     `]
 })
 export class EmployeesListComponent implements OnInit, OnDestroy {
@@ -606,9 +815,15 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
     // Dialog properties
     showFormDialog = false;
     showDetailDialog = false;
+    showImportDialog = false;
     selectedEmployee: Employee | null = null;
     detailEmployee: Employee | null = null;
     teams: Team[] = [];
+
+    // Import properties
+    importing = false;
+    selectedImportFile: File | null = null;
+    importResult: { imported: number; updated: number; errors: string[]; success: boolean } | null = null;
 
     exportMenuItems: MenuItem[] = [
         {
@@ -1041,6 +1256,108 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
             severity: 'success',
             summary: 'Export Complete',
             detail: `${this.filteredEmployees.length} employees exported to CSV`
+        });
+    }
+
+    // ==================== IMPORT METHODS ====================
+    openImportDialog(): void {
+        this.showImportDialog = true;
+        this.selectedImportFile = null;
+        this.importResult = null;
+        this.importing = false;
+    }
+
+    closeImportDialog(): void {
+        this.showImportDialog = false;
+        this.selectedImportFile = null;
+        this.importResult = null;
+        this.importing = false;
+    }
+
+    onImportFileSelect(event: any): void {
+        if (event.files && event.files.length > 0) {
+            this.selectedImportFile = event.files[0];
+            this.importResult = null;
+        }
+    }
+
+    importEmployees(): void {
+        if (!this.selectedImportFile) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Attention',
+                detail: 'Veuillez sélectionner un fichier'
+            });
+            return;
+        }
+
+        this.importing = true;
+        this.importResult = null;
+
+        this.employeeService.importEmployees(this.selectedImportFile).subscribe({
+            next: (result) => {
+                this.importing = false;
+                this.importResult = result;
+
+                if (result.success) {
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Import réussi',
+                        detail: `${result.imported || 0} créés, ${result.updated || 0} mis à jour`,
+                        life: 5000
+                    });
+                    this.loadEmployees();
+                }
+
+                if (result.errors && result.errors.length > 0) {
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Avertissements',
+                        detail: `${result.errors.length} erreur(s) détectée(s)`,
+                        life: 5000
+                    });
+                }
+            },
+            error: (err) => {
+                this.importing = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: err.error?.error || 'Échec de l\'import',
+                    life: 5000
+                });
+            }
+        });
+    }
+
+    downloadTemplate(): void {
+        const headers = ['Badge ID', 'First Name', 'Last Name', 'Gender', 'Date of Birth', 'Category', 'Department', 'Hire Date', 'Status'];
+        const sampleData = ['EMP001', 'John', 'Doe', 'M', '1990-01-15', 'Operator', 'Production', '2024-01-01', 'Active'];
+        const instructions = [
+            '',
+            'Instructions:',
+            '- Gender: M or F',
+            '- Category: Operator, Team Leader, Supervisor, Manager, Technician, Engineer',
+            '- Status: Active, Inactive, On Leave, Terminated',
+            '- Dates: YYYY-MM-DD format',
+            '',
+            'French columns also accepted: Id_Emp, Nom_Emp, Prenom_Emp, etc.'
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, sampleData, [], ...instructions.map(i => [i])]);
+        ws['!cols'] = [
+            { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 8 },
+            { wch: 14 }, { wch: 15 }, { wch: 20 }, { wch: 14 }, { wch: 12 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        XLSX.writeFile(wb, 'employee_import_template.xlsx');
+
+        this.messageService.add({
+            severity: 'info',
+            summary: 'Template',
+            detail: 'Template téléchargé avec succès'
         });
     }
 }
