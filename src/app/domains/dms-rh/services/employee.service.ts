@@ -4,7 +4,7 @@
  */
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, map } from 'rxjs/operators';
 import { ApiService } from '@core/services/api.service';
 import {
     Employee,
@@ -30,7 +30,26 @@ export class DmsEmployeeService {
         team?: number;
         search?: string;
     }): Observable<Employee[]> {
-        return this.api.get<Employee[]>(this.endpoint, params);
+        return this.api.get<{ count: number; results: Employee[] } | Employee[]>(this.endpoint, params).pipe(
+            map(response => {
+                // Handle both paginated and array responses for backward compatibility
+                return Array.isArray(response) ? response : response.results || [];
+            })
+        );
+    }
+
+    /**
+     * Get employees with server-side pagination
+     */
+    getEmployeesPaginated(params: {
+        page?: number;
+        page_size?: number;
+        search?: string;
+        department?: string;
+        status?: string;
+        ordering?: string;
+    }): Observable<{ count: number; results: Employee[] }> {
+        return this.api.get<{ count: number; results: Employee[] }>(this.endpoint, params);
     }
 
     getEmployee(id: number): Observable<Employee> {

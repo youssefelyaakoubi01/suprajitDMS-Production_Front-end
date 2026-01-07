@@ -34,6 +34,7 @@ import { HRService } from '@core/services/hr.service';
 import { QualificationStateService } from '@core/state/qualification-state.service';
 import { Qualification, Employee, Formation, Formateur } from '@core/models/employee.model';
 import { environment } from '../../../../../environments/environment';
+import { EmployeeAutocompleteComponent } from '@shared/components/employee-autocomplete/employee-autocomplete.component';
 
 @Component({
     selector: 'app-qualifications-list',
@@ -58,7 +59,8 @@ import { environment } from '../../../../../environments/environment';
         IconFieldModule,
         InputIconModule,
         RippleModule,
-        SkeletonModule
+        SkeletonModule,
+        EmployeeAutocompleteComponent
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -317,43 +319,12 @@ import { environment } from '../../../../../environments/environment';
                 <div class="form-row">
                     <div class="form-group full">
                         <label><i class="pi pi-user"></i> Employé *</label>
-                        <p-select formControlName="employee" [options]="employees"
-                                  optionLabel="fullName" optionValue="Id_Emp"
-                                  [filter]="true"
-                                  filterBy="fullName,Prenom_Emp,Nom_Emp,BadgeNumber,employee_id"
-                                  filterPlaceholder="Rechercher par nom, prénom ou badge..."
-                                  placeholder="Sélectionner un employé"
-                                  appendTo="body"
-                                  styleClass="w-full">
-                            <ng-template let-emp pTemplate="item">
-                                <div class="employee-option">
-                                    <p-avatar [image]="getEmployeePicture(emp.Picture)"
-                                              [label]="!emp.Picture ? getInitials(emp.fullName) : undefined"
-                                              shape="circle" size="normal"
-                                              [style]="{'background': getAvatarColor(emp.fullName), 'color': 'white', 'width': '32px', 'height': '32px', 'font-size': '0.75rem'}">
-                                    </p-avatar>
-                                    <div class="employee-option-info">
-                                        <span class="employee-option-name">{{ emp.fullName }}</span>
-                                        <span class="employee-option-badge" *ngIf="emp.BadgeNumber || emp.employee_id">
-                                            <i class="pi pi-id-card"></i> {{ emp.BadgeNumber || emp.employee_id }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </ng-template>
-                            <ng-template let-emp pTemplate="selectedItem">
-                                <div class="employee-option selected" *ngIf="emp">
-                                    <p-avatar [image]="getEmployeePicture(emp.Picture)"
-                                              [label]="!emp.Picture ? getInitials(emp.fullName) : undefined"
-                                              shape="circle" size="normal"
-                                              [style]="{'background': getAvatarColor(emp.fullName), 'color': 'white', 'width': '28px', 'height': '28px', 'font-size': '0.7rem'}">
-                                    </p-avatar>
-                                    <span class="employee-option-name">{{ emp.fullName }}</span>
-                                    <span class="employee-option-badge-inline" *ngIf="emp.BadgeNumber || emp.employee_id">
-                                        ({{ emp.BadgeNumber || emp.employee_id }})
-                                    </span>
-                                </div>
-                            </ng-template>
-                        </p-select>
+                        <app-employee-autocomplete
+                            formControlName="employee"
+                            placeholder="Rechercher un employé par nom ou badge..."
+                            [showClear]="true"
+                            appendTo="body">
+                        </app-employee-autocomplete>
                     </div>
                 </div>
                 <div class="form-row">
@@ -998,7 +969,6 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     // Use signal from state service
     qualifications = this.qualificationState.qualifications;
 
-    employees: any[] = [];
     formations: Formation[] = [];
     formateurs: Formateur[] = [];
     loading = false;
@@ -1076,15 +1046,10 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         this.loading = true;
         forkJoin({
             qualifications: this.hrService.getQualifications().pipe(catchError(() => of([]))),
-            employees: this.hrService.getEmployees().pipe(catchError(() => of([]))),
             formations: this.hrService.getFormations().pipe(catchError(() => of([]))),
             formateurs: this.hrService.getFormateurs().pipe(catchError(() => of([])))
         }).pipe(takeUntil(this.destroy$)).subscribe({
             next: (data) => {
-                this.employees = data.employees.map((e: Employee) => ({
-                    ...e,
-                    fullName: `${e.Prenom_Emp} ${e.Nom_Emp}`
-                }));
                 this.formations = data.formations;
                 this.formateurs = data.formateurs;
                 this.loading = false;

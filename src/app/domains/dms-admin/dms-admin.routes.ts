@@ -30,6 +30,28 @@ export const DMS_ADMIN_ROUTES: Routes = [
             import('./features/activity-logs/activity-logs.component')
                 .then(m => m.ActivityLogsComponent),
         title: 'Logs d\'activité'
+    },
+    // ==================== DATA IMPORT ====================
+    {
+        path: 'data-import',
+        loadComponent: () =>
+            import('./features/data-import/import-dashboard.component')
+                .then(m => m.ImportDashboardComponent),
+        title: 'Import de Données'
+    },
+    {
+        path: 'data-import/preview',
+        loadComponent: () =>
+            import('./features/data-import/import-preview.component')
+                .then(m => m.ImportPreviewComponent),
+        title: 'Prévisualisation Import'
+    },
+    {
+        path: 'data-import/execute',
+        loadComponent: () =>
+            import('./features/data-import/import-execution.component')
+                .then(m => m.ImportExecutionComponent),
+        title: 'Exécution Import'
     }
 ];
 

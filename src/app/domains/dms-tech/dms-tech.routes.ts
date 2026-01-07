@@ -83,6 +83,18 @@ export const DMS_TECH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/problem-types.component').then(m => m.ProblemTypesComponent),
         title: 'Problem Types Management'
+    },
+    {
+        path: 'shifts',
+        loadComponent: () =>
+            import('./features/shifts.component').then(m => m.ShiftsComponent),
+        title: 'Shifts Management'
+    },
+    {
+        path: 'shift-types',
+        loadComponent: () =>
+            import('./features/shift-types.component').then(m => m.ShiftTypesComponent),
+        title: 'Shift Types Management'
     }
 ];
 

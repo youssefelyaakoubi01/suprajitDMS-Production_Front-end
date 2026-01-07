@@ -65,6 +65,14 @@ interface ConfigCard {
                 </h2>
                 <div class="actions-grid">
                     <p-button
+                        label="Import Tech Data"
+                        icon="pi pi-upload"
+                        styleClass="w-full"
+                        severity="success"
+                        routerLink="/dms-admin/data-import"
+                        [queryParams]="{module: 'tech'}">
+                    </p-button>
+                    <p-button
                         label="Add New Project"
                         icon="pi pi-plus"
                         styleClass="w-full p-button-outlined"

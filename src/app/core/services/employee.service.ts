@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import {
     Employee,
@@ -23,7 +24,12 @@ export class EmployeeService {
         category?: string;
         status?: string
     }): Observable<Employee[]> {
-        return this.api.get<Employee[]>(this.endpoint, params);
+        return this.api.get<{ count: number; results: Employee[] } | Employee[]>(this.endpoint, params).pipe(
+            map(response => {
+                // Handle both paginated and array responses for backward compatibility
+                return Array.isArray(response) ? response : response.results || [];
+            })
+        );
     }
 
     getEmployee(id: number): Observable<Employee> {

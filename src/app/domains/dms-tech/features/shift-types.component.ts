@@ -5,6 +5,8 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TagModule } from 'primeng/tag';
@@ -12,12 +14,14 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
+import { SliderModule } from 'primeng/slider';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageService, ConfirmationService } from 'primeng/api';
-import { ProductionService } from '../../core/services/production.service';
-import { Shift } from '../../core/models/production.model';
+import { ProductionService } from '../../../core/services/production.service';
+import { ShiftType } from '../../../core/models/production.model';
 
 @Component({
-    selector: 'app-shifts',
+    selector: 'app-shift-types',
     standalone: true,
     imports: [
         CommonModule,
@@ -26,13 +30,17 @@ import { Shift } from '../../core/models/production.model';
         ButtonModule,
         DialogModule,
         InputTextModule,
+        InputNumberModule,
+        TextareaModule,
         ToastModule,
         ConfirmDialogModule,
         TagModule,
         ToggleSwitchModule,
         CardModule,
         ToolbarModule,
-        TooltipModule
+        TooltipModule,
+        SliderModule,
+        ProgressBarModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -42,11 +50,11 @@ import { Shift } from '../../core/models/production.model';
         <div class="card">
             <p-toolbar styleClass="mb-4">
                 <ng-template pTemplate="left">
-                    <h2 class="m-0">Shift Management</h2>
+                    <h2 class="m-0">Shift Type Management</h2>
                 </ng-template>
                 <ng-template pTemplate="right">
                     <p-button
-                        label="New Shift"
+                        label="New Shift Type"
                         icon="pi pi-plus"
                         styleClass="p-button-success mr-2"
                         (onClick)="openNew()">
@@ -55,19 +63,19 @@ import { Shift } from '../../core/models/production.model';
                         label="Refresh"
                         icon="pi pi-refresh"
                         styleClass="p-button-outlined"
-                        (onClick)="loadShifts()">
+                        (onClick)="loadShiftTypes()">
                     </p-button>
                 </ng-template>
             </p-toolbar>
 
             <p-table
-                [value]="shifts"
+                [value]="shiftTypes"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
                 [rows]="10"
                 [showCurrentPageReport]="true"
-                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} shifts"
+                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} shift types"
                 styleClass="p-datatable-sm">
 
                 <ng-template pTemplate="header">
@@ -75,24 +83,34 @@ import { Shift } from '../../core/models/production.model';
                         <th style="width: 80px">ID</th>
                         <th>Code</th>
                         <th>Name</th>
-                        <th>Start Time</th>
-                        <th>End Time</th>
+                        <th style="width: 200px">Target %</th>
+                        <th>Description</th>
                         <th style="width: 100px">Status</th>
                         <th style="width: 150px">Actions</th>
                     </tr>
                 </ng-template>
 
-                <ng-template pTemplate="body" let-shift>
+                <ng-template pTemplate="body" let-shiftType>
                     <tr>
-                        <td>{{ shift.id }}</td>
-                        <td><strong>{{ shift.code }}</strong></td>
-                        <td>{{ shift.name }}</td>
-                        <td>{{ shift.start_time }}</td>
-                        <td>{{ shift.end_time }}</td>
+                        <td>{{ shiftType.id }}</td>
+                        <td><strong>{{ shiftType.code }}</strong></td>
+                        <td>{{ shiftType.name }}</td>
+                        <td>
+                            <div class="flex align-items-center gap-2">
+                                <p-progressBar
+                                    [value]="shiftType.target_percentage"
+                                    [showValue]="false"
+                                    styleClass="h-1rem flex-grow-1"
+                                    [style]="{'background-color': getProgressBgColor(shiftType.target_percentage)}">
+                                </p-progressBar>
+                                <span class="font-bold" style="min-width: 45px">{{ shiftType.target_percentage }}%</span>
+                            </div>
+                        </td>
+                        <td>{{ shiftType.description || '-' }}</td>
                         <td>
                             <p-tag
-                                [value]="shift.is_active ? 'Active' : 'Inactive'"
-                                [severity]="shift.is_active ? 'success' : 'danger'">
+                                [value]="shiftType.is_active ? 'Active' : 'Inactive'"
+                                [severity]="shiftType.is_active ? 'success' : 'danger'">
                             </p-tag>
                         </td>
                         <td>
@@ -100,19 +118,19 @@ import { Shift } from '../../core/models/production.model';
                                 icon="pi pi-eye"
                                 styleClass="p-button-rounded p-button-info p-button-text mr-1"
                                 pTooltip="View Details"
-                                (onClick)="viewShift(shift)">
+                                (onClick)="viewShiftType(shiftType)">
                             </p-button>
                             <p-button
                                 icon="pi pi-pencil"
                                 styleClass="p-button-rounded p-button-warning p-button-text mr-1"
                                 pTooltip="Edit"
-                                (onClick)="editShift(shift)">
+                                (onClick)="editShiftType(shiftType)">
                             </p-button>
                             <p-button
                                 icon="pi pi-trash"
                                 styleClass="p-button-rounded p-button-danger p-button-text"
                                 pTooltip="Delete"
-                                (onClick)="confirmDelete(shift)">
+                                (onClick)="confirmDelete(shiftType)">
                             </p-button>
                         </td>
                     </tr>
@@ -122,7 +140,7 @@ import { Shift } from '../../core/models/production.model';
                     <tr>
                         <td colspan="7" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
-                            <span class="text-gray-500">No shifts found. Click "New Shift" to create one.</span>
+                            <span class="text-gray-500">No shift types found. Click "New Shift Type" to create one.</span>
                         </td>
                     </tr>
                 </ng-template>
@@ -132,36 +150,45 @@ import { Shift } from '../../core/models/production.model';
         <!-- View/Details Dialog -->
         <p-dialog
             [(visible)]="viewDialog"
-            [style]="{width: '450px'}"
-            header="Shift Details"
+            [style]="{width: '500px'}"
+            header="Shift Type Details"
             [modal]="true">
-            <div class="p-fluid" *ngIf="selectedShift">
+            <div class="p-fluid" *ngIf="selectedShiftType">
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">ID</label>
-                    <div class="text-lg">{{ selectedShift.id }}</div>
+                    <div class="text-lg">{{ selectedShiftType.id }}</div>
                 </div>
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">Code</label>
-                    <div class="text-lg">{{ selectedShift.code }}</div>
+                    <div class="text-lg">{{ selectedShiftType.code }}</div>
                 </div>
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">Name</label>
-                    <div class="text-lg">{{ selectedShift.name }}</div>
+                    <div class="text-lg">{{ selectedShiftType.name }}</div>
                 </div>
                 <div class="field mb-4">
-                    <label class="font-bold text-gray-600">Start Time</label>
-                    <div class="text-lg">{{ selectedShift.start_time }}</div>
+                    <label class="font-bold text-gray-600">Target Percentage</label>
+                    <div class="flex align-items-center gap-2 mt-2">
+                        <p-progressBar
+                            [value]="selectedShiftType.target_percentage"
+                            styleClass="h-1rem flex-grow-1">
+                        </p-progressBar>
+                        <span class="text-lg font-bold">{{ selectedShiftType.target_percentage }}%</span>
+                    </div>
+                    <small class="text-gray-500 mt-2 block">
+                        Target will be adjusted to {{ selectedShiftType.target_percentage }}% of the base hourly target
+                    </small>
                 </div>
                 <div class="field mb-4">
-                    <label class="font-bold text-gray-600">End Time</label>
-                    <div class="text-lg">{{ selectedShift.end_time }}</div>
+                    <label class="font-bold text-gray-600">Description</label>
+                    <div class="text-lg">{{ selectedShiftType.description || 'No description' }}</div>
                 </div>
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">Status</label>
                     <div>
                         <p-tag
-                            [value]="selectedShift.is_active ? 'Active' : 'Inactive'"
-                            [severity]="selectedShift.is_active ? 'success' : 'danger'">
+                            [value]="selectedShiftType.is_active ? 'Active' : 'Inactive'"
+                            [severity]="selectedShiftType.is_active ? 'success' : 'danger'">
                         </p-tag>
                     </div>
                 </div>
@@ -174,9 +201,9 @@ import { Shift } from '../../core/models/production.model';
 
         <!-- Create/Edit Dialog -->
         <p-dialog
-            [(visible)]="shiftDialog"
-            [style]="{width: '500px'}"
-            [header]="editMode ? 'Edit Shift' : 'New Shift'"
+            [(visible)]="shiftTypeDialog"
+            [style]="{width: '550px'}"
+            [header]="editMode ? 'Edit Shift Type' : 'New Shift Type'"
             [modal]="true"
             styleClass="p-fluid">
 
@@ -187,12 +214,13 @@ import { Shift } from '../../core/models/production.model';
                         type="text"
                         pInputText
                         id="code"
-                        [(ngModel)]="shift.code"
+                        [(ngModel)]="shiftType.code"
                         required
                         autofocus
-                        placeholder="e.g., S1, S2, S3"
-                        [ngClass]="{'ng-invalid ng-dirty': submitted && !shift.code}" />
-                    <small class="p-error" *ngIf="submitted && !shift.code">Code is required.</small>
+                        placeholder="e.g., normal, setup, break"
+                        [ngClass]="{'ng-invalid ng-dirty': submitted && !shiftType.code}" />
+                    <small class="p-error" *ngIf="submitted && !shiftType.code">Code is required.</small>
+                    <small class="text-gray-500">Unique identifier (lowercase, no spaces recommended)</small>
                 </div>
 
                 <div class="field mb-4">
@@ -201,51 +229,59 @@ import { Shift } from '../../core/models/production.model';
                         type="text"
                         pInputText
                         id="name"
-                        [(ngModel)]="shift.name"
+                        [(ngModel)]="shiftType.name"
                         required
-                        placeholder="e.g., Morning Shift, Night Shift"
-                        [ngClass]="{'ng-invalid ng-dirty': submitted && !shift.name}" />
-                    <small class="p-error" *ngIf="submitted && !shift.name">Name is required.</small>
+                        placeholder="e.g., Normal, Setup, Break"
+                        [ngClass]="{'ng-invalid ng-dirty': submitted && !shiftType.name}" />
+                    <small class="p-error" *ngIf="submitted && !shiftType.name">Name is required.</small>
                 </div>
 
-                <div class="grid">
-                    <div class="col-6">
-                        <div class="field mb-4">
-                            <label for="startTime" class="font-bold">Start Time *</label>
-                            <input
-                                type="time"
-                                pInputText
-                                id="startTime"
-                                [(ngModel)]="shift.start_time"
-                                required
-                                [ngClass]="{'ng-invalid ng-dirty': submitted && !shift.start_time}" />
-                            <small class="p-error" *ngIf="submitted && !shift.start_time">Start time is required.</small>
-                        </div>
+                <div class="field mb-4">
+                    <label for="targetPercentage" class="font-bold">Target Percentage *</label>
+                    <div class="flex align-items-center gap-3 mt-2">
+                        <p-slider
+                            [(ngModel)]="shiftType.target_percentage"
+                            [min]="0"
+                            [max]="100"
+                            styleClass="flex-grow-1">
+                        </p-slider>
+                        <p-inputNumber
+                            [(ngModel)]="shiftType.target_percentage"
+                            [min]="0"
+                            [max]="100"
+                            suffix="%"
+                            [style]="{width: '100px'}">
+                        </p-inputNumber>
                     </div>
-                    <div class="col-6">
-                        <div class="field mb-4">
-                            <label for="endTime" class="font-bold">End Time *</label>
-                            <input
-                                type="time"
-                                pInputText
-                                id="endTime"
-                                [(ngModel)]="shift.end_time"
-                                required
-                                [ngClass]="{'ng-invalid ng-dirty': submitted && !shift.end_time}" />
-                            <small class="p-error" *ngIf="submitted && !shift.end_time">End time is required.</small>
-                        </div>
+                    <small class="text-gray-500 mt-2 block">
+                        Percentage of base target to apply. 100% = full target, 50% = half target, 0% = no production expected
+                    </small>
+                    <div class="mt-2 p-3 surface-100 border-round">
+                        <strong>Example:</strong> If hourly target is 100 units and percentage is {{ shiftType.target_percentage }}%,
+                        the adjusted target will be <strong>{{ shiftType.target_percentage }}</strong> units.
                     </div>
                 </div>
 
                 <div class="field mb-4">
+                    <label for="description" class="font-bold">Description</label>
+                    <textarea
+                        pInputTextarea
+                        id="description"
+                        [(ngModel)]="shiftType.description"
+                        rows="3"
+                        placeholder="Optional description of when this shift type is used">
+                    </textarea>
+                </div>
+
+                <div class="field mb-4">
                     <label for="isActive" class="font-bold mr-3">Active</label>
-                    <p-toggleswitch [(ngModel)]="shift.is_active" inputId="isActive"></p-toggleswitch>
+                    <p-toggleSwitch [(ngModel)]="shiftType.is_active" inputId="isActive"></p-toggleSwitch>
                 </div>
             </ng-template>
 
             <ng-template pTemplate="footer">
                 <p-button label="Cancel" icon="pi pi-times" styleClass="p-button-text" (onClick)="hideDialog()"></p-button>
-                <p-button label="Save" icon="pi pi-check" (onClick)="saveShift()"></p-button>
+                <p-button label="Save" icon="pi pi-check" (onClick)="saveShiftType()"></p-button>
             </ng-template>
         </p-dialog>
     `,
@@ -253,14 +289,20 @@ import { Shift } from '../../core/models/production.model';
         :host ::ng-deep .p-datatable .p-datatable-thead > tr > th {
             background-color: var(--surface-50);
         }
+        :host ::ng-deep .p-progressbar {
+            height: 0.75rem;
+        }
+        :host ::ng-deep .p-slider {
+            width: 100%;
+        }
     `]
 })
-export class ShiftsComponent implements OnInit {
-    shifts: Shift[] = [];
-    shift: Partial<Shift> = {};
-    selectedShift: Shift | null = null;
+export class ShiftTypesComponent implements OnInit {
+    shiftTypes: ShiftType[] = [];
+    shiftType: Partial<ShiftType> = {};
+    selectedShiftType: ShiftType | null = null;
 
-    shiftDialog = false;
+    shiftTypeDialog = false;
     viewDialog = false;
     editMode = false;
     submitted = false;
@@ -273,77 +315,69 @@ export class ShiftsComponent implements OnInit {
     ) {}
 
     ngOnInit(): void {
-        this.loadShifts();
+        this.loadShiftTypes();
     }
 
-    loadShifts(): void {
+    loadShiftTypes(): void {
         this.loading = true;
-        this.productionService.getShifts().subscribe({
+        this.productionService.getShiftTypes().subscribe({
             next: (data: any) => {
-                // Handle paginated response or direct array
-                this.shifts = data.results || data;
+                this.shiftTypes = data.results || data;
                 this.loading = false;
             },
             error: (error) => {
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
-                    detail: 'Failed to load shifts'
+                    detail: 'Failed to load shift types'
                 });
                 this.loading = false;
-                console.error('Error loading shifts:', error);
+                console.error('Error loading shift types:', error);
             }
         });
     }
 
     openNew(): void {
-        this.shift = {
+        this.shiftType = {
             code: '',
             name: '',
-            start_time: '06:00',
-            end_time: '14:00',
+            target_percentage: 100,
+            description: '',
             is_active: true
         };
         this.editMode = false;
         this.submitted = false;
-        this.shiftDialog = true;
+        this.shiftTypeDialog = true;
     }
 
-    viewShift(shift: Shift): void {
-        this.selectedShift = { ...shift };
+    viewShiftType(shiftType: ShiftType): void {
+        this.selectedShiftType = { ...shiftType };
         this.viewDialog = true;
     }
 
     editFromView(): void {
-        if (this.selectedShift) {
-            this.editShift(this.selectedShift);
+        if (this.selectedShiftType) {
+            this.editShiftType(this.selectedShiftType);
             this.viewDialog = false;
         }
     }
 
-    editShift(shift: Shift): void {
-        this.shift = { ...shift };
-        // Convert time format if needed (remove seconds for input[type=time])
-        if (this.shift.start_time && this.shift.start_time.length > 5) {
-            this.shift.start_time = this.shift.start_time.substring(0, 5);
-        }
-        if (this.shift.end_time && this.shift.end_time.length > 5) {
-            this.shift.end_time = this.shift.end_time.substring(0, 5);
-        }
+    editShiftType(shiftType: ShiftType): void {
+        this.shiftType = { ...shiftType };
         this.editMode = true;
         this.submitted = false;
-        this.shiftDialog = true;
+        this.shiftTypeDialog = true;
     }
 
     hideDialog(): void {
-        this.shiftDialog = false;
+        this.shiftTypeDialog = false;
         this.submitted = false;
     }
 
-    saveShift(): void {
+    saveShiftType(): void {
         this.submitted = true;
 
-        if (!this.shift.code || !this.shift.name || !this.shift.start_time || !this.shift.end_time) {
+        if (!this.shiftType.code || !this.shiftType.name || this.shiftType.target_percentage === undefined) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Validation Error',
@@ -352,109 +386,82 @@ export class ShiftsComponent implements OnInit {
             return;
         }
 
-        // Ensure time format includes seconds for backend
-        const shiftData = {
-            ...this.shift,
-            start_time: this.shift.start_time!.length === 5 ? `${this.shift.start_time}:00` : this.shift.start_time,
-            end_time: this.shift.end_time!.length === 5 ? `${this.shift.end_time}:00` : this.shift.end_time
-        };
-
-        if (this.editMode && this.shift.id) {
-            // Update existing shift
-            this.productionService.updateShift(this.shift.id, shiftData).subscribe({
+        if (this.editMode && this.shiftType.id) {
+            this.productionService.updateShiftType(this.shiftType.id, this.shiftType).subscribe({
                 next: () => {
                     this.messageService.add({
                         severity: 'success',
                         summary: 'Success',
-                        detail: 'Shift updated successfully'
+                        detail: 'Shift type updated successfully'
                     });
-                    this.loadShifts();
+                    this.loadShiftTypes();
                     this.hideDialog();
                 },
                 error: (error) => {
                     this.messageService.add({
                         severity: 'error',
                         summary: 'Error',
-                        detail: error.error?.detail || 'Failed to update shift'
+                        detail: error.error?.detail || 'Failed to update shift type'
                     });
-                    console.error('Error updating shift:', error);
                 }
             });
         } else {
-            // Create new shift
-            this.productionService.createShift(shiftData).subscribe({
+            this.productionService.createShiftType(this.shiftType).subscribe({
                 next: () => {
                     this.messageService.add({
                         severity: 'success',
                         summary: 'Success',
-                        detail: 'Shift created successfully'
+                        detail: 'Shift type created successfully'
                     });
-                    this.loadShifts();
+                    this.loadShiftTypes();
                     this.hideDialog();
                 },
                 error: (error) => {
                     this.messageService.add({
                         severity: 'error',
                         summary: 'Error',
-                        detail: error.error?.detail || error.error?.code?.[0] || 'Failed to create shift'
+                        detail: error.error?.detail || error.error?.code?.[0] || 'Failed to create shift type'
                     });
-                    console.error('Error creating shift:', error);
                 }
             });
         }
     }
 
-    confirmDelete(shift: Shift): void {
+    confirmDelete(shiftType: ShiftType): void {
         this.confirmationService.confirm({
-            message: `Are you sure you want to delete the shift "${shift.name}"?`,
+            message: `Are you sure you want to delete the shift type "${shiftType.name}"?`,
             header: 'Confirm Delete',
             icon: 'pi pi-exclamation-triangle',
             acceptButtonStyleClass: 'p-button-danger',
             accept: () => {
-                this.deleteShift(shift);
+                this.deleteShiftType(shiftType);
             }
         });
     }
 
-    deleteShift(shift: Shift): void {
-        this.productionService.deleteShift(shift.id).subscribe({
+    deleteShiftType(shiftType: ShiftType): void {
+        this.productionService.deleteShiftType(shiftType.id).subscribe({
             next: () => {
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Success',
-                    detail: 'Shift deleted successfully'
+                    detail: 'Shift type deleted successfully'
                 });
-
-                // Clear production session from localStorage if it uses this shift
-                this.clearProductionSessionIfUsingShift(shift.id);
-
-                this.loadShifts();
+                this.loadShiftTypes();
             },
             error: (error) => {
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
-                    detail: error.error?.detail || 'Failed to delete shift. It may be in use.'
+                    detail: error.error?.detail || 'Failed to delete shift type. It may be in use.'
                 });
-                console.error('Error deleting shift:', error);
             }
         });
     }
 
-    private clearProductionSessionIfUsingShift(shiftId: number): void {
-        const SESSION_STORAGE_KEY = 'dms_production_session';
-        try {
-            const savedData = localStorage.getItem(SESSION_STORAGE_KEY);
-            if (savedData) {
-                const parsed = JSON.parse(savedData);
-                // Check if the saved session uses this shift
-                if (parsed?.session?.shift?.id === shiftId) {
-                    localStorage.removeItem(SESSION_STORAGE_KEY);
-                    console.log('Cleared production session because shift was deleted');
-                }
-            }
-        } catch (error) {
-            console.error('Error checking production session:', error);
-        }
+    getProgressBgColor(percentage: number): string {
+        if (percentage === 0) return '#e5e7eb';
+        if (percentage <= 50) return '#fef3c7';
+        return '#d1fae5';
     }
 }

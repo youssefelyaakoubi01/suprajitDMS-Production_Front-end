@@ -12,15 +12,15 @@
         </div>
         <div class="header-stats">
             <div class="stat-item">
-                <span class="stat-value">{{ employees.length }}</span>
+                <span class="stat-value">{{ totalRecords }}</span>
                 <span class="stat-label">Total</span>
             </div>
             <div class="stat-item success">
-                <span class="stat-value">{{ employees.filter(e => e.EmpStatus === 'Active').length }}</span>
+                <span class="stat-value">{{ employees.filter(e => e.EmpStatus === 'active' || e.status === 'active').length }}</span>
                 <span class="stat-label">Active</span>
             </div>
             <div class="stat-item warning">
-                <span class="stat-value">{{ employees.filter(e => e.EmpStatus === 'On Leave').length }}</span>
+                <span class="stat-value">{{ employees.filter(e => e.EmpStatus === 'on_leave' || e.status === 'on_leave').length }}</span>
                 <span class="stat-label">On Leave</span>
             </div>
         </div>
@@ -81,6 +81,7 @@
                 [options]="departmentOptions"
                 placeholder="All Departments"
                 [showClear]="true"
+                (onChange)="onFilterChange()"
                 styleClass="filter-select">
             </p-select>
             <p-select
@@ -88,6 +89,7 @@
                 [options]="categoryOptions"
                 placeholder="All Categories"
                 [showClear]="true"
+                (onChange)="onFilterChange()"
                 styleClass="filter-select">
             </p-select>
             <p-select
@@ -95,6 +97,7 @@
                 [options]="statusOptions"
                 placeholder="All Statuses"
                 [showClear]="true"
+                (onChange)="onFilterChange()"
                 styleClass="filter-select">
             </p-select>
             <p-button
@@ -112,11 +115,14 @@
             #dt
             [value]="employees"
             [(selection)]="selectedEmployees"
-            [rows]="10"
+            [lazy]="true"
+            (onLazyLoad)="loadEmployeesLazy($event)"
+            [rows]="rows"
+            [first]="first"
+            [totalRecords]="totalRecords"
             [paginator]="true"
             [rowsPerPageOptions]="[10, 25, 50]"
             [loading]="loading"
-            [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Departement_Emp', 'Categorie_Emp', 'BadgeNumber']"
             [rowHover]="true"
             dataKey="Id_Emp"
             styleClass="p-datatable-striped"

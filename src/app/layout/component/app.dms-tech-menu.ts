@@ -89,6 +89,16 @@ export class AppDmsTechMenu {
                         label: 'Targets',
                         icon: 'pi pi-fw pi-chart-bar',
                         routerLink: ['/dms-tech/targets']
+                    },
+                    {
+                        label: 'Shifts',
+                        icon: 'pi pi-fw pi-calendar',
+                        routerLink: ['/dms-tech/shifts']
+                    },
+                    {
+                        label: 'Shift Types',
+                        icon: 'pi pi-fw pi-sliders-h',
+                        routerLink: ['/dms-tech/shift-types']
                     }
                 ]
             },

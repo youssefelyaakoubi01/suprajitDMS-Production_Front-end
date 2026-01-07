@@ -6,6 +6,7 @@
  */
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -38,6 +39,7 @@ interface KpiCard {
     standalone: true,
     imports: [
         CommonModule,
+        RouterModule,
         CardModule,
         ChartModule,
         ProgressBarModule,
@@ -62,6 +64,14 @@ interface KpiCard {
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button pButton pRipple
+                            icon="pi pi-upload"
+                            label="Import HR Data"
+                            class="p-button-outlined p-button-sm mr-2"
+                            routerLink="/dms-admin/data-import"
+                            [queryParams]="{module: 'hr'}"
+                            pTooltip="Import HR data from Excel">
+                    </button>
                     <button pButton pRipple
                             icon="pi pi-refresh"
                             class="p-button-text p-button-rounded"

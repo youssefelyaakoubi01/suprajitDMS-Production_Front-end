@@ -56,23 +56,6 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
         title: 'Downtime Declaration'
     },
     {
-        path: 'settings',
-        children: [
-            {
-                path: 'shifts',
-                loadComponent: () =>
-                    import('@features/settings/shifts.component').then(m => m.ShiftsComponent),
-                title: 'Shift Settings'
-            },
-            {
-                path: 'shift-types',
-                loadComponent: () =>
-                    import('@features/settings/shift-types.component').then(m => m.ShiftTypesComponent),
-                title: 'Shift Type Settings'
-            }
-        ]
-    },
-    {
         path: 'profile',
         loadComponent: () =>
             import('@features/profile/profile.component').then(m => m.ProfileComponent),

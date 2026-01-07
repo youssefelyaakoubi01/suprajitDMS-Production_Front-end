@@ -79,7 +79,11 @@ export class HRService {
         search?: string;
     }): Observable<Employee[]> {
         this.cacheState.setLoadingEmployees(true);
-        return this.api.get<Employee[]>(`${this.endpoint}`, params).pipe(
+        return this.api.get<{ count: number; results: Employee[] } | Employee[]>(`${this.endpoint}`, params).pipe(
+            map(response => {
+                // Handle both paginated and array responses for backward compatibility
+                return Array.isArray(response) ? response : response.results || [];
+            }),
             tap(employees => {
                 // Update signal-based cache
                 this.cacheState.setEmployees(employees);
@@ -87,6 +91,29 @@ export class HRService {
                 // Also update legacy BehaviorSubject for backward compatibility
                 this.employeesCache$.next(employees);
             }),
+            catchError(err => {
+                this.cacheState.setLoadingEmployees(false);
+                throw err;
+            })
+        );
+    }
+
+    /**
+     * Get employees with server-side pagination
+     * Returns paginated response with count and results
+     */
+    getEmployeesPaginated(params: {
+        page?: number;
+        page_size?: number;
+        search?: string;
+        department?: string;
+        category?: string;
+        status?: string;
+        ordering?: string;
+    }): Observable<{ count: number; results: Employee[] }> {
+        this.cacheState.setLoadingEmployees(true);
+        return this.api.get<{ count: number; results: Employee[] }>(`${this.endpoint}`, params).pipe(
+            tap(() => this.cacheState.setLoadingEmployees(false)),
             catchError(err => {
                 this.cacheState.setLoadingEmployees(false);
                 throw err;

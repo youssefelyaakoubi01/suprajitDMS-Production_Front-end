@@ -25,6 +25,7 @@ import { MessageService } from 'primeng/api';
 // Domain imports
 import { Employee, Formation, Formateur, RecyclageEmployee } from '@domains/dms-rh';
 import { environment } from '../../../../../environments/environment';
+import { EmployeeAutocompleteComponent } from '@shared/components/employee-autocomplete/employee-autocomplete.component';
 
 interface RecyclageSchedule {
     id?: number;
@@ -53,7 +54,8 @@ interface RecyclageSchedule {
         DividerModule,
         TextareaModule,
         AvatarModule,
-        TagModule
+        TagModule,
+        EmployeeAutocompleteComponent
     ],
     providers: [MessageService],
     template: `
@@ -93,53 +95,13 @@ interface RecyclageSchedule {
 
                     <div class="form-field">
                         <label for="employee">Sélectionner l'Employé *</label>
-                        <p-select id="employee"
-                                  formControlName="employeeId"
-                                  [options]="employeeOptions"
-                                  optionLabel="fullName"
-                                  optionValue="Id_Emp"
-                                  placeholder="Rechercher un employé..."
-                                  [filter]="true"
-                                  filterPlaceholder="Rechercher..."
-                                  [disabled]="!!preselectedEmployee"
-                                  appendTo="body"
-                                  styleClass="w-full">
-                            <ng-template let-employee pTemplate="item">
-                                <div class="employee-option">
-                                    <p-avatar [image]="getEmployeePhoto(employee)"
-                                              [label]="!employee.Picture ? getInitials(employee) : undefined"
-                                              shape="circle"
-                                              size="normal"
-                                              [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
-                                    </p-avatar>
-                                    <div class="employee-info">
-                                        <span class="employee-name">{{ employee.fullName }}</span>
-                                        <span class="employee-dept">{{ employee.Departement_Emp }}</span>
-                                    </div>
-                                    <p-tag *ngIf="employee.isOverdue"
-                                           value="En retard"
-                                           severity="danger"
-                                           [rounded]="true">
-                                    </p-tag>
-                                    <p-tag *ngIf="!employee.isOverdue && employee.requiresRecyclage"
-                                           value="À prévoir"
-                                           severity="warn"
-                                           [rounded]="true">
-                                    </p-tag>
-                                </div>
-                            </ng-template>
-                            <ng-template let-employee pTemplate="selectedItem">
-                                <div class="employee-option" *ngIf="employee">
-                                    <p-avatar [image]="getEmployeePhoto(employee)"
-                                              [label]="!employee.Picture ? getInitials(employee) : undefined"
-                                              shape="circle"
-                                              size="normal"
-                                              [style]="{'background': 'var(--hr-gradient)', 'color': 'white', 'width': '28px', 'height': '28px', 'font-size': '0.75rem'}">
-                                    </p-avatar>
-                                    <span>{{ employee.fullName }}</span>
-                                </div>
-                            </ng-template>
-                        </p-select>
+                        <app-employee-autocomplete
+                            formControlName="employeeId"
+                            placeholder="Rechercher un employé..."
+                            [disabled]="!!preselectedEmployee"
+                            [showClear]="true"
+                            appendTo="body">
+                        </app-employee-autocomplete>
                     </div>
                 </div>
 
@@ -500,7 +462,6 @@ export class RecyclageFormDialogComponent implements OnInit, OnChanges {
     @Input() visible = false;
     @Input() schedule: RecyclageSchedule | null = null;
     @Input() preselectedEmployee: RecyclageEmployee | null = null;
-    @Input() employees: Employee[] = [];
     @Input() formations: Formation[] = [];
     @Input() trainers: Formateur[] = [];
 
@@ -512,7 +473,6 @@ export class RecyclageFormDialogComponent implements OnInit, OnChanges {
     saving = false;
     minDate = new Date();
 
-    employeeOptions: any[] = [];
     recyclageFormations: Formation[] = [];
 
     statusOptions = [
@@ -545,7 +505,7 @@ export class RecyclageFormDialogComponent implements OnInit, OnChanges {
     }
 
     ngOnChanges(changes: SimpleChanges): void {
-        if (changes['employees'] || changes['formations']) {
+        if (changes['formations']) {
             this.prepareData();
         }
 
@@ -576,12 +536,6 @@ export class RecyclageFormDialogComponent implements OnInit, OnChanges {
     }
 
     private prepareData(): void {
-        // Prepare employees with full name and recyclage info
-        this.employeeOptions = this.employees.map(emp => ({
-            ...emp,
-            fullName: `${emp.Prenom_Emp} ${emp.Nom_Emp}`
-        }));
-
         // Filter formations for recyclage type
         this.recyclageFormations = this.formations.filter(f =>
             f.type?.toLowerCase() === 'recyclage' || f.is_active !== false

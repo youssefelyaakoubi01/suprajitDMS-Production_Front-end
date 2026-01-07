@@ -39,6 +39,8 @@ import { AssignmentStateService } from '@core/state/assignment-state.service';
 import { EmployeeWorkstationAssignment, AssignmentCreateRequest } from '../../models/assignment.model';
 import { Employee, HRWorkstation } from '@core/models/employee.model';
 import { environment } from '../../../../../environments/environment';
+import { EmployeeAutocompleteComponent } from '@shared/components/employee-autocomplete/employee-autocomplete.component';
+import { EmployeeSearchResult } from '@core/services/employee-search.service';
 
 interface Machine {
     id: number;
@@ -78,7 +80,8 @@ interface ProductionLine {
         SkeletonModule,
         RippleModule,
         IconFieldModule,
-        InputIconModule
+        InputIconModule,
+        EmployeeAutocompleteComponent
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -348,39 +351,13 @@ interface ProductionLine {
                         <i class="pi pi-user"></i>
                         Employee <span class="required">*</span>
                     </label>
-                    <p-select id="employee"
-                              formControlName="employee"
-                              [options]="employees"
-                              optionLabel="searchLabel"
-                              optionValue="Id_Emp"
-                              [filter]="true"
-                              [filterBy]="'BadgeNumber,fullName,Nom_Emp,Prenom_Emp'"
-                              filterPlaceholder="Search by badge, name..."
-                              placeholder="Select an employee"
-                              styleClass="w-full">
-                        <ng-template let-emp pTemplate="item">
-                            <div class="employee-option">
-                                <p-avatar [label]="getInitials(emp.fullName)"
-                                          shape="circle"
-                                          size="normal"
-                                          [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
-                                </p-avatar>
-                                <div class="option-details">
-                                    <span class="option-name">{{ emp.fullName }}</span>
-                                    <span class="option-badge">
-                                        <i class="pi pi-id-card"></i>
-                                        {{ emp.BadgeNumber || 'No Badge' }}
-                                    </span>
-                                </div>
-                            </div>
-                        </ng-template>
-                        <ng-template let-emp pTemplate="selectedItem">
-                            <div class="employee-selected" *ngIf="emp">
-                                <span>{{ emp.fullName }}</span>
-                                <span class="badge-hint">({{ emp.BadgeNumber || 'No Badge' }})</span>
-                            </div>
-                        </ng-template>
-                    </p-select>
+                    <app-employee-autocomplete
+                        formControlName="employee"
+                        placeholder="Search employee by name or badge..."
+                        [appendTo]="'body'"
+                        inputId="employee"
+                        (employeeSelected)="onEmployeeSelected($event)">
+                    </app-employee-autocomplete>
                     <small class="help-text">Search by badge number or employee name</small>
                     <small class="p-error" *ngIf="assignmentForm.get('employee')?.invalid && assignmentForm.get('employee')?.touched">
                         Employee is required
@@ -993,9 +970,10 @@ export class AffectationsComponent implements OnInit, OnDestroy {
 
     loadData(): void {
         this.loading = true;
+        // Note: Employees are now loaded on-demand via EmployeeAutocompleteComponent
+        // This reduces initial load time and memory usage for 3000+ employees
         forkJoin({
             assignments: this.hrService.getWorkstationAssignments().pipe(catchError(() => of([]))),
-            employees: this.hrService.getEmployees().pipe(catchError(() => of([]))),
             workstations: this.hrService.getWorkstations().pipe(catchError(() => of([]))),
             machines: this.api.get<Machine[]>('production/machines').pipe(catchError(() => of([]))),
             productionLines: this.api.get<any>('production/lines').pipe(catchError(() => of([])))
@@ -1004,12 +982,6 @@ export class AffectationsComponent implements OnInit, OnDestroy {
             finalize(() => this.loading = false)
         ).subscribe({
             next: (data) => {
-                this.employees = (data.employees as Employee[]).map((e: Employee) => ({
-                    ...e,
-                    fullName: `${e.Prenom_Emp} ${e.Nom_Emp}`,
-                    searchLabel: `${e.BadgeNumber || ''} - ${e.Prenom_Emp} ${e.Nom_Emp}`
-                }));
-
                 this.workstations = data.workstations;
                 this.filteredFormWorkstations = [...this.workstations];
 
@@ -1047,6 +1019,15 @@ export class AffectationsComponent implements OnInit, OnDestroy {
             return (parts[0][0] + parts[1][0]).toUpperCase();
         }
         return name.substring(0, 2).toUpperCase();
+    }
+
+    /**
+     * Handle employee selection from autocomplete
+     */
+    onEmployeeSelected(employee: EmployeeSearchResult): void {
+        // The form control is already updated via formControlName
+        // This handler can be used for additional logic if needed
+        console.log('Employee selected:', employee.fullName);
     }
 
     // Dialog handlers

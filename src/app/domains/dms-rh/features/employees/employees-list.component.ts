@@ -960,11 +960,18 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
 
         if (this.searchTerm) {
             const term = this.searchTerm.toLowerCase();
-            filtered = filtered.filter(e =>
-                e.Nom_Emp?.toLowerCase().includes(term) ||
-                e.Prenom_Emp?.toLowerCase().includes(term) ||
-                e.Id_Emp?.toString().includes(term)
-            );
+            filtered = filtered.filter(e => {
+                const emp = e as any;
+                return (
+                    emp.Nom_Emp?.toLowerCase().includes(term) ||
+                    emp.Prenom_Emp?.toLowerCase().includes(term) ||
+                    emp.Id_Emp?.toString().includes(term) ||
+                    emp.BadgeNumber?.toLowerCase().includes(term) ||
+                    emp.employee_id?.toLowerCase().includes(term) ||
+                    emp.CIN_Emp?.toLowerCase().includes(term) ||
+                    emp.cin?.toLowerCase().includes(term)
+                );
+            });
         }
 
         if (this.selectedDepartment) {

@@ -15,11 +15,15 @@ export class ApiService {
         return endpoint.endsWith('/') ? endpoint : `${endpoint}/`;
     }
 
-    get<T>(endpoint: string, params?: Record<string, string | number | boolean>): Observable<T> {
+    get<T>(endpoint: string, params?: Record<string, unknown>): Observable<T> {
         let httpParams = new HttpParams();
         if (params) {
             Object.keys(params).forEach(key => {
-                httpParams = httpParams.set(key, String(params[key]));
+                const value = params[key];
+                // Only include non-null, non-undefined, non-empty values
+                if (value !== undefined && value !== null && value !== '') {
+                    httpParams = httpParams.set(key, String(value));
+                }
             });
         }
         return this.http.get<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, { params: httpParams });
@@ -27,6 +31,10 @@ export class ApiService {
 
     post<T>(endpoint: string, body: unknown): Observable<T> {
         return this.http.post<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, body);
+    }
+
+    postFormData<T>(endpoint: string, formData: FormData): Observable<T> {
+        return this.http.post<T>(`${this.apiUrl}/${this.ensureTrailingSlash(endpoint)}`, formData);
     }
 
     put<T>(endpoint: string, body: unknown): Observable<T> {

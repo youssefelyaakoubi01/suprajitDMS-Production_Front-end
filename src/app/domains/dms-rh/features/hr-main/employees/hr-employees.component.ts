@@ -1,10 +1,12 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 
 // PrimeNG Modules
-import { TableModule, Table } from 'primeng/table';
+import { TableModule, Table, TableLazyLoadEvent } from 'primeng/table';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -61,9 +63,13 @@ import { Employee, Team, Department, EmployeeCategory, Trajet } from '@core/mode
     templateUrl: './hr-employees.component.html',
     styleUrls: ['./hr-employees.component.scss']
 })
-export class HrEmployeesComponent implements OnInit {
+export class HrEmployeesComponent implements OnInit, OnDestroy {
     @ViewChild('dt') dt!: Table;
     @ViewChild('fileUpload') fileUpload!: FileUpload;
+
+    // Subjects for cleanup and debounce
+    private destroy$ = new Subject<void>();
+    private searchSubject$ = new Subject<string>();
 
     // Data
     employees: Employee[] = [];
@@ -89,6 +95,11 @@ export class HrEmployeesComponent implements OnInit {
     loading = false;
     saving = false;
 
+    // Pagination
+    totalRecords = 0;
+    rows = 25;
+    first = 0;
+
     // Import states
     importing = false;
     selectedFile: File | null = null;
@@ -107,9 +118,9 @@ export class HrEmployeesComponent implements OnInit {
     ];
 
     statusOptions = [
-        { label: 'Active', value: 'Active' },
-        { label: 'Inactive', value: 'Inactive' },
-        { label: 'On Leave', value: 'On Leave' }
+        { label: 'Active', value: 'active' },
+        { label: 'Inactive', value: 'inactive' },
+        { label: 'On Leave', value: 'on_leave' }
     ];
 
     // Export menu items
@@ -136,8 +147,30 @@ export class HrEmployeesComponent implements OnInit {
     }
 
     ngOnInit(): void {
+        this.setupSearchDebounce();
         this.loadEmployees();
         this.loadReferenceData();
+    }
+
+    ngOnDestroy(): void {
+        this.destroy$.next();
+        this.destroy$.complete();
+    }
+
+    /**
+     * Setup debounced search to avoid too many API calls
+     */
+    private setupSearchDebounce(): void {
+        this.searchSubject$.pipe(
+            debounceTime(400),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(searchTerm => {
+            this.searchText = searchTerm;
+            // Reset to first page when searching
+            this.first = 0;
+            this.loadEmployeesLazy({ first: 0, rows: this.rows });
+        });
     }
 
     private initForm(): void {
@@ -158,13 +191,43 @@ export class HrEmployeesComponent implements OnInit {
     }
 
     loadEmployees(): void {
+        // Initial load - will be replaced by lazy load event
+        this.loadEmployeesLazy({ first: 0, rows: this.rows });
+    }
+
+    /**
+     * Lazy load employees with server-side pagination and search
+     */
+    loadEmployeesLazy(event: TableLazyLoadEvent | { first: number; rows: number }): void {
         this.loading = true;
-        this.hrService.getEmployees().subscribe({
-            next: (data) => {
-                this.employees = data;
+        this.first = event.first || 0;
+        const rows = event.rows || this.rows;
+        const page = Math.floor(this.first / rows) + 1;
+
+        // Build ordering string from sort event
+        let ordering: string | undefined;
+        if ('sortField' in event && event.sortField) {
+            ordering = event.sortOrder === -1 ? `-${event.sortField}` : String(event.sortField);
+        }
+
+        // Use component's searchText for server-side search
+        const search = this.searchText?.trim() || undefined;
+
+        this.hrService.getEmployeesPaginated({
+            page,
+            page_size: rows,
+            search,
+            ordering,
+            department: this.selectedDepartment || undefined,
+            category: this.selectedCategory || undefined,
+            status: this.selectedStatus || undefined
+        }).subscribe({
+            next: (response) => {
+                this.employees = response.results;
+                this.totalRecords = response.count;
                 this.loading = false;
             },
-            error: (err) => {
+            error: () => {
                 this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load employees' });
                 this.loading = false;
             }
@@ -481,10 +544,11 @@ export class HrEmployeesComponent implements OnInit {
         });
     }
 
-    // Filtering
+    // Filtering - Server-side search with debounce
     onGlobalFilter(event: Event): void {
         const value = (event.target as HTMLInputElement).value;
-        this.dt.filterGlobal(value, 'contains');
+        // Emit to debounced subject for server-side search
+        this.searchSubject$.next(value);
     }
 
     clearFilters(): void {
@@ -492,7 +556,17 @@ export class HrEmployeesComponent implements OnInit {
         this.selectedDepartment = null;
         this.selectedCategory = null;
         this.selectedStatus = null;
-        this.dt.clear();
+        this.first = 0;
+        // Reload with cleared filters
+        this.loadEmployeesLazy({ first: 0, rows: this.rows });
+    }
+
+    /**
+     * Handle filter dropdown changes - reload data with new filters
+     */
+    onFilterChange(): void {
+        this.first = 0;
+        this.loadEmployeesLazy({ first: 0, rows: this.rows });
     }
 
     // Helpers
@@ -502,8 +576,11 @@ export class HrEmployeesComponent implements OnInit {
 
     getStatusSeverity(status: string): 'success' | 'danger' | 'warn' | 'info' {
         const map: Record<string, 'success' | 'danger' | 'warn' | 'info'> = {
+            'active': 'success',
             'Active': 'success',
+            'inactive': 'danger',
             'Inactive': 'danger',
+            'on_leave': 'warn',
             'On Leave': 'warn'
         };
         return map[status] || 'info';

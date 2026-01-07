@@ -52,22 +52,6 @@ export class AppDmsMenu {
             },
             { separator: true },
             {
-                label: 'Settings',
-                items: [
-                    {
-                        label: 'Shifts',
-                        icon: 'pi pi-fw pi-calendar',
-                        routerLink: ['/dms-production/settings/shifts']
-                    },
-                    {
-                        label: 'Shift Types',
-                        icon: 'pi pi-fw pi-sliders-h',
-                        routerLink: ['/dms-production/settings/shift-types']
-                    }
-                ]
-            },
-            { separator: true },
-            {
                 label: 'Navigation',
                 items: [
                     {

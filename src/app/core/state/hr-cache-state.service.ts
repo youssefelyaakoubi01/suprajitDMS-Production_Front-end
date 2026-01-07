@@ -11,6 +11,16 @@ import { Employee, Team, Department } from '../models/employee.model';
  */
 @Injectable({ providedIn: 'root' })
 export class HRCacheStateService {
+    // ==================== Cache TTL Configuration ====================
+
+    /** Cache Time-To-Live in milliseconds (5 minutes) */
+    private readonly CACHE_TTL = 5 * 60 * 1000;
+
+    /** Cache expiry timestamps */
+    private _employeesCacheExpiry = 0;
+    private _teamsCacheExpiry = 0;
+    private _departmentsCacheExpiry = 0;
+
     // ==================== Private Writable Signals ====================
 
     /** Cached employees */
@@ -110,6 +120,14 @@ export class HRCacheStateService {
      */
     setEmployees(employees: Employee[]): void {
         this._employees.set(employees);
+        this._employeesCacheExpiry = Date.now() + this.CACHE_TTL;
+    }
+
+    /**
+     * Check if employees cache is valid (not expired and not empty)
+     */
+    isEmployeesCacheValid(): boolean {
+        return this._employees().length > 0 && Date.now() < this._employeesCacheExpiry;
     }
 
     /**
@@ -158,6 +176,14 @@ export class HRCacheStateService {
      */
     setTeams(teams: Team[]): void {
         this._teams.set(teams);
+        this._teamsCacheExpiry = Date.now() + this.CACHE_TTL;
+    }
+
+    /**
+     * Check if teams cache is valid (not expired and not empty)
+     */
+    isTeamsCacheValid(): boolean {
+        return this._teams().length > 0 && Date.now() < this._teamsCacheExpiry;
     }
 
     /**
@@ -199,6 +225,14 @@ export class HRCacheStateService {
      */
     setDepartments(departments: Department[]): void {
         this._departments.set(departments);
+        this._departmentsCacheExpiry = Date.now() + this.CACHE_TTL;
+    }
+
+    /**
+     * Check if departments cache is valid (not expired and not empty)
+     */
+    isDepartmentsCacheValid(): boolean {
+        return this._departments().length > 0 && Date.now() < this._departmentsCacheExpiry;
     }
 
     /**
@@ -243,6 +277,25 @@ export class HRCacheStateService {
         this._teams.set([]);
         this._departments.set([]);
         this._loadingEmployees.set(false);
+        this._employeesCacheExpiry = 0;
+        this._teamsCacheExpiry = 0;
+        this._departmentsCacheExpiry = 0;
+    }
+
+    /**
+     * Invalidate all caches (force refresh on next request)
+     */
+    invalidateAll(): void {
+        this._employeesCacheExpiry = 0;
+        this._teamsCacheExpiry = 0;
+        this._departmentsCacheExpiry = 0;
+    }
+
+    /**
+     * Invalidate employees cache only
+     */
+    invalidateEmployees(): void {
+        this._employeesCacheExpiry = 0;
     }
 
     /**
