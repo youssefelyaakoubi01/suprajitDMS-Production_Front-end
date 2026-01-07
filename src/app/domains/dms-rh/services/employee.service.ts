@@ -134,6 +134,10 @@ export class DmsEmployeeService {
         return this.api.put<EmployeeCategory>(`${this.endpoint}/categories/${id}`, category);
     }
 
+    deleteEmployeeCategory(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/categories/${id}`);
+    }
+
     // ==================== DEPARTMENTS ====================
     getDepartments(): Observable<Department[]> {
         return this.api.get<Department[]>(`${this.endpoint}/departments`);

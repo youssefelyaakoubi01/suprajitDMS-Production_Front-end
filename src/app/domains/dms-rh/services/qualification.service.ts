@@ -103,12 +103,23 @@ export class DmsQualificationService {
         return this.api.put<HRProcess>(`${this.endpoint}/processes/${id}`, process);
     }
 
+    deleteProcess(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/processes/${id}`);
+    }
+
     // ==================== RECYCLAGE ====================
     getRecyclageEmployees(params?: {
         daysThreshold?: number;
         includeOverdue?: boolean;
     }): Observable<RecyclageEmployee[]> {
         return this.api.get<RecyclageEmployee[]>(`${this.endpoint}/recyclage`, params);
+    }
+
+    getExpiringQualifications(params?: {
+        daysThreshold?: number;
+        includeExpired?: boolean;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/qualifications/expiring`, params);
     }
 
     getRecyclageNotifications(params?: {

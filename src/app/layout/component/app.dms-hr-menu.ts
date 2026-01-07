@@ -34,9 +34,19 @@ export class AppDmsHrMenu {
                         routerLink: ['/dms-hr/employees']
                     },
                     {
+                        label: 'Catégories',
+                        icon: 'pi pi-fw pi-tag',
+                        routerLink: ['/dms-hr/categories']
+                    },
+                    {
                         label: 'Formations',
                         icon: 'pi pi-fw pi-book',
                         routerLink: ['/dms-hr/formations']
+                    },
+                    {
+                        label: 'Formateurs',
+                        icon: 'pi pi-fw pi-user-edit',
+                        routerLink: ['/dms-hr/formateurs']
                     },
                     {
                         label: 'Qualifications',

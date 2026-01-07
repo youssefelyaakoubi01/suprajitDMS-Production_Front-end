@@ -26,6 +26,12 @@ export const DMS_RH_ROUTES: Routes = [
         title: 'Employees'
     },
     {
+        path: 'categories',
+        loadComponent: () =>
+            import('./features/categories/categories-list.component').then(m => m.CategoriesListComponent),
+        title: 'Catégories'
+    },
+    {
         path: 'formations',
         loadComponent: () =>
             import('./features/formations/formations-list.component').then(m => m.FormationsListComponent),
@@ -84,6 +90,12 @@ export const DMS_RH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/qualifications/qualifications-list.component').then(m => m.QualificationsListComponent),
         title: 'Gestion des Qualifications'
+    },
+    {
+        path: 'formateurs',
+        loadComponent: () =>
+            import('./features/formateurs/formateurs-list.component').then(m => m.FormateursListComponent),
+        title: 'Formateurs'
     }
 ];
 

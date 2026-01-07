@@ -368,7 +368,10 @@ interface ProductionLine {
                 <div class="form-field">
                     <label for="productionLine">
                         <i class="pi pi-sitemap"></i>
-                        Production Line
+                        Ligne de Production
+                        <span class="count-badge" *ngIf="productionLines.length > 0">
+                            ({{ productionLines.length }})
+                        </span>
                     </label>
                     <p-select id="productionLine"
                               [(ngModel)]="selectedFormProductionLine"
@@ -377,11 +380,34 @@ interface ProductionLine {
                               optionLabel="name"
                               optionValue="id"
                               [filter]="true"
-                              filterPlaceholder="Search line..."
-                              placeholder="Filter workstations by line"
+                              [virtualScroll]="true"
+                              [virtualScrollItemSize]="45"
+                              filterPlaceholder="Rechercher ligne..."
+                              placeholder="Filtrer par ligne de production"
                               [showClear]="true"
                               (onChange)="onFormProductionLineChange()"
-                              styleClass="w-full">
+                              [panelStyle]="{'max-height': '300px'}"
+                              appendTo="body"
+                              styleClass="w-full production-line-dropdown">
+                        <ng-template let-line pTemplate="item">
+                            <div class="line-option-item">
+                                <i class="pi pi-sitemap line-icon"></i>
+                                <span class="line-option-name">{{ line.name }}</span>
+                                <p-tag *ngIf="line.code" [value]="line.code" severity="secondary" [rounded]="true" styleClass="line-code-tag"></p-tag>
+                            </div>
+                        </ng-template>
+                        <ng-template pTemplate="selectedItem" let-line>
+                            <div class="line-selected" *ngIf="line">
+                                <i class="pi pi-sitemap"></i>
+                                <span>{{ line.name }}</span>
+                            </div>
+                        </ng-template>
+                        <ng-template pTemplate="empty">
+                            <div class="dropdown-empty">
+                                <i class="pi pi-inbox"></i>
+                                <span>Aucune ligne trouvée</span>
+                            </div>
+                        </ng-template>
                     </p-select>
                 </div>
 
@@ -390,6 +416,9 @@ interface ProductionLine {
                     <label for="workstation">
                         <i class="pi pi-desktop"></i>
                         Workstation <span class="required">*</span>
+                        <span class="count-badge" *ngIf="filteredFormWorkstations.length > 0">
+                            ({{ filteredFormWorkstations.length }})
+                        </span>
                     </label>
                     <p-select id="workstation"
                               formControlName="workstation"
@@ -397,17 +426,43 @@ interface ProductionLine {
                               optionLabel="name"
                               optionValue="id"
                               [filter]="true"
-                              filterPlaceholder="Search workstation..."
-                              placeholder="Select a workstation"
+                              [virtualScroll]="true"
+                              [virtualScrollItemSize]="50"
+                              filterPlaceholder="Rechercher workstation..."
+                              placeholder="Sélectionner une workstation"
                               (onChange)="onWorkstationChange()"
-                              styleClass="w-full">
+                              [panelStyle]="{'max-height': '350px'}"
+                              appendTo="body"
+                              styleClass="w-full workstation-dropdown">
                         <ng-template let-ws pTemplate="item">
-                            <div class="workstation-option">
-                                <span class="option-name">{{ ws.name }}</span>
-                                <p-tag [value]="ws.code" severity="info" [rounded]="true"></p-tag>
+                            <div class="workstation-option-item">
+                                <div class="ws-option-main">
+                                    <i class="pi pi-desktop ws-icon"></i>
+                                    <span class="ws-option-name">{{ ws.name }}</span>
+                                </div>
+                                <div class="ws-option-meta">
+                                    <p-tag [value]="ws.code" severity="info" [rounded]="true" styleClass="ws-code-tag"></p-tag>
+                                    <span class="ws-line" *ngIf="ws.production_line_name">{{ ws.production_line_name }}</span>
+                                </div>
+                            </div>
+                        </ng-template>
+                        <ng-template pTemplate="selectedItem" let-ws>
+                            <div class="workstation-selected" *ngIf="ws">
+                                <i class="pi pi-desktop"></i>
+                                <span>{{ ws.name }}</span>
+                                <p-tag [value]="ws.code" severity="info" [rounded]="true" styleClass="ws-selected-tag"></p-tag>
+                            </div>
+                        </ng-template>
+                        <ng-template pTemplate="empty">
+                            <div class="dropdown-empty">
+                                <i class="pi pi-inbox"></i>
+                                <span>Aucune workstation trouvée</span>
                             </div>
                         </ng-template>
                     </p-select>
+                    <small class="help-text" *ngIf="!selectedFormProductionLine">
+                        Sélectionnez une ligne de production pour filtrer les workstations
+                    </small>
                     <small class="p-error" *ngIf="assignmentForm.get('workstation')?.invalid && assignmentForm.get('workstation')?.touched">
                         Workstation is required
                     </small>
@@ -417,7 +472,10 @@ interface ProductionLine {
                 <div class="form-field">
                     <label for="machine">
                         <i class="pi pi-cog"></i>
-                        Machine (Optional)
+                        Machine (Optionnel)
+                        <span class="count-badge" *ngIf="filteredMachines.length > 0">
+                            ({{ filteredMachines.length }})
+                        </span>
                     </label>
                     <p-select id="machine"
                               formControlName="machine"
@@ -425,11 +483,37 @@ interface ProductionLine {
                               optionLabel="name"
                               optionValue="id"
                               [filter]="true"
-                              filterPlaceholder="Search machine..."
-                              placeholder="Select a machine"
+                              [virtualScroll]="true"
+                              [virtualScrollItemSize]="45"
+                              filterPlaceholder="Rechercher machine..."
+                              placeholder="Sélectionner une machine"
                               [showClear]="true"
-                              styleClass="w-full">
+                              [panelStyle]="{'max-height': '300px'}"
+                              appendTo="body"
+                              styleClass="w-full machine-dropdown">
+                        <ng-template let-machine pTemplate="item">
+                            <div class="machine-option-item">
+                                <i class="pi pi-cog machine-icon"></i>
+                                <span class="machine-option-name">{{ machine.name }}</span>
+                                <p-tag *ngIf="machine.code" [value]="machine.code" severity="warn" [rounded]="true" styleClass="machine-code-tag"></p-tag>
+                            </div>
+                        </ng-template>
+                        <ng-template pTemplate="selectedItem" let-machine>
+                            <div class="machine-selected" *ngIf="machine">
+                                <i class="pi pi-cog"></i>
+                                <span>{{ machine.name }}</span>
+                            </div>
+                        </ng-template>
+                        <ng-template pTemplate="empty">
+                            <div class="dropdown-empty">
+                                <i class="pi pi-inbox"></i>
+                                <span>{{ assignmentForm.get('workstation')?.value ? 'Aucune machine pour cette workstation' : 'Sélectionnez d\'abord une workstation' }}</span>
+                            </div>
+                        </ng-template>
                     </p-select>
+                    <small class="help-text" *ngIf="!assignmentForm.get('workstation')?.value">
+                        Sélectionnez une workstation pour voir les machines disponibles
+                    </small>
                 </div>
 
                 <!-- Primary Checkbox -->
@@ -797,6 +881,201 @@ interface ProductionLine {
                 .badge-hint {
                     font-size: 0.8rem;
                     color: var(--text-color-secondary);
+                }
+            }
+
+            /* Count Badge */
+            .count-badge {
+                font-size: 0.75rem;
+                font-weight: 400;
+                color: var(--text-color-secondary);
+            }
+
+            /* Workstation Dropdown Styles */
+            .workstation-option-item {
+                display: flex;
+                flex-direction: column;
+                gap: 0.375rem;
+                padding: 0.5rem 0;
+                width: 100%;
+            }
+
+            .ws-option-main {
+                display: flex;
+                align-items: center;
+                gap: 0.625rem;
+
+                .ws-icon {
+                    color: var(--hr-primary);
+                    font-size: 1rem;
+                }
+
+                .ws-option-name {
+                    font-weight: 500;
+                    color: var(--text-color);
+                    font-size: 0.9375rem;
+                }
+            }
+
+            .ws-option-meta {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-left: 1.625rem;
+
+                .ws-line {
+                    font-size: 0.75rem;
+                    color: var(--text-color-secondary);
+                }
+            }
+
+            .workstation-selected {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+
+                i {
+                    color: var(--hr-primary);
+                }
+
+                span {
+                    font-weight: 500;
+                }
+            }
+
+            .dropdown-empty {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                padding: 1.5rem;
+                color: var(--text-color-secondary);
+
+                i {
+                    font-size: 2rem;
+                    opacity: 0.5;
+                }
+            }
+
+            /* Production Line Dropdown Styles */
+            .line-option-item {
+                display: flex;
+                align-items: center;
+                gap: 0.625rem;
+                padding: 0.375rem 0;
+
+                .line-icon {
+                    color: var(--teal-500);
+                    font-size: 1rem;
+                }
+
+                .line-option-name {
+                    font-weight: 500;
+                    color: var(--text-color);
+                    flex: 1;
+                }
+            }
+
+            .line-selected {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+
+                i {
+                    color: var(--teal-500);
+                }
+
+                span {
+                    font-weight: 500;
+                }
+            }
+
+            /* Machine Dropdown Styles */
+            .machine-option-item {
+                display: flex;
+                align-items: center;
+                gap: 0.625rem;
+                padding: 0.375rem 0;
+
+                .machine-icon {
+                    color: var(--orange-500);
+                    font-size: 1rem;
+                }
+
+                .machine-option-name {
+                    font-weight: 500;
+                    color: var(--text-color);
+                    flex: 1;
+                }
+            }
+
+            .machine-selected {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+
+                i {
+                    color: var(--orange-500);
+                }
+
+                span {
+                    font-weight: 500;
+                }
+            }
+        }
+
+        /* Global dropdown panel styles */
+        :host ::ng-deep {
+            .workstation-dropdown {
+                .p-select-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+            }
+
+            .p-select-panel {
+                .p-select-items {
+                    padding: 0.25rem;
+                }
+
+                .p-select-item {
+                    padding: 0.5rem 0.75rem;
+                    border-radius: 6px;
+                    margin: 2px 0;
+
+                    &:hover {
+                        background: var(--surface-hover);
+                    }
+
+                    &.p-highlight {
+                        background: rgba(139, 92, 246, 0.1);
+                    }
+                }
+
+                .ws-code-tag,
+                .line-code-tag,
+                .machine-code-tag {
+                    font-size: 0.6875rem;
+                    padding: 0.125rem 0.375rem;
+                }
+            }
+
+            .ws-selected-tag,
+            .line-code-tag,
+            .machine-code-tag {
+                font-size: 0.6875rem;
+                padding: 0.125rem 0.375rem;
+            }
+
+            /* Production Line Dropdown Panel */
+            .production-line-dropdown,
+            .machine-dropdown {
+                .p-select-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
                 }
             }
         }

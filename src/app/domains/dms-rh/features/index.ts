@@ -11,6 +11,9 @@ export * from './rh-dashboard';
 // Employees
 export * from './employees';
 
+// Categories
+export * from './categories';
+
 // Formations
 export * from './formations';
 

@@ -148,10 +148,34 @@ export class QualificationStateService {
 
     /**
      * Update an existing qualification by ID (immutable update)
+     * Preserves enriched fields (employee_name, formation_name, trainer_name)
+     * when they are not present or null in the update
      */
     updateQualification(id: number, updated: Qualification): void {
+        // Fields that should be preserved if the update doesn't include them
+        const enrichedFields = ['employee_name', 'formation_name', 'trainer_name', 'employee_badge', 'employee_picture'];
+
         this._qualifications.update(current =>
-            current.map(q => q.id === id ? { ...q, ...updated } : q)
+            current.map(q => {
+                if (q.id !== id) return q;
+
+                // Create merged object, preserving enriched fields if update has null/undefined
+                const merged = { ...q };
+                for (const key in updated) {
+                    const value = updated[key as keyof Qualification];
+                    // For enriched fields, only update if the new value is truthy
+                    if (enrichedFields.includes(key)) {
+                        if (value != null && value !== '') {
+                            (merged as any)[key] = value;
+                        }
+                        // else: keep existing value
+                    } else {
+                        // For other fields, always update
+                        (merged as any)[key] = value;
+                    }
+                }
+                return merged;
+            })
         );
     }
 

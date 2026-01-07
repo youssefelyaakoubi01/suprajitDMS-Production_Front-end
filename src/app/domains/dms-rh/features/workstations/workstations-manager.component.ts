@@ -6,9 +6,9 @@
  */
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, finalize } from 'rxjs/operators';
 
 // PrimeNG
 import { TableModule } from 'primeng/table';
@@ -20,6 +20,11 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { SelectModule } from 'primeng/select';
 import { TabsModule } from 'primeng/tabs';
 import { InputTextModule } from 'primeng/inputtext';
+import { DialogModule } from 'primeng/dialog';
+import { ToastModule } from 'primeng/toast';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { RippleModule } from 'primeng/ripple';
+import { MessageService, ConfirmationService } from 'primeng/api';
 
 // Domain imports
 import { DmsQualificationService, HRWorkstation, HRProcess } from '@domains/dms-rh';
@@ -37,6 +42,7 @@ interface ProductionLine {
     imports: [
         CommonModule,
         FormsModule,
+        ReactiveFormsModule,
         TableModule,
         CardModule,
         ButtonModule,
@@ -45,8 +51,13 @@ interface ProductionLine {
         ToolbarModule,
         SelectModule,
         TabsModule,
-        InputTextModule
+        InputTextModule,
+        DialogModule,
+        ToastModule,
+        ConfirmDialogModule,
+        RippleModule
     ],
+    providers: [MessageService, ConfirmationService],
     template: `
         <div class="workstations-manager">
             <p-tabs [value]="activeTab">
@@ -85,13 +96,10 @@ interface ProductionLine {
 
                             <ng-template pTemplate="header">
                                 <tr>
-                                    <th pSortableColumn="name">Name</th>
+                                    <th pSortableColumn="name">Nom</th>
                                     <th pSortableColumn="code">Code</th>
-                                    <th>Production Line</th>
-                                    <th>Mode</th>
-                                    <th pSortableColumn="cycle_time_seconds">Cycle Time</th>
-                                    <th>Critical</th>
-                                    <th>Actions</th>
+                                    <th>Ligne de Production</th>
+                                    <th style="width: 120px; text-align: center">Actions</th>
                                 </tr>
                             </ng-template>
 
@@ -100,25 +108,18 @@ interface ProductionLine {
                                     <td>
                                         <span class="font-semibold">{{ ws.name }}</span>
                                     </td>
-                                    <td>{{ ws.code }}</td>
+                                    <td>
+                                        <p-tag [value]="ws.code" severity="info" [rounded]="true"></p-tag>
+                                    </td>
                                     <td>{{ ws.production_line_name || '-' }}</td>
-                                    <td>
-                                        <p-tag [value]="getModeLabel(ws.process_mode)"
-                                               [severity]="getModeSeverity(ws.process_mode)">
-                                        </p-tag>
-                                    </td>
-                                    <td>{{ ws.cycle_time_seconds ? ws.cycle_time_seconds + 's' : '-' }}</td>
-                                    <td>
-                                        <i *ngIf="ws.is_critical" class="pi pi-exclamation-triangle text-orange-500"></i>
-                                    </td>
-                                    <td>
+                                    <td class="text-center">
                                         <button pButton icon="pi pi-pencil"
                                                 class="p-button-text p-button-sm"
-                                                (click)="onEditWorkstation(ws)" pTooltip="Edit">
+                                                (click)="onEditWorkstation(ws)" pTooltip="Modifier">
                                         </button>
                                         <button pButton icon="pi pi-trash"
                                                 class="p-button-text p-button-sm p-button-danger"
-                                                (click)="onDeleteWorkstation(ws)" pTooltip="Delete">
+                                                (click)="onDeleteWorkstation(ws)" pTooltip="Supprimer">
                                         </button>
                                     </td>
                                 </tr>
@@ -176,6 +177,137 @@ interface ProductionLine {
                 </p-tabpanels>
             </p-tabs>
         </div>
+
+        <!-- Workstation Form Dialog -->
+        <p-dialog [(visible)]="showWorkstationDialog"
+                  [header]="editingWorkstation ? 'Modifier Workstation' : 'Nouvelle Workstation'"
+                  [modal]="true"
+                  [style]="{width: '500px'}"
+                  [draggable]="false"
+                  [resizable]="false"
+                  styleClass="workstation-dialog">
+            <form [formGroup]="workstationForm" class="workstation-form">
+                <div class="form-field">
+                    <label for="ws-name">
+                        <i class="pi pi-desktop"></i> Nom <span class="required">*</span>
+                    </label>
+                    <input pInputText id="ws-name" formControlName="name"
+                           placeholder="Nom de la workstation" class="w-full" />
+                    <small class="p-error" *ngIf="workstationForm.get('name')?.invalid && workstationForm.get('name')?.touched">
+                        Le nom est requis
+                    </small>
+                </div>
+
+                <div class="form-field">
+                    <label for="ws-code">
+                        <i class="pi pi-tag"></i> Code <span class="required">*</span>
+                    </label>
+                    <input pInputText id="ws-code" formControlName="code"
+                           placeholder="Code unique" class="w-full" />
+                    <small class="p-error" *ngIf="workstationForm.get('code')?.invalid && workstationForm.get('code')?.touched">
+                        Le code est requis
+                    </small>
+                </div>
+
+                <div class="form-field">
+                    <label for="ws-line">
+                        <i class="pi pi-sitemap"></i> Ligne de Production <span class="required">*</span>
+                    </label>
+                    <p-select id="ws-line"
+                              formControlName="production_line"
+                              [options]="productionLines"
+                              optionLabel="name"
+                              optionValue="id"
+                              [filter]="true"
+                              [virtualScroll]="true"
+                              [virtualScrollItemSize]="40"
+                              filterPlaceholder="Rechercher..."
+                              placeholder="Sélectionner une ligne"
+                              appendTo="body"
+                              [panelStyle]="{'max-height': '250px'}"
+                              styleClass="w-full">
+                        <ng-template let-line pTemplate="item">
+                            <div class="line-option">
+                                <i class="pi pi-sitemap"></i>
+                                <span>{{ line.name }}</span>
+                                <p-tag *ngIf="line.code" [value]="line.code" severity="secondary" [rounded]="true"></p-tag>
+                            </div>
+                        </ng-template>
+                    </p-select>
+                    <small class="p-error" *ngIf="workstationForm.get('production_line')?.invalid && workstationForm.get('production_line')?.touched">
+                        La ligne de production est requise
+                    </small>
+                </div>
+            </form>
+
+            <ng-template pTemplate="footer">
+                <div class="dialog-footer">
+                    <button pButton pRipple label="Annuler" icon="pi pi-times"
+                            class="p-button-text"
+                            (click)="showWorkstationDialog = false">
+                    </button>
+                    <button pButton pRipple
+                            [label]="editingWorkstation ? 'Mettre à jour' : 'Créer'"
+                            icon="pi pi-check"
+                            class="p-button-primary"
+                            (click)="saveWorkstation()"
+                            [disabled]="workstationForm.invalid"
+                            [loading]="saving">
+                    </button>
+                </div>
+            </ng-template>
+        </p-dialog>
+
+        <!-- Process Form Dialog -->
+        <p-dialog [(visible)]="showProcessDialog"
+                  [header]="editingProcess ? 'Modifier Process' : 'Nouveau Process'"
+                  [modal]="true"
+                  [style]="{width: '450px'}"
+                  [draggable]="false"
+                  styleClass="process-form-dialog">
+            <form [formGroup]="processForm" class="workstation-form">
+                <div class="form-field">
+                    <label for="proc-name">
+                        <i class="pi pi-cog"></i> Nom <span class="required">*</span>
+                    </label>
+                    <input pInputText id="proc-name" formControlName="name"
+                           placeholder="Nom du process" class="w-full" />
+                    <small class="p-error" *ngIf="processForm.get('name')?.invalid && processForm.get('name')?.touched">
+                        Le nom est requis
+                    </small>
+                </div>
+                <div class="form-field">
+                    <label for="proc-code">
+                        <i class="pi pi-tag"></i> Code <span class="required">*</span>
+                    </label>
+                    <input pInputText id="proc-code" formControlName="code"
+                           placeholder="Code unique" class="w-full" />
+                    <small class="p-error" *ngIf="processForm.get('code')?.invalid && processForm.get('code')?.touched">
+                        Le code est requis
+                    </small>
+                </div>
+            </form>
+
+            <ng-template pTemplate="footer">
+                <div class="dialog-footer">
+                    <button pButton pRipple label="Annuler" icon="pi pi-times"
+                            class="p-button-text"
+                            (click)="showProcessDialog = false">
+                    </button>
+                    <button pButton pRipple
+                            [label]="editingProcess ? 'Mettre à jour' : 'Créer'"
+                            icon="pi pi-check"
+                            class="p-button-primary"
+                            (click)="saveProcess()"
+                            [disabled]="processForm.invalid"
+                            [loading]="savingProcess">
+                    </button>
+                </div>
+            </ng-template>
+        </p-dialog>
+
+        <p-toast position="top-right"></p-toast>
+        <p-confirmDialog></p-confirmDialog>
     `,
     styles: [`
         .workstations-manager {
@@ -222,6 +354,99 @@ interface ProductionLine {
                 }
             }
         }
+
+        /* Form Styles */
+        .workstation-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+
+            .form-field {
+                flex: 1;
+            }
+        }
+
+        .form-field {
+            label {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-weight: 500;
+                margin-bottom: 0.5rem;
+                color: var(--text-color);
+
+                i {
+                    color: var(--primary-color);
+                    font-size: 0.875rem;
+                }
+
+                .required {
+                    color: var(--red-500);
+                }
+            }
+
+            &.checkbox-field {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding-top: 1.75rem;
+
+                .checkbox-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0;
+                    cursor: pointer;
+                }
+            }
+        }
+
+        .line-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+
+            i {
+                color: var(--teal-500);
+            }
+        }
+
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        /* Dialog Overrides */
+        :host ::ng-deep {
+            .workstation-dialog,
+            .process-form-dialog {
+                .p-dialog-content {
+                    padding: 1.5rem;
+                }
+            }
+
+            .p-select-panel {
+                .p-select-item {
+                    padding: 0.5rem 0.75rem;
+                }
+            }
+        }
+
+        @media (max-width: 576px) {
+            .form-row {
+                flex-direction: column;
+            }
+
+            .form-field.checkbox-field {
+                padding-top: 0;
+            }
+        }
     `]
 })
 export class WorkstationsManagerComponent implements OnInit, OnDestroy {
@@ -243,10 +468,40 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
     filteredWorkstations: HRWorkstation[] = [];
     productionLines: ProductionLine[] = [];
 
+    // Dialog state
+    showWorkstationDialog = false;
+    showProcessDialog = false;
+    editingWorkstation: HRWorkstation | null = null;
+    editingProcess: HRProcess | null = null;
+    saving = false;
+    savingProcess = false;
+
+    // Forms
+    workstationForm!: FormGroup;
+    processForm!: FormGroup;
+
     constructor(
         private qualificationService: DmsQualificationService,
-        private api: ApiService
-    ) {}
+        private api: ApiService,
+        private fb: FormBuilder,
+        private messageService: MessageService,
+        private confirmationService: ConfirmationService
+    ) {
+        this.initForms();
+    }
+
+    private initForms(): void {
+        this.workstationForm = this.fb.group({
+            name: ['', Validators.required],
+            code: ['', Validators.required],
+            production_line: [null, Validators.required]
+        });
+
+        this.processForm = this.fb.group({
+            name: ['', Validators.required],
+            code: ['', Validators.required]
+        });
+    }
 
     ngOnInit(): void {
         if (this.workstations.length === 0) {
@@ -321,24 +576,6 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
         }
     }
 
-    getModeLabel(mode: string | undefined): string {
-        const labels: Record<string, string> = {
-            manual: 'Manual',
-            semi_auto: 'Semi-Auto',
-            full_auto: 'Full Auto'
-        };
-        return labels[mode || ''] || mode || '-';
-    }
-
-    getModeSeverity(mode: string | undefined): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
-        const map: Record<string, 'success' | 'info' | 'warn'> = {
-            manual: 'warn',
-            semi_auto: 'info',
-            full_auto: 'success'
-        };
-        return map[mode || ''] || 'secondary';
-    }
-
     getWorkstationCount(process: HRProcess): number {
         // Note: Workstations are linked to ProductionLines, not Processes
         // This returns 0 as the relationship doesn't exist in the current data model
@@ -346,26 +583,167 @@ export class WorkstationsManagerComponent implements OnInit, OnDestroy {
     }
 
     onAddWorkstation(): void {
-        this.addWorkstation.emit();
+        this.editingWorkstation = null;
+        this.workstationForm.reset();
+        this.showWorkstationDialog = true;
     }
 
     onEditWorkstation(ws: HRWorkstation): void {
-        this.editWorkstation.emit(ws);
+        this.editingWorkstation = ws;
+        this.workstationForm.patchValue({
+            name: ws.name,
+            code: ws.code,
+            production_line: ws.production_line
+        });
+        this.showWorkstationDialog = true;
     }
 
     onDeleteWorkstation(ws: HRWorkstation): void {
-        this.deleteWorkstation.emit(ws);
+        this.confirmationService.confirm({
+            message: `Êtes-vous sûr de vouloir supprimer la workstation "${ws.name}" ?`,
+            header: 'Confirmer la suppression',
+            icon: 'pi pi-exclamation-triangle',
+            acceptLabel: 'Supprimer',
+            rejectLabel: 'Annuler',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () => {
+                this.qualificationService.deleteHRWorkstation(ws.id)
+                    .pipe(takeUntil(this.destroy$))
+                    .subscribe({
+                        next: () => {
+                            this.messageService.add({
+                                severity: 'success',
+                                summary: 'Succès',
+                                detail: 'Workstation supprimée avec succès'
+                            });
+                            this.loadWorkstations();
+                        },
+                        error: (err) => {
+                            this.messageService.add({
+                                severity: 'error',
+                                summary: 'Erreur',
+                                detail: err.error?.detail || 'Échec de la suppression'
+                            });
+                        }
+                    });
+            }
+        });
+    }
+
+    saveWorkstation(): void {
+        if (this.workstationForm.invalid) return;
+
+        this.saving = true;
+        const formValue = this.workstationForm.value;
+
+        const request$ = this.editingWorkstation
+            ? this.qualificationService.updateHRWorkstation(this.editingWorkstation.id, formValue)
+            : this.qualificationService.createHRWorkstation(formValue);
+
+        request$.pipe(
+            takeUntil(this.destroy$),
+            finalize(() => this.saving = false)
+        ).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Succès',
+                    detail: this.editingWorkstation
+                        ? 'Workstation mise à jour avec succès'
+                        : 'Workstation créée avec succès'
+                });
+                this.showWorkstationDialog = false;
+                this.loadWorkstations();
+            },
+            error: (err) => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: err.error?.detail || 'Échec de la sauvegarde'
+                });
+            }
+        });
     }
 
     onAddProcess(): void {
-        this.addProcess.emit();
+        this.editingProcess = null;
+        this.processForm.reset();
+        this.showProcessDialog = true;
     }
 
     onEditProcess(process: HRProcess): void {
-        this.editProcess.emit(process);
+        this.editingProcess = process;
+        this.processForm.patchValue({
+            name: process.name,
+            code: process.code
+        });
+        this.showProcessDialog = true;
     }
 
     onDeleteProcess(process: HRProcess): void {
-        this.deleteProcess.emit(process);
+        this.confirmationService.confirm({
+            message: `Êtes-vous sûr de vouloir supprimer le process "${process.name}" ?`,
+            header: 'Confirmer la suppression',
+            icon: 'pi pi-exclamation-triangle',
+            acceptLabel: 'Supprimer',
+            rejectLabel: 'Annuler',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () => {
+                this.qualificationService.deleteProcess(process.id)
+                    .pipe(takeUntil(this.destroy$))
+                    .subscribe({
+                        next: () => {
+                            this.messageService.add({
+                                severity: 'success',
+                                summary: 'Succès',
+                                detail: 'Process supprimé avec succès'
+                            });
+                            this.loadProcesses();
+                        },
+                        error: (err: any) => {
+                            this.messageService.add({
+                                severity: 'error',
+                                summary: 'Erreur',
+                                detail: err.error?.detail || 'Échec de la suppression'
+                            });
+                        }
+                    });
+            }
+        });
+    }
+
+    saveProcess(): void {
+        if (this.processForm.invalid) return;
+
+        this.savingProcess = true;
+        const formValue = this.processForm.value;
+
+        const request$ = this.editingProcess
+            ? this.qualificationService.updateProcess(this.editingProcess.id, formValue)
+            : this.qualificationService.createProcess(formValue);
+
+        request$.pipe(
+            takeUntil(this.destroy$),
+            finalize(() => this.savingProcess = false)
+        ).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Succès',
+                    detail: this.editingProcess
+                        ? 'Process mis à jour avec succès'
+                        : 'Process créé avec succès'
+                });
+                this.showProcessDialog = false;
+                this.loadProcesses();
+            },
+            error: (err) => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: err.error?.detail || 'Échec de la sauvegarde'
+                });
+            }
+        });
     }
 }

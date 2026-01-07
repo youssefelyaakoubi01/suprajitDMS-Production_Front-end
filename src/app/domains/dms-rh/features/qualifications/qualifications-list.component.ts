@@ -142,6 +142,29 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
 
             <!-- Filter Section -->
             <div class="hr-filter-section">
+                <div class="filter-group badge-scan-group">
+                    <p-iconfield>
+                        <p-inputicon styleClass="pi pi-id-card"></p-inputicon>
+                        <input type="text" pInputText
+                               [(ngModel)]="badgeScan"
+                               (keyup.enter)="onBadgeScan()"
+                               (ngModelChange)="onBadgeChange($event)"
+                               placeholder="Scanner le badge employé..."
+                               class="badge-scan-input" />
+                    </p-iconfield>
+                    <button pButton pRipple icon="pi pi-search"
+                            class="p-button-outlined badge-scan-btn"
+                            (click)="onBadgeScan()"
+                            pTooltip="Rechercher par badge"
+                            [disabled]="!badgeScan">
+                    </button>
+                    <button *ngIf="badgeFilter()"
+                            pButton pRipple icon="pi pi-times"
+                            class="p-button-text p-button-danger badge-clear-btn"
+                            (click)="clearBadgeFilter()"
+                            pTooltip="Effacer le filtre badge">
+                    </button>
+                </div>
                 <div class="filter-group">
                     <p-iconfield>
                         <p-inputicon styleClass="pi pi-search"></p-inputicon>
@@ -171,6 +194,21 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                             (click)="onQuickFilter(result.value)">
                     </button>
                 </div>
+            </div>
+
+            <!-- Badge Filter Active Indicator -->
+            <div *ngIf="badgeFilter()" class="badge-filter-indicator">
+                <div class="badge-filter-content">
+                    <i class="pi pi-id-card"></i>
+                    <span>Filtre actif par badge: <strong>{{ badgeFilter() }}</strong></span>
+                    <span *ngIf="filteredQualifications().length > 0" class="badge-count">
+                        ({{ filteredQualifications().length }} qualification(s) trouvée(s))
+                    </span>
+                </div>
+                <button pButton pRipple icon="pi pi-times" label="Effacer"
+                        class="p-button-text p-button-sm"
+                        (click)="clearBadgeFilter()">
+                </button>
             </div>
 
             <!-- Loading State -->
@@ -547,6 +585,63 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
 
         .filter-select {
             min-width: 200px;
+        }
+
+        /* Badge Scan Styles */
+        .badge-scan-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge-scan-input {
+            width: 220px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.875rem;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-scan-btn {
+            flex-shrink: 0;
+        }
+
+        .badge-clear-btn {
+            flex-shrink: 0;
+        }
+
+        /* Badge Filter Indicator */
+        .badge-filter-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1.25rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(167, 139, 250, 0.1) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .badge-filter-content {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--hr-primary, #8B5CF6);
+
+            i {
+                font-size: 1.25rem;
+            }
+
+            strong {
+                font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                background: rgba(139, 92, 246, 0.15);
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+            }
+
+            .badge-count {
+                color: var(--text-color-secondary);
+                font-size: 0.875rem;
+            }
         }
 
         .filter-chips {
@@ -956,6 +1051,26 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                 justify-content: flex-start;
             }
 
+            .badge-scan-group {
+                width: 100%;
+            }
+
+            .badge-scan-input {
+                flex: 1;
+                width: auto;
+            }
+
+            .badge-filter-indicator {
+                flex-direction: column;
+                gap: 0.75rem;
+                text-align: center;
+            }
+
+            .badge-filter-content {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
             .form-row.two-cols {
                 flex-direction: column;
             }
@@ -976,6 +1091,8 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     // Use signals for reactive filtering
     searchTerm = signal('');
     selectedResult = signal<string | null>(null);
+    badgeFilter = signal<string | null>(null);
+    badgeScan = '';
 
     showQualificationDialog = false;
     editingQualification: Qualification | null = null;
@@ -993,13 +1110,23 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         let result = this.qualifications();
         const term = this.searchTerm();
         const resultFilter = this.selectedResult();
+        const badge = this.badgeFilter();
 
-        // Filter by search term
+        // Filter by badge (exact or partial match)
+        if (badge) {
+            const badgeLower = badge.toLowerCase();
+            result = result.filter(q =>
+                q.employee_badge?.toLowerCase().includes(badgeLower)
+            );
+        }
+
+        // Filter by search term (includes badge search as well)
         if (term) {
             const termLower = term.toLowerCase();
             result = result.filter(q =>
                 q.employee_name?.toLowerCase().includes(termLower) ||
-                q.formation_name?.toLowerCase().includes(termLower)
+                q.formation_name?.toLowerCase().includes(termLower) ||
+                q.employee_badge?.toLowerCase().includes(termLower)
             );
         }
 
@@ -1071,6 +1198,41 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         }
     }
 
+    /**
+     * Handle badge scan - triggered on Enter key or button click
+     */
+    onBadgeScan(): void {
+        if (this.badgeScan && this.badgeScan.trim()) {
+            this.badgeFilter.set(this.badgeScan.trim());
+            this.messageService.add({
+                severity: 'info',
+                summary: 'Filtre Badge',
+                detail: `Recherche par badge: ${this.badgeScan.trim()}`,
+                life: 2000
+            });
+        }
+    }
+
+    /**
+     * Handle badge input change - for auto-scan support
+     * Some badge scanners automatically press Enter after scan
+     */
+    onBadgeChange(value: string): void {
+        // If the badge scanner adds a newline/carriage return, trigger search
+        if (value && value.includes('\n')) {
+            this.badgeScan = value.replace(/\n/g, '').trim();
+            this.onBadgeScan();
+        }
+    }
+
+    /**
+     * Clear the badge filter
+     */
+    clearBadgeFilter(): void {
+        this.badgeScan = '';
+        this.badgeFilter.set(null);
+    }
+
     getRowClass(result: string): string {
         const resultNorm = (result || 'pending').toLowerCase().replace(' ', '-');
         return `row-${resultNorm}`;
@@ -1136,6 +1298,10 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     }
 
     editQualification(qual: Qualification): void {
+        console.log('Editing qualification:', qual);
+        console.log('qual.trainer:', qual.trainer, 'type:', typeof qual.trainer);
+        console.log('qual.end_date:', qual.end_date, 'type:', typeof qual.end_date);
+
         this.editingQualification = qual;
         this.qualificationForm.patchValue({
             employee: qual.employee,
@@ -1145,6 +1311,7 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
             trainer: qual.trainer,
             test_result: qual.test_result
         });
+        console.log('Form value after patch:', this.qualificationForm.value);
         this.showQualificationDialog = true;
     }
 
@@ -1170,24 +1337,59 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
             trainer: formValue.trainer || null
         };
 
+        // Debug: log payload to verify data being sent
+        console.log('Qualification form value:', formValue);
+        console.log('Qualification payload to send:', payload);
+
         if (this.editingQualification) {
             this.hrService.updateQualification(this.editingQualification.id, payload).subscribe({
-                next: () => {
-                    this.loadData();
-                    this.messageService.add({ severity: 'success', summary: 'Succès', detail: 'Qualification mise à jour' });
-                    this.showQualificationDialog = false;
+                next: (response) => {
+                    console.log('Update qualification response:', response);
+                    // Reload fresh data from backend to get enriched fields
+                    this.hrService.getQualifications().pipe(takeUntil(this.destroy$)).subscribe({
+                        next: (qualifications) => {
+                            console.log('Reloaded qualifications count:', qualifications.length);
+                            console.log('Looking for id:', this.editingQualification?.id);
+                            console.log('First 3 qualification IDs:', qualifications.slice(0, 3).map(q => q.id));
+                            // Find the updated qualification to verify
+                            const updated = qualifications.find(q => q.id === this.editingQualification?.id);
+                            console.log('Updated qualification after reload:', updated);
+                            if (!updated) {
+                                console.warn('Qualification not found! Checking state service...');
+                                console.log('State qualifications count:', this.qualifications().length);
+                            }
+                            this.messageService.add({ severity: 'success', summary: 'Succès', detail: 'Qualification mise à jour' });
+                            this.showQualificationDialog = false;
+                        },
+                        error: (err) => {
+                            console.error('Reload qualifications error:', err);
+                            // Update succeeded but reload failed - still close dialog
+                            this.messageService.add({ severity: 'success', summary: 'Succès', detail: 'Qualification mise à jour' });
+                            this.showQualificationDialog = false;
+                        }
+                    });
                 },
                 error: (err) => {
-                    console.error('Update qualification error:', err.error);
+                    console.error('Update qualification error:', err);
+                    console.error('Error details:', err.error);
                     this.messageService.add({ severity: 'error', summary: 'Erreur', detail: 'Échec de la mise à jour' });
                 }
             });
         } else {
             this.hrService.createQualification(payload).subscribe({
                 next: () => {
-                    this.loadData();
-                    this.messageService.add({ severity: 'success', summary: 'Succès', detail: 'Qualification créée' });
-                    this.showQualificationDialog = false;
+                    // Reload fresh data from backend to get enriched fields
+                    this.hrService.getQualifications().pipe(takeUntil(this.destroy$)).subscribe({
+                        next: () => {
+                            this.messageService.add({ severity: 'success', summary: 'Succès', detail: 'Qualification créée' });
+                            this.showQualificationDialog = false;
+                        },
+                        error: () => {
+                            // Create succeeded but reload failed - still close dialog
+                            this.messageService.add({ severity: 'success', summary: 'Succès', detail: 'Qualification créée' });
+                            this.showQualificationDialog = false;
+                        }
+                    });
                 },
                 error: (err) => {
                     console.error('Create qualification error:', err.error);

@@ -4,7 +4,7 @@
  *
  * Displays and manages the employee directory with modern Sakai template styling
  */
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChild, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -44,6 +44,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 @Component({
     selector: 'app-employees-list',
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         CommonModule,
         FormsModule,
@@ -107,7 +108,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
                         <i class="pi pi-users"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">{{ employees.length }}</div>
+                        <div class="stat-value">{{ totalRecords | number }}</div>
                         <div class="stat-label">Total Employés</div>
                     </div>
                 </div>
@@ -116,7 +117,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
                         <i class="pi pi-check-circle"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-success">{{ activeCount }}</div>
+                        <div class="stat-value text-success">{{ statsActiveCount | number }}</div>
                         <div class="stat-label">Actifs</div>
                     </div>
                 </div>
@@ -125,17 +126,17 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
                         <i class="pi pi-clock"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-warning">{{ onLeaveCount }}</div>
+                        <div class="stat-value text-warning">{{ statsOnLeaveCount | number }}</div>
                         <div class="stat-label">En Congé</div>
                     </div>
                 </div>
                 <div class="hr-stat-card">
-                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--hr-info);">
-                        <i class="pi pi-graduation-cap"></i>
+                    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--hr-danger);">
+                        <i class="pi pi-user-minus"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value text-info">{{ trainingCount }}</div>
-                        <div class="stat-label">En Formation</div>
+                        <div class="stat-value text-danger">{{ statsInactiveCount | number }}</div>
+                        <div class="stat-label">Inactifs</div>
                     </div>
                 </div>
             </div>
@@ -194,12 +195,16 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
                 <!-- Employee Table -->
                 <div class="section-body p-0">
                     <p-table #employeeTable
-                             [value]="filteredEmployees"
+                             [value]="employees"
+                             [lazy]="true"
+                             (onLazyLoad)="loadEmployeesLazy($event)"
                              [loading]="loading"
                              [paginator]="true"
-                             [rows]="10"
-                             [rowsPerPageOptions]="[10, 25, 50]"
-                             [globalFilterFields]="['Nom_Emp', 'Prenom_Emp', 'Departement_Emp', 'Categorie_Emp']"
+                             [rows]="rows"
+                             [totalRecords]="totalRecords"
+                             [rowsPerPageOptions]="[10, 25, 50, 100]"
+                             [showCurrentPageReport]="true"
+                             currentPageReportTemplate="Affichage {first} à {last} sur {totalRecords} employés"
                              [rowHover]="true"
                              dataKey="Id_Emp"
                              [exportFilename]="'employees_export'"
@@ -797,17 +802,31 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
     private destroy$ = new Subject<void>();
     private searchSubject = new Subject<string>();
 
-    filteredEmployees: Employee[] = [];
+    // Pagination
+    totalRecords = 0;
+    rows = 25;
+    first = 0;
+
+    // Stats (server-side)
+    statsActiveCount = 0;
+    statsOnLeaveCount = 0;
+    statsInactiveCount = 0;
+
+    // Filters
     searchTerm = '';
     selectedDepartment: string | null = null;
     selectedCategory: string | null = null;
     selectedQuickFilter = 'all';
 
+    // Current sort
+    currentSortField = '';
+    currentSortOrder = 1;
+
     quickFilterOptions = [
         { label: 'Tous', value: 'all' },
         { label: 'Actifs', value: 'active' },
-        { label: 'En Congé', value: 'leave' },
-        { label: 'Formation', value: 'training' }
+        { label: 'En Congé', value: 'on_leave' },
+        { label: 'Inactifs', value: 'inactive' }
     ];
 
     private mediaUrl = environment.mediaUrl;
@@ -838,41 +857,39 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
         }
     ];
 
-    get activeCount(): number {
-        return this.employees.filter(e => !e.EmpStatus || e.EmpStatus?.toLowerCase() === 'active').length;
-    }
-
-    get onLeaveCount(): number {
-        return this.employees.filter(e => e.EmpStatus?.toLowerCase() === 'leave' || e.EmpStatus?.toLowerCase() === 'on leave').length;
-    }
-
-    get trainingCount(): number {
-        return this.employees.filter(e => e.EmpStatus?.toLowerCase() === 'training').length;
-    }
-
     constructor(
         private employeeService: DmsEmployeeService,
         private teamService: DmsTeamService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
-        private exportService: DmsExportService
+        private exportService: DmsExportService,
+        private cdr: ChangeDetectorRef
     ) {}
 
-    ngOnInit(): void {
-        this.filteredEmployees = [...this.employees];
+    /**
+     * TrackBy function for table rows - improves rendering performance
+     */
+    trackByEmployeeId(index: number, employee: Employee): number {
+        return employee.Id_Emp;
+    }
 
+    ngOnInit(): void {
+        // Setup debounced search - will trigger table reload
         this.searchSubject.pipe(
-            debounceTime(300),
+            debounceTime(400),
             distinctUntilChanged(),
             takeUntil(this.destroy$)
         ).subscribe(() => {
-            this.applyFilters();
+            this.first = 0; // Reset to first page on search
+            this.loadEmployeesLazy({
+                first: 0,
+                rows: this.rows,
+                sortField: this.currentSortField,
+                sortOrder: this.currentSortOrder
+            });
         });
 
-        if (this.employees.length === 0) {
-            this.loadEmployees();
-        }
-
+        // Load reference data
         if (this.departments.length === 0) {
             this.loadDepartments();
         }
@@ -882,6 +899,7 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
         }
 
         this.loadTeams();
+        this.loadStats();
     }
 
     ngOnDestroy(): void {
@@ -889,20 +907,141 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
         this.destroy$.complete();
     }
 
-    loadEmployees(): void {
+    /**
+     * Lazy load employees with server-side pagination
+     */
+    loadEmployeesLazy(event: any): void {
         this.loading = true;
-        this.employeeService.getEmployees()
+        this.first = event.first || 0;
+        this.rows = event.rows || 25;
+
+        // Calculate page number (1-based for backend)
+        const page = Math.floor(this.first / this.rows) + 1;
+
+        // Build ordering string for backend
+        let ordering = '';
+        if (event.sortField) {
+            this.currentSortField = event.sortField;
+            this.currentSortOrder = event.sortOrder || 1;
+            // Map frontend field names to backend field names
+            const fieldMap: Record<string, string> = {
+                'Nom_Emp': 'last_name',
+                'Prenom_Emp': 'first_name',
+                'DateEmbauche_Emp': 'hire_date',
+                'Departement_Emp': 'department',
+                'Categorie_Emp': 'category',
+                'BadgeNumber': 'badge_number',
+                'CIN_Emp': 'cin'
+            };
+            const backendField = fieldMap[event.sortField] || event.sortField;
+            ordering = event.sortOrder === -1 ? `-${backendField}` : backendField;
+        }
+
+        // Build filter params
+        const params: any = {
+            page,
+            page_size: this.rows
+        };
+
+        if (ordering) {
+            params.ordering = ordering;
+        }
+
+        if (this.searchTerm) {
+            params.search = this.searchTerm;
+        }
+
+        if (this.selectedDepartment) {
+            params.department = this.selectedDepartment;
+        }
+
+        if (this.selectedCategory) {
+            params.category = this.selectedCategory;
+        }
+
+        if (this.selectedQuickFilter && this.selectedQuickFilter !== 'all') {
+            params.status = this.selectedQuickFilter;
+        }
+
+        this.employeeService.getEmployeesPaginated(params)
             .pipe(takeUntil(this.destroy$))
             .subscribe({
-                next: (employees) => {
-                    this.employees = employees;
-                    this.filteredEmployees = [...employees];
+                next: (response) => {
+                    this.employees = response.results || [];
+                    this.totalRecords = response.count || 0;
                     this.loading = false;
+                    this.cdr.markForCheck();
                 },
-                error: () => {
+                error: (err) => {
                     this.loading = false;
+                    this.cdr.markForCheck();
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Erreur',
+                        detail: 'Impossible de charger les employés'
+                    });
                 }
             });
+    }
+
+    /**
+     * Load employee statistics (total counts by status)
+     */
+    loadStats(): void {
+        // Load active count
+        this.employeeService.getEmployeesPaginated({ page: 1, page_size: 1, status: 'active' })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+                next: (res) => {
+                    this.statsActiveCount = res.count || 0;
+                    this.cdr.markForCheck();
+                },
+                error: () => {
+                    this.statsActiveCount = 0;
+                    this.cdr.markForCheck();
+                }
+            });
+
+        // Load on leave count (backend uses 'on_leave')
+        this.employeeService.getEmployeesPaginated({ page: 1, page_size: 1, status: 'on_leave' })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+                next: (res) => {
+                    this.statsOnLeaveCount = res.count || 0;
+                    this.cdr.markForCheck();
+                },
+                error: () => {
+                    this.statsOnLeaveCount = 0;
+                    this.cdr.markForCheck();
+                }
+            });
+
+        // Load inactive count (replacing training which doesn't exist)
+        this.employeeService.getEmployeesPaginated({ page: 1, page_size: 1, status: 'inactive' })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+                next: (res) => {
+                    this.statsInactiveCount = res.count || 0;
+                    this.cdr.markForCheck();
+                },
+                error: () => {
+                    this.statsInactiveCount = 0;
+                    this.cdr.markForCheck();
+                }
+            });
+    }
+
+    /**
+     * Reload current page of employees
+     */
+    reloadEmployees(): void {
+        this.loadEmployeesLazy({
+            first: this.first,
+            rows: this.rows,
+            sortField: this.currentSortField,
+            sortOrder: this.currentSortOrder
+        });
+        this.loadStats();
     }
 
     loadDepartments(): void {
@@ -934,11 +1073,23 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
     }
 
     onQuickFilterChange(event: any): void {
-        this.applyFilters();
+        this.first = 0; // Reset to first page
+        this.loadEmployeesLazy({
+            first: 0,
+            rows: this.rows,
+            sortField: this.currentSortField,
+            sortOrder: this.currentSortOrder
+        });
     }
 
     onFilterChange(): void {
-        this.applyFilters();
+        this.first = 0; // Reset to first page
+        this.loadEmployeesLazy({
+            first: 0,
+            rows: this.rows,
+            sortField: this.currentSortField,
+            sortOrder: this.currentSortOrder
+        });
         this.filterChanged.emit({
             search: this.searchTerm,
             department: this.selectedDepartment,
@@ -952,44 +1103,13 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
         this.selectedDepartment = null;
         this.selectedCategory = null;
         this.selectedQuickFilter = 'all';
-        this.applyFilters();
-    }
-
-    private applyFilters(): void {
-        let filtered = [...this.employees];
-
-        if (this.searchTerm) {
-            const term = this.searchTerm.toLowerCase();
-            filtered = filtered.filter(e => {
-                const emp = e as any;
-                return (
-                    emp.Nom_Emp?.toLowerCase().includes(term) ||
-                    emp.Prenom_Emp?.toLowerCase().includes(term) ||
-                    emp.Id_Emp?.toString().includes(term) ||
-                    emp.BadgeNumber?.toLowerCase().includes(term) ||
-                    emp.employee_id?.toLowerCase().includes(term) ||
-                    emp.CIN_Emp?.toLowerCase().includes(term) ||
-                    emp.cin?.toLowerCase().includes(term)
-                );
-            });
-        }
-
-        if (this.selectedDepartment) {
-            filtered = filtered.filter(e => e.Departement_Emp === this.selectedDepartment);
-        }
-
-        if (this.selectedCategory) {
-            filtered = filtered.filter(e => e.Categorie_Emp === this.selectedCategory);
-        }
-
-        if (this.selectedQuickFilter !== 'all') {
-            filtered = filtered.filter(e => {
-                const status = e.EmpStatus?.toLowerCase() || 'active';
-                return status === this.selectedQuickFilter;
-            });
-        }
-
-        this.filteredEmployees = filtered;
+        this.first = 0;
+        this.loadEmployeesLazy({
+            first: 0,
+            rows: this.rows,
+            sortField: this.currentSortField,
+            sortOrder: this.currentSortOrder
+        });
     }
 
     getPhotoUrl(employee: Employee): string {
@@ -1101,8 +1221,7 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
                     .pipe(takeUntil(this.destroy$))
                     .subscribe({
                         next: () => {
-                            this.employees = this.employees.filter(e => e.Id_Emp !== employee.Id_Emp);
-                            this.applyFilters();
+                            this.reloadEmployees();
                             this.messageService.add({
                                 severity: 'success',
                                 summary: 'Succès',
@@ -1134,11 +1253,7 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
                 .pipe(takeUntil(this.destroy$))
                 .subscribe({
                     next: (updatedEmployee) => {
-                        const index = this.employees.findIndex(e => e.Id_Emp === this.selectedEmployee!.Id_Emp);
-                        if (index !== -1) {
-                            this.employees[index] = { ...this.employees[index], ...updatedEmployee };
-                        }
-                        this.applyFilters();
+                        this.reloadEmployees();
                         this.showFormDialog = false;
                         this.selectedEmployee = null;
                         this.messageService.add({
@@ -1169,8 +1284,7 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
                 .pipe(takeUntil(this.destroy$))
                 .subscribe({
                     next: (newEmployee) => {
-                        this.employees.unshift(newEmployee);
-                        this.applyFilters();
+                        this.reloadEmployees();
                         this.showFormDialog = false;
                         this.messageService.add({
                             severity: 'success',
@@ -1231,38 +1345,88 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
     }
 
     exportToExcel(): void {
-        if (this.filteredEmployees.length === 0) {
+        if (this.totalRecords === 0) {
             this.messageService.add({
                 severity: 'warn',
-                summary: 'No Data',
-                detail: 'No employees to export'
+                summary: 'Pas de données',
+                detail: 'Aucun employé à exporter'
             });
             return;
         }
 
-        this.exportService.exportEmployees(this.filteredEmployees);
         this.messageService.add({
-            severity: 'success',
-            summary: 'Export Complete',
-            detail: `${this.filteredEmployees.length} employees exported to Excel`
+            severity: 'info',
+            summary: 'Export en cours',
+            detail: 'Préparation de l\'export Excel...'
+        });
+
+        // Fetch all employees with current filters for export
+        this.fetchAllEmployeesForExport().then(employees => {
+            this.exportService.exportEmployees(employees);
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Export terminé',
+                detail: `${employees.length} employés exportés vers Excel`
+            });
         });
     }
 
     exportToCsv(): void {
-        if (this.filteredEmployees.length === 0) {
+        if (this.totalRecords === 0) {
             this.messageService.add({
                 severity: 'warn',
-                summary: 'No Data',
-                detail: 'No employees to export'
+                summary: 'Pas de données',
+                detail: 'Aucun employé à exporter'
             });
             return;
         }
 
-        this.exportService.exportEmployeesToCsv(this.filteredEmployees);
         this.messageService.add({
-            severity: 'success',
-            summary: 'Export Complete',
-            detail: `${this.filteredEmployees.length} employees exported to CSV`
+            severity: 'info',
+            summary: 'Export en cours',
+            detail: 'Préparation de l\'export CSV...'
+        });
+
+        // Fetch all employees with current filters for export
+        this.fetchAllEmployeesForExport().then(employees => {
+            this.exportService.exportEmployeesToCsv(employees);
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Export terminé',
+                detail: `${employees.length} employés exportés vers CSV`
+            });
+        });
+    }
+
+    /**
+     * Fetch all employees with current filters for export
+     */
+    private fetchAllEmployeesForExport(): Promise<Employee[]> {
+        return new Promise((resolve) => {
+            const params: any = {
+                page: 1,
+                page_size: 10000 // Large number to get all
+            };
+
+            if (this.searchTerm) {
+                params.search = this.searchTerm;
+            }
+            if (this.selectedDepartment) {
+                params.department = this.selectedDepartment;
+            }
+            if (this.selectedCategory) {
+                params.category = this.selectedCategory;
+            }
+            if (this.selectedQuickFilter && this.selectedQuickFilter !== 'all') {
+                params.status = this.selectedQuickFilter;
+            }
+
+            this.employeeService.getEmployeesPaginated(params)
+                .pipe(takeUntil(this.destroy$))
+                .subscribe({
+                    next: (response) => resolve(response.results || []),
+                    error: () => resolve([])
+                });
         });
     }
 
@@ -1313,7 +1477,7 @@ export class EmployeesListComponent implements OnInit, OnDestroy {
                         detail: `${result.imported || 0} créés, ${result.updated || 0} mis à jour`,
                         life: 5000
                     });
-                    this.loadEmployees();
+                    this.reloadEmployees();
                 }
 
                 if (result.errors && result.errors.length > 0) {

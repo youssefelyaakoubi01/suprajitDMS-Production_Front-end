@@ -99,7 +99,23 @@ export class DmsFormationService {
 
     // ==================== TRAINER SPECIALIZATIONS ====================
     getTrainerSpecializations(): Observable<TrainerSpecialization[]> {
-        return this.api.get<TrainerSpecialization[]>(`${this.endpoint}/trainer-specializations`);
+        return this.api.get<TrainerSpecialization[]>(`${this.endpoint}/specializations`);
+    }
+
+    getTrainerSpecialization(id: number): Observable<TrainerSpecialization> {
+        return this.api.get<TrainerSpecialization>(`${this.endpoint}/specializations/${id}`);
+    }
+
+    createTrainerSpecialization(specialization: Partial<TrainerSpecialization>): Observable<TrainerSpecialization> {
+        return this.api.post<TrainerSpecialization>(`${this.endpoint}/specializations`, specialization);
+    }
+
+    updateTrainerSpecialization(id: number, specialization: Partial<TrainerSpecialization>): Observable<TrainerSpecialization> {
+        return this.api.put<TrainerSpecialization>(`${this.endpoint}/specializations/${id}`, specialization);
+    }
+
+    deleteTrainerSpecialization(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/specializations/${id}`);
     }
 
     // ==================== STATS ====================

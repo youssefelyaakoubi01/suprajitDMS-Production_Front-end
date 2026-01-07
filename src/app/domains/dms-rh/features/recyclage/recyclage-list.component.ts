@@ -2,12 +2,13 @@
  * Recyclage List Component
  * Domain: DMS-RH
  *
- * Displays employees requiring retraining (recyclage) with modern alert styling
+ * Displays employees with expiring qualifications and remaining duration
  */
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { FormsModule } from '@angular/forms';
+import { Subject, forkJoin } from 'rxjs';
+import { takeUntil, finalize } from 'rxjs/operators';
 
 // PrimeNG
 import { TableModule } from 'primeng/table';
@@ -21,15 +22,37 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { BadgeModule } from 'primeng/badge';
 import { RippleModule } from 'primeng/ripple';
 import { MessageModule } from 'primeng/message';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
+import { InputTextModule } from 'primeng/inputtext';
+import { SelectModule } from 'primeng/select';
 
 // Domain imports
 import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
+import { HRService } from '@core/services/hr.service';
+
+// Interface for expiring qualification
+export interface ExpiringQualification {
+    id: number;
+    employee_id: number;
+    employee_name: string;
+    employee_badge?: string;
+    formation_name: string;
+    formation_id: number;
+    start_date: Date;
+    end_date: Date;
+    days_remaining: number;
+    is_expired: boolean;
+    trainer_name?: string;
+    test_result?: string;
+}
 
 @Component({
     selector: 'app-recyclage-list',
     standalone: true,
     imports: [
         CommonModule,
+        FormsModule,
         TableModule,
         CardModule,
         ButtonModule,
@@ -40,7 +63,11 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
         SkeletonModule,
         BadgeModule,
         RippleModule,
-        MessageModule
+        MessageModule,
+        IconFieldModule,
+        InputIconModule,
+        InputTextModule,
+        SelectModule
     ],
     template: `
         <div class="recyclage-list">
@@ -51,14 +78,14 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                         <i class="pi pi-refresh"></i>
                     </div>
                     <div class="title-text">
-                        <h1>Recyclage Management</h1>
-                        <span class="subtitle">Monitor and schedule employee retraining</span>
+                        <h1>Recyclage - Qualifications Expirantes</h1>
+                        <span class="subtitle">Suivi des qualifications arrivant à expiration</span>
                     </div>
                 </div>
                 <div class="header-actions">
                     <button pButton pRipple
                             icon="pi pi-refresh"
-                            label="Refresh"
+                            label="Actualiser"
                             class="p-button-outlined"
                             (click)="loadData()"
                             [loading]="loading">
@@ -67,44 +94,44 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
             </div>
 
             <!-- Alert Banner -->
-            <div class="alert-banner" *ngIf="overdueCount > 0">
+            <div class="alert-banner" *ngIf="expiredCount() > 0">
                 <div class="alert-content">
                     <div class="alert-icon">
                         <i class="pi pi-exclamation-triangle"></i>
                     </div>
                     <div class="alert-text">
-                        <strong>{{ overdueCount }} employee{{ overdueCount > 1 ? 's' : '' }}</strong>
-                        {{ overdueCount > 1 ? 'have' : 'has' }} overdue recyclage requirements.
-                        Please schedule their retraining as soon as possible.
+                        <strong>{{ expiredCount() }} qualification{{ expiredCount() > 1 ? 's' : '' }}</strong>
+                        {{ expiredCount() > 1 ? 'ont expiré' : 'a expiré' }}.
+                        Veuillez planifier le recyclage dès que possible.
                     </div>
                     <button pButton pRipple
-                            label="View Overdue"
+                            label="Voir Expirées"
                             class="p-button-danger p-button-sm"
-                            (click)="filterOverdue()">
+                            (click)="filterExpired()">
                     </button>
                 </div>
             </div>
 
             <!-- Stats Cards -->
             <div class="stats-grid">
-                <div class="recyclage-stat-card overdue" (click)="filterOverdue()" pRipple>
+                <div class="recyclage-stat-card overdue" (click)="filterExpired()" pRipple>
                     <div class="stat-visual">
                         <svg viewBox="0 0 100 100" class="stat-ring">
                             <circle cx="50" cy="50" r="40" fill="none"
                                     stroke="rgba(239, 68, 68, 0.2)" stroke-width="8"/>
                             <circle cx="50" cy="50" r="40" fill="none"
                                     stroke="#EF4444" stroke-width="8"
-                                    [attr.stroke-dasharray]="getOverdueDashArray()"
+                                    [attr.stroke-dasharray]="getExpiredDashArray()"
                                     stroke-linecap="round"
                                     transform="rotate(-90 50 50)"/>
                         </svg>
                         <div class="stat-value-center">
-                            <span class="value">{{ overdueCount }}</span>
+                            <span class="value">{{ expiredCount() }}</span>
                         </div>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Overdue</span>
-                        <span class="stat-sublabel">Immediate action required</span>
+                        <span class="stat-label">Expirées</span>
+                        <span class="stat-sublabel">Action immédiate requise</span>
                     </div>
                 </div>
 
@@ -120,12 +147,12 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                                     transform="rotate(-90 50 50)"/>
                         </svg>
                         <div class="stat-value-center">
-                            <span class="value">{{ dueSoonCount }}</span>
+                            <span class="value">{{ dueSoonCount() }}</span>
                         </div>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Due Soon</span>
-                        <span class="stat-sublabel">Within 30 days</span>
+                        <span class="stat-label">Expire Bientôt</span>
+                        <span class="stat-sublabel">Dans 30 jours</span>
                     </div>
                 </div>
 
@@ -141,12 +168,12 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                                     transform="rotate(-90 50 50)"/>
                         </svg>
                         <div class="stat-value-center">
-                            <span class="value">{{ upcomingCount }}</span>
+                            <span class="value">{{ upcomingCount() }}</span>
                         </div>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-label">Upcoming</span>
-                        <span class="stat-sublabel">Within 90 days</span>
+                        <span class="stat-label">À Venir</span>
+                        <span class="stat-sublabel">Dans 90 jours</span>
                     </div>
                 </div>
 
@@ -162,77 +189,80 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                                     transform="rotate(-90 50 50)"/>
                         </svg>
                         <div class="stat-value-center">
-                            <span class="value">{{ employees.length }}</span>
+                            <span class="value">{{ qualifications().length }}</span>
                         </div>
                     </div>
                     <div class="stat-info">
                         <span class="stat-label">Total</span>
-                        <span class="stat-sublabel">All requiring recyclage</span>
+                        <span class="stat-sublabel">Toutes les qualifications</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Employees Table -->
+            <!-- Qualifications Table -->
             <div class="hr-section-card">
                 <div class="section-header">
                     <span class="section-title">
-                        <i class="pi pi-users"></i>
-                        Employees Requiring Recyclage
+                        <i class="pi pi-id-card"></i>
+                        Qualifications Arrivant à Expiration
                         <p-badge *ngIf="activeFilter" [value]="activeFilter" severity="info" styleClass="ml-2"></p-badge>
                     </span>
-                    <button pButton pRipple
-                            icon="pi pi-filter-slash"
-                            label="Clear Filter"
-                            class="p-button-text p-button-sm"
-                            *ngIf="activeFilter"
-                            (click)="clearFilter()">
-                    </button>
+                    <div class="section-actions">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input pInputText type="text"
+                                   [(ngModel)]="searchTerm"
+                                   (input)="onSearch()"
+                                   placeholder="Rechercher..."
+                                   class="search-input" />
+                        </p-iconfield>
+                        <button pButton pRipple
+                                icon="pi pi-filter-slash"
+                                label="Effacer"
+                                class="p-button-text p-button-sm"
+                                *ngIf="activeFilter"
+                                (click)="clearFilter()">
+                        </button>
+                    </div>
                 </div>
                 <div class="section-body p-0">
-                    <p-table [value]="filteredEmployees"
+                    <p-table [value]="filteredQualifications()"
                              [loading]="loading"
                              [paginator]="true"
                              [rows]="10"
+                             [rowsPerPageOptions]="[10, 25, 50]"
+                             [showCurrentPageReport]="true"
+                             currentPageReportTemplate="Affichage {first} à {last} sur {totalRecords} qualifications"
                              [rowHover]="true"
-                             styleClass="hr-table">
+                             [sortField]="'days_remaining'"
+                             [sortOrder]="1"
+                             styleClass="p-datatable-sm hr-table">
 
                         <ng-template pTemplate="header">
                             <tr>
                                 <th style="width: 60px"></th>
-                                <th pSortableColumn="Employee.Nom_Emp">
-                                    <div class="flex align-items-center gap-2">
-                                        Employee
-                                        <p-sortIcon field="Employee.Nom_Emp"></p-sortIcon>
-                                    </div>
+                                <th pSortableColumn="employee_name">
+                                    Opérateur <p-sortIcon field="employee_name"></p-sortIcon>
                                 </th>
-                                <th pSortableColumn="DateEmbauche_Emp">
-                                    <div class="flex align-items-center gap-2">
-                                        Hire Date
-                                        <p-sortIcon field="DateEmbauche_Emp"></p-sortIcon>
-                                    </div>
+                                <th pSortableColumn="formation_name">
+                                    Formation <p-sortIcon field="formation_name"></p-sortIcon>
                                 </th>
-                                <th pSortableColumn="lastQualificationDate">
-                                    <div class="flex align-items-center gap-2">
-                                        Last Qualification
-                                        <p-sortIcon field="lastQualificationDate"></p-sortIcon>
-                                    </div>
+                                <th pSortableColumn="end_date" style="width: 140px">
+                                    Date Fin <p-sortIcon field="end_date"></p-sortIcon>
                                 </th>
-                                <th pSortableColumn="daysUntilRecyclage" style="width: 160px">
-                                    <div class="flex align-items-center gap-2">
-                                        Days Until Due
-                                        <p-sortIcon field="daysUntilRecyclage"></p-sortIcon>
-                                    </div>
+                                <th pSortableColumn="days_remaining" style="width: 180px">
+                                    Durée Restante <p-sortIcon field="days_remaining"></p-sortIcon>
                                 </th>
-                                <th style="width: 120px">Status</th>
-                                <th style="width: 140px; text-align: center">Actions</th>
+                                <th style="width: 120px">Statut</th>
+                                <th style="width: 100px; text-align: center">Actions</th>
                             </tr>
                         </ng-template>
 
-                        <ng-template pTemplate="body" let-emp>
+                        <ng-template pTemplate="body" let-qual>
                             <tr>
                                 <td>
                                     <div class="hr-avatar-badge">
-                                        <p-avatar [label]="getInitials(emp.Employee)"
+                                        <p-avatar [label]="getInitials(qual.employee_name)"
                                                   shape="circle"
                                                   size="large"
                                                   [style]="{'background': 'var(--hr-gradient)', 'color': 'white'}">
@@ -242,48 +272,45 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                                 <td>
                                     <div class="hr-employee-info">
                                         <div class="employee-details">
-                                            <span class="employee-name">
-                                                {{ emp.Employee?.Nom_Emp }} {{ emp.Employee?.Prenom_Emp }}
-                                            </span>
-                                            <span class="employee-meta">
-                                                ID: {{ emp.Id_Emp }}
+                                            <span class="employee-name">{{ qual.employee_name }}</span>
+                                            <span class="employee-meta" *ngIf="qual.employee_badge">
+                                                Badge: {{ qual.employee_badge }}
                                             </span>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="hr-info-row">
-                                        <i class="pi pi-calendar"></i>
-                                        <span>{{ emp.DateEmbauche_Emp | date:'dd/MM/yyyy' }}</span>
+                                    <div class="formation-info">
+                                        <i class="pi pi-book"></i>
+                                        <span>{{ qual.formation_name }}</span>
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="hr-info-row" *ngIf="emp.lastQualificationDate">
-                                        <i class="pi pi-verified"></i>
-                                        <span>{{ emp.lastQualificationDate | date:'dd/MM/yyyy' }}</span>
+                                    <div class="hr-info-row" [ngClass]="{'expired-date': qual.is_expired}">
+                                        <i class="pi pi-calendar"></i>
+                                        <span>{{ qual.end_date | date:'dd/MM/yyyy' }}</span>
                                     </div>
-                                    <span class="text-color-secondary" *ngIf="!emp.lastQualificationDate">-</span>
                                 </td>
                                 <td>
                                     <div class="days-indicator-wrapper">
-                                        <div class="hr-days-indicator" [ngClass]="getDaysClass(emp)">
-                                            <i [class]="getDaysIcon(emp)"></i>
-                                            <span *ngIf="emp.isOverdue">
-                                                {{ Math.abs(emp.daysUntilRecyclage) }} days overdue
+                                        <div class="hr-days-indicator" [ngClass]="getDaysClass(qual)">
+                                            <i [class]="getDaysIcon(qual)"></i>
+                                            <span *ngIf="qual.is_expired" class="days-text">
+                                                {{ formatDaysOverdue(qual.days_remaining) }}
                                             </span>
-                                            <span *ngIf="!emp.isOverdue">
-                                                {{ emp.daysUntilRecyclage }} days
+                                            <span *ngIf="!qual.is_expired" class="days-text">
+                                                {{ formatDaysRemaining(qual.days_remaining) }}
                                             </span>
                                         </div>
                                         <div class="days-progress">
-                                            <div class="progress-fill" [ngClass]="getDaysClass(emp)"
-                                                 [style.width.%]="getDaysProgress(emp)"></div>
+                                            <div class="progress-fill" [ngClass]="getDaysClass(qual)"
+                                                 [style.width.%]="getDaysProgress(qual)"></div>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <p-tag [value]="getStatusLabel(emp)"
-                                           [severity]="getStatusSeverity(emp)"
+                                    <p-tag [value]="getStatusLabel(qual)"
+                                           [severity]="getStatusSeverity(qual)"
                                            [rounded]="true">
                                     </p-tag>
                                 </td>
@@ -292,14 +319,8 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                                         <button pButton pRipple
                                                 icon="pi pi-calendar-plus"
                                                 class="p-button-text p-button-rounded p-button-sm"
-                                                (click)="onScheduleRecyclage(emp)"
-                                                pTooltip="Schedule Recyclage">
-                                        </button>
-                                        <button pButton pRipple
-                                                icon="pi pi-eye"
-                                                class="p-button-text p-button-rounded p-button-sm"
-                                                (click)="onViewEmployee(emp)"
-                                                pTooltip="View Details">
+                                                (click)="onScheduleRecyclage(qual)"
+                                                pTooltip="Planifier Recyclage">
                                         </button>
                                     </div>
                                 </td>
@@ -311,8 +332,8 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                                 <td colspan="7">
                                     <div class="hr-empty-state success-state">
                                         <i class="empty-icon pi pi-check-circle" style="color: var(--hr-success);"></i>
-                                        <h3>All caught up!</h3>
-                                        <p>No employees requiring recyclage at this time</p>
+                                        <h3>Tout est à jour!</h3>
+                                        <p>Aucune qualification à recycler pour le moment</p>
                                     </div>
                                 </td>
                             </tr>
@@ -321,12 +342,12 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
                         <ng-template pTemplate="loadingbody">
                             <tr *ngFor="let i of [1,2,3,4,5]">
                                 <td><p-skeleton shape="circle" size="48px"></p-skeleton></td>
-                                <td><p-skeleton width="180px" height="20px"></p-skeleton></td>
+                                <td><p-skeleton width="150px" height="20px"></p-skeleton></td>
+                                <td><p-skeleton width="120px" height="20px"></p-skeleton></td>
                                 <td><p-skeleton width="100px" height="20px"></p-skeleton></td>
-                                <td><p-skeleton width="100px" height="20px"></p-skeleton></td>
-                                <td><p-skeleton width="120px" height="28px" borderRadius="14px"></p-skeleton></td>
+                                <td><p-skeleton width="140px" height="28px" borderRadius="14px"></p-skeleton></td>
                                 <td><p-skeleton width="80px" height="24px" borderRadius="12px"></p-skeleton></td>
-                                <td><p-skeleton width="100px" height="32px"></p-skeleton></td>
+                                <td><p-skeleton width="40px" height="32px"></p-skeleton></td>
                             </tr>
                         </ng-template>
                     </p-table>
@@ -497,6 +518,44 @@ import { DmsQualificationService, RecyclageEmployee } from '@domains/dms-rh';
             }
         }
 
+        /* Formation Info */
+        .formation-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-color);
+
+            i {
+                color: var(--primary-color);
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Expired Date */
+        .expired-date {
+            color: var(--hr-danger) !important;
+
+            i {
+                color: var(--hr-danger) !important;
+            }
+        }
+
+        /* Days Text */
+        .days-text {
+            font-weight: 500;
+        }
+
+        /* Section Actions */
+        .section-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+
+            .search-input {
+                min-width: 200px;
+            }
+        }
+
         /* Table Customization */
         :host ::ng-deep {
             .p-datatable .p-datatable-thead > tr > th {
@@ -514,35 +573,55 @@ export class RecyclageListComponent implements OnInit, OnDestroy {
     @Input() employees: RecyclageEmployee[] = [];
     @Input() loading = false;
 
-    @Output() scheduleRecyclage = new EventEmitter<RecyclageEmployee>();
-    @Output() viewEmployee = new EventEmitter<RecyclageEmployee>();
+    @Output() scheduleRecyclage = new EventEmitter<ExpiringQualification>();
 
     private destroy$ = new Subject<void>();
 
     Math = Math;
-    filteredEmployees: RecyclageEmployee[] = [];
+
+    // Signals for reactive data
+    qualifications = signal<ExpiringQualification[]>([]);
+    searchTerm = '';
     activeFilter: string | null = null;
 
-    get overdueCount(): number {
-        return this.employees.filter(e => e.isOverdue).length;
-    }
+    // Computed counts
+    expiredCount = computed(() => this.qualifications().filter(q => q.is_expired).length);
+    dueSoonCount = computed(() => this.qualifications().filter(q => !q.is_expired && q.days_remaining <= 30).length);
+    upcomingCount = computed(() => this.qualifications().filter(q => !q.is_expired && q.days_remaining > 30 && q.days_remaining <= 90).length);
 
-    get dueSoonCount(): number {
-        return this.employees.filter(e => !e.isOverdue && e.daysUntilRecyclage <= 30).length;
-    }
+    // Filtered qualifications
+    filteredQualifications = computed(() => {
+        let result = this.qualifications();
 
-    get upcomingCount(): number {
-        return this.employees.filter(e => !e.isOverdue && e.daysUntilRecyclage > 30 && e.daysUntilRecyclage <= 90).length;
-    }
+        // Apply search filter
+        if (this.searchTerm) {
+            const term = this.searchTerm.toLowerCase();
+            result = result.filter(q =>
+                q.employee_name?.toLowerCase().includes(term) ||
+                q.formation_name?.toLowerCase().includes(term) ||
+                q.employee_badge?.toLowerCase().includes(term)
+            );
+        }
 
-    constructor(private qualificationService: DmsQualificationService) {}
+        // Apply status filter
+        if (this.activeFilter === 'Expirées') {
+            result = result.filter(q => q.is_expired);
+        } else if (this.activeFilter === 'Expire Bientôt') {
+            result = result.filter(q => !q.is_expired && q.days_remaining <= 30);
+        } else if (this.activeFilter === 'À Venir') {
+            result = result.filter(q => !q.is_expired && q.days_remaining > 30 && q.days_remaining <= 90);
+        }
+
+        return result;
+    });
+
+    constructor(
+        private qualificationService: DmsQualificationService,
+        private hrService: HRService
+    ) {}
 
     ngOnInit(): void {
-        if (this.employees.length === 0) {
-            this.loadData();
-        } else {
-            this.filteredEmployees = [...this.employees];
-        }
+        this.loadData();
     }
 
     ngOnDestroy(): void {
@@ -552,134 +631,250 @@ export class RecyclageListComponent implements OnInit, OnDestroy {
 
     loadData(): void {
         this.loading = true;
-        this.qualificationService.getRecyclageEmployees({ includeOverdue: true })
-            .pipe(takeUntil(this.destroy$))
-            .subscribe({
-                next: (employees) => {
-                    // Map API response to expected format
-                    this.employees = employees.map((emp: any) => this.mapRecyclageEmployee(emp));
-                    this.filteredEmployees = [...this.employees];
-                    this.loading = false;
-                },
-                error: () => {
-                    this.loading = false;
-                }
-            });
+        // Load all qualifications and calculate expiring ones
+        this.loadQualificationsWithExpiry();
     }
 
-    private mapRecyclageEmployee(data: any): RecyclageEmployee {
-        // Parse full_name into first/last name
-        const fullName = data.full_name || '';
-        const nameParts = fullName.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
+    private loadQualificationsWithExpiry(): void {
+        // Load both qualifications and employees to join them for status filtering
+        forkJoin({
+            qualifications: this.hrService.getQualifications(),
+            employees: this.hrService.getEmployees()
+        }).pipe(
+            takeUntil(this.destroy$),
+            finalize(() => this.loading = false)
+        ).subscribe({
+            next: ({ qualifications, employees }) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
 
-        // Handle both nested Employee object and flat structure from API
-        const employee = data.Employee || {
-            Id_Emp: data.id || data.employee_id,
-            Nom_Emp: lastName || data.Nom_Emp || '',
-            Prenom_Emp: firstName || data.Prenom_Emp || '',
-            Picture: data.picture || data.Picture || null,
-            Departement_Emp: data.department || data.Departement_Emp || '',
-            Categorie_Emp: data.category || data.Categorie_Emp || ''
-        };
+                // Create a map of employee ID to employee status for quick lookup
+                const employeeStatusMap = new Map<number, string>();
+                employees.forEach((emp: any) => {
+                    const empId = emp.Id_Emp || emp.id;
+                    const status = (emp.EmpStatus || emp.status || '').toString().toLowerCase().trim();
+                    employeeStatusMap.set(empId, status);
+                });
 
-        return {
-            Id_Emp: data.id || data.employee_id || data.Id_Emp,
-            Employee: employee,
-            DateEmbauche_Emp: data.hire_date || data.DateEmbauche_Emp,
-            daysUntilRecyclage: data.days_until_recyclage ?? data.daysUntilRecyclage ?? 0,
-            isOverdue: data.is_overdue ?? data.isOverdue ?? false,
-            lastQualificationDate: data.last_qualification_date || data.lastQualificationDate,
-            requiresRecyclage: data.requires_recyclage ?? data.requiresRecyclage ?? true
-        };
+                console.log('Employees loaded:', employees.length);
+                console.log('Qualifications loaded:', qualifications.length);
+
+                const expiringQuals: ExpiringQualification[] = qualifications
+                    .filter((q: any) => {
+                        // Check for end_date field (API uses snake_case)
+                        const endDate = q.end_date || q.end_qualif;
+                        if (!endDate) return false;
+
+                        // Exclude explicitly failed/cancelled qualifications
+                        const testResult = (q.test_result || '').toString().toLowerCase().trim();
+                        const isInvalidQualification = testResult === 'failed' ||
+                                                       testResult === 'échoué' ||
+                                                       testResult === 'echec' ||
+                                                       testResult === 'cancelled' ||
+                                                       testResult === 'annulé' ||
+                                                       testResult === 'pending' ||
+                                                       testResult === 'en attente' ||
+                                                       testResult === 'no' ||
+                                                       testResult === 'non' ||
+                                                       testResult === '0' ||
+                                                       testResult === 'false';
+
+                        if (isInvalidQualification) return false;
+
+                        // Get employee status from the map using employee ID
+                        const employeeId = q.employee || q.Id_Emp;
+                        const employeeStatus = employeeStatusMap.get(employeeId) || '';
+
+                        const isInactiveEmployee = employeeStatus === 'inactive' ||
+                                                   employeeStatus === 'inactif' ||
+                                                   employeeStatus === 'terminated' ||
+                                                   employeeStatus === 'terminé' ||
+                                                   employeeStatus === 'resigned' ||
+                                                   employeeStatus === 'démissionné' ||
+                                                   employeeStatus === 'i' ||
+                                                   employeeStatus === 'disabled' ||
+                                                   employeeStatus === 'désactivé';
+
+                        if (isInactiveEmployee) {
+                            console.log('Filtered out inactive employee:', q.employee_name, 'Status:', employeeStatus);
+                        }
+
+                        return !isInactiveEmployee;
+                    })
+                    .map((q: any) => {
+                        const endDateStr = q.end_date || q.end_qualif;
+                        const endDate = new Date(endDateStr);
+                        endDate.setHours(0, 0, 0, 0);
+
+                        const diffTime = endDate.getTime() - today.getTime();
+                        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        return {
+                            id: q.id || q.id_qualif,
+                            employee_id: q.employee || q.Id_Emp,
+                            employee_name: q.employee_name ||
+                                (q.Employee ? `${q.Employee.Prenom_Emp || ''} ${q.Employee.Nom_Emp || ''}`.trim() : '') ||
+                                `Employé #${q.employee || q.Id_Emp}`,
+                            employee_badge: q.employee_badge || q.Employee?.BadgeNumber || q.Employee?.badge,
+                            formation_name: q.formation_name ||
+                                q.Formation?.name_formation ||
+                                q.Formation?.name ||
+                                `Formation #${q.formation || q.id_formation}`,
+                            formation_id: q.formation || q.id_formation,
+                            start_date: new Date(q.start_date || q.start_qualif),
+                            end_date: endDate,
+                            days_remaining: daysRemaining,
+                            is_expired: daysRemaining < 0,
+                            trainer_name: q.trainer_name || q.TrainerName,
+                            test_result: q.test_result
+                        };
+                    })
+                    .filter((q: ExpiringQualification) => q.days_remaining <= 90) // Only show next 90 days or expired
+                    .sort((a: ExpiringQualification, b: ExpiringQualification) => a.days_remaining - b.days_remaining);
+
+                console.log('Expiring qualifications (active employees only):', expiringQuals.length);
+                this.qualifications.set(expiringQuals);
+            },
+            error: (err) => {
+                console.error('Error loading data:', err);
+                this.qualifications.set([]);
+            }
+        });
     }
 
-    filterOverdue(): void {
-        this.activeFilter = 'Overdue';
-        this.filteredEmployees = this.employees.filter(e => e.isOverdue);
+    private mapExpiringQualifications(data: any[]): ExpiringQualification[] {
+        return data.map((item: any) => ({
+            id: item.id || item.id_qualif,
+            employee_id: item.employee_id || item.Id_Emp,
+            employee_name: item.employee_name || item.full_name ||
+                (item.Employee ? `${item.Employee.Prenom_Emp || ''} ${item.Employee.Nom_Emp || ''}`.trim() : ''),
+            employee_badge: item.employee_badge || item.badge,
+            formation_name: item.formation_name || item.Formation?.name_formation || '',
+            formation_id: item.formation_id || item.id_formation,
+            start_date: new Date(item.start_date || item.start_qualif),
+            end_date: new Date(item.end_date || item.end_qualif),
+            days_remaining: item.days_remaining ?? item.days_until_expiry ?? 0,
+            is_expired: item.is_expired ?? (item.days_remaining < 0),
+            trainer_name: item.trainer_name || item.TrainerName,
+            test_result: item.test_result
+        })).sort((a: ExpiringQualification, b: ExpiringQualification) => a.days_remaining - b.days_remaining);
+    }
+
+    onSearch(): void {
+        // Trigger computed recalculation
+        this.qualifications.update(q => [...q]);
+    }
+
+    filterExpired(): void {
+        this.activeFilter = 'Expirées';
+        this.qualifications.update(q => [...q]);
     }
 
     filterDueSoon(): void {
-        this.activeFilter = 'Due Soon';
-        this.filteredEmployees = this.employees.filter(e => !e.isOverdue && e.daysUntilRecyclage <= 30);
+        this.activeFilter = 'Expire Bientôt';
+        this.qualifications.update(q => [...q]);
     }
 
     filterUpcoming(): void {
-        this.activeFilter = 'Upcoming';
-        this.filteredEmployees = this.employees.filter(e => !e.isOverdue && e.daysUntilRecyclage > 30 && e.daysUntilRecyclage <= 90);
+        this.activeFilter = 'À Venir';
+        this.qualifications.update(q => [...q]);
     }
 
     clearFilter(): void {
         this.activeFilter = null;
-        this.filteredEmployees = [...this.employees];
+        this.searchTerm = '';
+        this.qualifications.update(q => [...q]);
     }
 
-    getOverdueDashArray(): string {
-        const total = this.employees.length || 1;
+    getExpiredDashArray(): string {
+        const total = this.qualifications().length || 1;
         const circumference = 2 * Math.PI * 40;
-        const progress = (this.overdueCount / total) * circumference;
+        const progress = (this.expiredCount() / total) * circumference;
         return `${progress}, ${circumference}`;
     }
 
     getDueSoonDashArray(): string {
-        const total = this.employees.length || 1;
+        const total = this.qualifications().length || 1;
         const circumference = 2 * Math.PI * 40;
-        const progress = (this.dueSoonCount / total) * circumference;
+        const progress = (this.dueSoonCount() / total) * circumference;
         return `${progress}, ${circumference}`;
     }
 
     getUpcomingDashArray(): string {
-        const total = this.employees.length || 1;
+        const total = this.qualifications().length || 1;
         const circumference = 2 * Math.PI * 40;
-        const progress = (this.upcomingCount / total) * circumference;
+        const progress = (this.upcomingCount() / total) * circumference;
         return `${progress}, ${circumference}`;
     }
 
-    getInitials(employee: any): string {
-        if (!employee) return '?';
-        const first = employee.Prenom_Emp?.charAt(0) || '';
-        const last = employee.Nom_Emp?.charAt(0) || '';
-        return (first + last).toUpperCase();
+    getInitials(name: string): string {
+        if (!name) return '?';
+        const parts = name.trim().split(' ');
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
     }
 
-    getDaysClass(emp: RecyclageEmployee): string {
-        if (emp.isOverdue) return 'overdue';
-        if (emp.daysUntilRecyclage <= 30) return 'due-soon';
-        if (emp.daysUntilRecyclage <= 90) return 'upcoming';
+    getDaysClass(qual: ExpiringQualification): string {
+        if (qual.is_expired) return 'overdue';
+        if (qual.days_remaining <= 30) return 'due-soon';
+        if (qual.days_remaining <= 90) return 'upcoming';
         return 'ok';
     }
 
-    getDaysIcon(emp: RecyclageEmployee): string {
-        if (emp.isOverdue) return 'pi pi-exclamation-circle';
-        if (emp.daysUntilRecyclage <= 30) return 'pi pi-clock';
+    getDaysIcon(qual: ExpiringQualification): string {
+        if (qual.is_expired) return 'pi pi-exclamation-circle';
+        if (qual.days_remaining <= 30) return 'pi pi-clock';
         return 'pi pi-calendar';
     }
 
-    getDaysProgress(emp: RecyclageEmployee): number {
-        if (emp.isOverdue) return 100;
-        const maxDays = 365;
-        return Math.max(0, Math.min(100, ((maxDays - emp.daysUntilRecyclage) / maxDays) * 100));
+    getDaysProgress(qual: ExpiringQualification): number {
+        if (qual.is_expired) return 100;
+        const maxDays = 90;
+        return Math.max(0, Math.min(100, ((maxDays - qual.days_remaining) / maxDays) * 100));
     }
 
-    getStatusLabel(emp: RecyclageEmployee): string {
-        if (emp.isOverdue) return 'Overdue';
-        if (emp.daysUntilRecyclage <= 30) return 'Due Soon';
-        if (emp.daysUntilRecyclage <= 90) return 'Upcoming';
-        return 'Scheduled';
+    formatDaysRemaining(days: number): string {
+        if (days === 0) return "Expire aujourd'hui";
+        if (days === 1) return '1 jour restant';
+        if (days < 7) return `${days} jours restants`;
+        if (days < 30) {
+            const weeks = Math.floor(days / 7);
+            return weeks === 1 ? '1 semaine restante' : `${weeks} semaines restantes`;
+        }
+        const months = Math.floor(days / 30);
+        return months === 1 ? '1 mois restant' : `${months} mois restants`;
     }
 
-    getStatusSeverity(emp: RecyclageEmployee): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
-        if (emp.isOverdue) return 'danger';
-        if (emp.daysUntilRecyclage <= 30) return 'warn';
+    formatDaysOverdue(days: number): string {
+        const absDays = Math.abs(days);
+        if (absDays === 0) return "Expiré aujourd'hui";
+        if (absDays === 1) return 'Expiré depuis 1 jour';
+        if (absDays < 7) return `Expiré depuis ${absDays} jours`;
+        if (absDays < 30) {
+            const weeks = Math.floor(absDays / 7);
+            return weeks === 1 ? 'Expiré depuis 1 semaine' : `Expiré depuis ${weeks} semaines`;
+        }
+        const months = Math.floor(absDays / 30);
+        return months === 1 ? 'Expiré depuis 1 mois' : `Expiré depuis ${months} mois`;
+    }
+
+    getStatusLabel(qual: ExpiringQualification): string {
+        if (qual.is_expired) return 'Expiré';
+        if (qual.days_remaining <= 7) return 'Urgent';
+        if (qual.days_remaining <= 30) return 'Bientôt';
+        return 'À Venir';
+    }
+
+    getStatusSeverity(qual: ExpiringQualification): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
+        if (qual.is_expired) return 'danger';
+        if (qual.days_remaining <= 7) return 'danger';
+        if (qual.days_remaining <= 30) return 'warn';
         return 'info';
     }
 
-    onScheduleRecyclage(emp: RecyclageEmployee): void {
-        this.scheduleRecyclage.emit(emp);
-    }
-
-    onViewEmployee(emp: RecyclageEmployee): void {
-        this.viewEmployee.emit(emp);
+    onScheduleRecyclage(qual: ExpiringQualification): void {
+        this.scheduleRecyclage.emit(qual);
     }
 }
