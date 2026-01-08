@@ -1088,8 +1088,8 @@
                     <td>{{ hour.timeRange }}</td>
                     <td>
                         <p-tag
-                            [value]="hour.hourType === 'normal' ? 'Normal' : (hour.hourType === 'setup' ? 'Setup' : (hour.hourType === 'break' ? 'Pause' : 'Extra Break'))"
-                            [severity]="hour.hourType === 'normal' ? 'info' : (hour.hourType === 'setup' ? 'warn' : 'secondary')"
+                            [value]="getHourTypeLabel(hour.hourType)"
+                            [severity]="getHourTypeSeverity(hour.hourType)"
                             [rounded]="true">
                         </p-tag>
                     </td>

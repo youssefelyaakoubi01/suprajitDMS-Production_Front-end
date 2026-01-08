@@ -307,7 +307,8 @@ export class ProductionService {
     }
 
     createTeamAssignment(assignment: Partial<TeamAssignment>): Observable<TeamAssignment> {
-        return this.api.post<TeamAssignment>(`${this.endpoint}/team-assignments`, assignment);
+        // Use the custom /assign/ endpoint which uses get_or_create for better duplicate handling
+        return this.api.post<TeamAssignment>(`${this.endpoint}/team-assignments/assign`, assignment);
     }
 
     deleteTeamAssignment(id: number): Observable<void> {

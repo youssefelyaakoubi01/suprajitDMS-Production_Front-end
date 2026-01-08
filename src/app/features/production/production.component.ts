@@ -484,12 +484,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
                 // Mark team as complete if we have productions
                 if (productions.length > 0) {
-                    this.session.isTeamComplete = true;
-
-                    // Load team assignments from ALL hourly productions (not just the first one)
-                    // This ensures we get all team members even if they were assigned to different hours
+                    // Load team assignments for each hour separately
+                    // This properly populates both hour.team and session.team
                     const headcount = productions[0].HC_HourlyProdPN || 0;
-                    this.loadTeamAssignmentsFromAllProductions(productions.map(p => p.Id_HourlyProd), headcount);
+                    this.loadTeamAssignmentsPerHour(productions, headcount);
                 }
 
                 // Open the selected hour dialog if in edit mode
@@ -683,13 +681,157 @@ export class ProductionComponent implements OnInit, OnDestroy {
         });
     }
 
-    saveTeamAssignmentsForHour(hourlyProductionId: number): void {
-        // Use currentHourTeam if available, otherwise fallback to main team
-        const teamToSave = this.currentHourTeam.length > 0
-            ? this.currentHourTeam
-            : this.teamState.team();
+    /**
+     * Load team assignments for each hour separately and populate hour.team
+     * This method properly separates shift-level team from hour-level team assignments
+     */
+    loadTeamAssignmentsPerHour(productions: any[], headcount: number = 0): void {
+        // Track all unique employees across all hours for shift-level team
+        const allEmployeeIds = new Set<number>();
+        let totalAssignmentsFound = 0;
+        let completedRequests = 0;
+        const totalRequests = productions.length;
 
-        console.log('saveTeamAssignmentsForHour called. Team to save:', teamToSave.length, 'members');
+        // If no productions, nothing to load
+        if (totalRequests === 0) {
+            return;
+        }
+
+        // Load team assignments for each hourly production
+        productions.forEach(prod => {
+            const hourlyProductionId = prod.Id_HourlyProd;
+            const hourNumber = prod.Hour_HourlyProd;
+
+            // Find the corresponding hour in session
+            const hourIndex = this.session.hours.findIndex(h => h.hour === hourNumber);
+
+            this.productionService.getTeamAssignments(hourlyProductionId).subscribe({
+                next: (assignments) => {
+                    console.log(`Loaded team assignments for hour ${hourNumber} (prod ${hourlyProductionId}):`, assignments?.length || 0);
+                    completedRequests++;
+                    totalAssignmentsFound += assignments?.length || 0;
+
+                    if (assignments && assignments.length > 0 && hourIndex >= 0) {
+                        // Initialize hour team array if not exists
+                        if (!this.session.hours[hourIndex].team) {
+                            this.session.hours[hourIndex].team = [];
+                        }
+
+                        // Load each employee for this hour
+                        assignments.forEach(assignment => {
+                            const empId = assignment.Id_Emp || assignment.employee;
+                            if (!empId) return;
+
+                            // Track for shift-level team
+                            allEmployeeIds.add(empId);
+
+                            // Load employee details
+                            this.employeeService.getEmployee(empId).subscribe({
+                                next: (employee: any) => {
+                                    const workstation = this.workstations.find(w =>
+                                        w.Id_Workstation === (assignment.Id_Workstation || assignment.workstation)
+                                    );
+
+                                    const newMember: EmployeeWithAssignment = {
+                                        Id_Emp: employee.id || employee.Id_Emp,
+                                        Nom_Emp: employee.last_name || employee.Nom_Emp || '',
+                                        Prenom_Emp: employee.first_name || employee.Prenom_Emp || '',
+                                        DateNaissance_Emp: employee.birth_date || employee.DateNaissance_Emp || new Date(),
+                                        Genre_Emp: employee.gender || employee.Genre_Emp || 'M',
+                                        Categorie_Emp: employee.category || employee.Categorie_Emp || 'operator',
+                                        DateEmbauche_Emp: employee.hire_date || employee.DateEmbauche_Emp || new Date(),
+                                        Departement_Emp: employee.department || employee.Departement_Emp || 'Production',
+                                        Picture: this.getEmployeePictureUrl(employee.picture || employee.Picture),
+                                        EmpStatus: employee.status || employee.EmpStatus || 'active',
+                                        workstation: workstation?.Name_Workstation || 'Unknown',
+                                        qualification: employee.current_qualification || 'Not Qualified',
+                                        qualificationLevel: employee.current_qualification ? 1 : 0
+                                    };
+
+                                    // Add to hour-specific team (avoid duplicates)
+                                    if (!this.session.hours[hourIndex].team.find(t => t.Id_Emp === newMember.Id_Emp)) {
+                                        this.session.hours[hourIndex].team.push(newMember);
+                                        console.log(`Added team member ${newMember.Prenom_Emp} ${newMember.Nom_Emp} to hour ${hourNumber}`);
+                                    }
+
+                                    // Also add to shift-level team (avoid duplicates)
+                                    if (!this.session.team.find(t => t.Id_Emp === newMember.Id_Emp)) {
+                                        this.session.team.push(newMember);
+                                        this.teamState.addMember(newMember);
+                                    }
+                                },
+                                error: (err) => {
+                                    console.error(`Error loading employee ${empId} for hour ${hourNumber}:`, err);
+                                }
+                            });
+                        });
+                    }
+
+                    // After all requests complete, check if we need to show message
+                    this.checkTeamLoadingComplete(completedRequests, totalRequests, totalAssignmentsFound, headcount);
+                },
+                error: (err) => {
+                    console.error(`Error loading team assignments for hour ${hourNumber}:`, err);
+                    completedRequests++;
+                    this.checkTeamLoadingComplete(completedRequests, totalRequests, totalAssignmentsFound, headcount);
+                }
+            });
+        });
+    }
+
+    /**
+     * Check if team loading is complete and show appropriate message
+     */
+    private checkTeamLoadingComplete(completedRequests: number, totalRequests: number, totalAssignmentsFound: number, headcount: number): void {
+        if (completedRequests !== totalRequests) {
+            return; // Not all requests completed yet
+        }
+
+        console.log(`Team loading complete: ${totalAssignmentsFound} total assignments found, headcount was ${headcount}`);
+
+        if (totalAssignmentsFound === 0 && headcount > 0) {
+            // No team assignments in database but headcount was recorded
+            // Try to restore team from localStorage first
+            const localStorageTeam = this.teamState.loadFromLocalStorage();
+            if (localStorageTeam && localStorageTeam.length > 0) {
+                console.log('No DB assignments, but found team in localStorage:', localStorageTeam.length, 'members');
+                this.session.team = localStorageTeam;
+                this.session.isTeamComplete = true;
+                this.teamState.setTeam(localStorageTeam);
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Team Restored',
+                    detail: `${localStorageTeam.length} team members restored from local session.`,
+                    life: 5000
+                });
+            } else {
+                // No localStorage team either - show info message
+                this.session.isTeamComplete = false;
+                this.messageService.add({
+                    severity: 'info',
+                    summary: 'Team Data Not Available',
+                    detail: `This production was recorded with ${headcount} team members, but individual assignments were not saved. You can re-assign the team if needed.`,
+                    life: 8000
+                });
+            }
+        } else if (totalAssignmentsFound > 0) {
+            this.session.isTeamComplete = true;
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Team Loaded',
+                detail: `${this.session.team.length} team members loaded from database.`,
+                life: 3000
+            });
+        }
+    }
+
+    /**
+     * Save team assignments for an hourly production
+     * @param hourlyProductionId - The ID of the hourly production
+     * @param teamToSave - The team to save (passed explicitly to avoid race conditions)
+     */
+    saveTeamAssignmentsForHour(hourlyProductionId: number, teamToSave: EmployeeWithAssignment[]): void {
+        console.log('saveTeamAssignmentsForHour called. Production ID:', hourlyProductionId, 'Team size:', teamToSave.length);
 
         if (teamToSave.length === 0) {
             console.warn('No team members to save for hourly production:', hourlyProductionId);
@@ -709,12 +851,39 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         return;
                     }
 
-                    // Find the workstation ID from the workstation name
-                    const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
-                    const workstationId = workstation?.Id_Workstation || this.workstations[0]?.Id_Workstation;
+                    // Find the workstation ID - prioritize stored ID, then name lookup, then default
+                    let workstationId: number | undefined;
 
+                    // First use the stored workstationId from the member
+                    if (member.workstationId) {
+                        workstationId = member.workstationId;
+                        console.log(`Using member's stored workstationId: ${workstationId}`);
+                    }
+
+                    // If not available, try to find by workstation name
+                    if (!workstationId && member.workstation && this.workstations.length > 0) {
+                        const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
+                        workstationId = workstation?.Id_Workstation;
+                        if (workstationId) {
+                            console.log(`Found workstation by name: ${member.workstation} (ID: ${workstationId})`);
+                        }
+                    }
+
+                    // If still not found, use the first available workstation from the list
+                    if (!workstationId && this.workstations.length > 0) {
+                        workstationId = this.workstations[0].Id_Workstation;
+                        console.log(`Using default workstation: ${this.workstations[0].Name_Workstation} (ID: ${workstationId})`);
+                    }
+
+                    // If still no workstation, try to get it from the selected line
                     if (!workstationId) {
-                        console.warn('No workstation found for team assignment');
+                        const selectedLine = this.shiftSetupForm.get('productionLine')?.value;
+                        if (selectedLine?.id) {
+                            console.error(`Cannot save team assignment for employee ${member.Id_Emp}: No workstations loaded. Try loading workstations first.`);
+                            // Skip this assignment but don't block others
+                        } else {
+                            console.error(`Cannot save team assignment for employee ${member.Id_Emp}: No production line selected`);
+                        }
                         return;
                     }
 
@@ -729,16 +898,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         assignmentData.machine = member.machineId;
                     }
 
+                    console.log('Creating team assignment:', assignmentData);
+
                     this.productionService.createTeamAssignment(assignmentData).subscribe({
                         next: (response) => {
-                            console.log('Team assignment saved:', response);
+                            console.log('Team assignment saved successfully:', response);
                         },
                         error: (err) => {
                             // Silently handle duplicate errors (race condition)
                             if (err.status === 400 && err.error?.non_field_errors) {
                                 console.log('Team assignment already exists (race condition), skipping...');
                             } else {
-                                console.error('Error saving team assignment:', err.error);
+                                console.error('Error saving team assignment:', err.error || err);
                             }
                         }
                     });
@@ -747,18 +918,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
             error: (err) => {
                 console.error('Error fetching existing team assignments:', err);
                 // Fallback: try to create all assignments anyway
-                this.createAllTeamAssignments(hourlyProductionId);
+                this.createAllTeamAssignments(hourlyProductionId, teamToSave);
             }
         });
     }
 
-    private createAllTeamAssignments(hourlyProductionId: number): void {
-        // Use currentHourTeam if available, otherwise fallback to main team
-        const teamToCreate = this.currentHourTeam.length > 0
-            ? this.currentHourTeam
-            : this.teamState.team();
-
-        console.log('createAllTeamAssignments called. Team size:', teamToCreate.length);
+    private createAllTeamAssignments(hourlyProductionId: number, teamToCreate: EmployeeWithAssignment[]): void {
+        console.log('createAllTeamAssignments called. Production ID:', hourlyProductionId, 'Team size:', teamToCreate.length);
 
         if (teamToCreate.length === 0) {
             console.warn('No team members to create assignments for production:', hourlyProductionId);
@@ -766,10 +932,35 @@ export class ProductionComponent implements OnInit, OnDestroy {
         }
 
         teamToCreate.forEach(member => {
-            const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
-            const workstationId = workstation?.Id_Workstation || this.workstations[0]?.Id_Workstation;
+            // Find the workstation ID - prioritize stored ID, then name lookup, then default
+            let workstationId: number | undefined;
 
-            if (!workstationId) return;
+            // First use the stored workstationId from the member
+            if (member.workstationId) {
+                workstationId = member.workstationId;
+                console.log(`Using member's stored workstationId: ${workstationId}`);
+            }
+
+            // If not available, try to find by workstation name
+            if (!workstationId && member.workstation && this.workstations.length > 0) {
+                const workstation = this.workstations.find(w => w.Name_Workstation === member.workstation);
+                workstationId = workstation?.Id_Workstation;
+                if (workstationId) {
+                    console.log(`Found workstation by name: ${member.workstation} (ID: ${workstationId})`);
+                }
+            }
+
+            // If still not found, use the first available workstation from the list
+            if (!workstationId && this.workstations.length > 0) {
+                workstationId = this.workstations[0].Id_Workstation;
+                console.log(`Using default workstation: ${this.workstations[0].Name_Workstation} (ID: ${workstationId})`);
+            }
+
+            // If still no workstation, skip this assignment
+            if (!workstationId) {
+                console.error(`Cannot create team assignment for employee ${member.Id_Emp}: No workstation available`);
+                return;
+            }
 
             const assignmentData: any = {
                 hourly_production: hourlyProductionId,
@@ -784,7 +975,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
             this.productionService.createTeamAssignment(assignmentData).subscribe({
                 next: (response) => console.log('Team assignment saved:', response),
-                error: () => {} // Silently ignore duplicates
+                error: (err) => console.error('Error creating team assignment:', err.error || err)
             });
         });
     }
@@ -2099,38 +2290,31 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     Math.round((hour.scrap! / hour.scrapTarget) * 10000) / 100 : 0;
                 hour.status = 'completed';
 
-                // Save the per-hour team - use currentHourTeam if available, otherwise fallback to main team
-                const teamToSaveForHour = this.currentHourTeam.length > 0
-                    ? this.currentHourTeam
-                    : this.teamState.team();
+                // IMPORTANT: Capture the team BEFORE any async operations
+                // This prevents race conditions where closeHourDialog() clears currentHourTeam
+                const teamToSaveForHour: EmployeeWithAssignment[] = this.currentHourTeam.length > 0
+                    ? [...this.currentHourTeam] // Deep copy to preserve data
+                    : [...this.teamState.team()];
+
+                // Save to hour.team for UI display
                 hour.team = [...teamToSaveForHour];
 
                 // Save session to localStorage
                 this.saveSessionToStorage();
 
-                // Save team assignments for this hourly production
-                // Check both currentHourTeam and main team from state
-                const hasTeamToSave = this.currentHourTeam.length > 0 || this.teamState.team().length > 0;
                 console.log('Team save check:', {
                     hourlyProductionId: hour.hourlyProductionId,
                     typeofId: typeof hour.hourlyProductionId,
-                    hasTeamToSave,
-                    currentHourTeamLength: this.currentHourTeam.length,
-                    mainTeamLength: this.teamState.team().length
+                    teamToSaveLength: teamToSaveForHour.length,
+                    teamMembers: teamToSaveForHour.map(t => ({ id: t.Id_Emp, name: `${t.Prenom_Emp} ${t.Nom_Emp}` }))
                 });
 
-                // Accept both number and numeric string IDs
-                const prodId = typeof hour.hourlyProductionId === 'number'
-                    ? hour.hourlyProductionId
-                    : (typeof hour.hourlyProductionId === 'string' && !isNaN(Number(hour.hourlyProductionId))
-                        ? Number(hour.hourlyProductionId)
-                        : null);
-
-                if (prodId && hasTeamToSave) {
-                    console.log('Calling saveTeamAssignmentsForHour with ID:', prodId);
-                    this.saveTeamAssignmentsForHour(prodId);
+                // Save team assignments to database if there's team to save
+                if (teamToSaveForHour.length > 0) {
+                    // Pass the captured team to avoid race conditions
+                    this.fetchProductionIdThenSaveTeam(hour, teamToSaveForHour);
                 } else {
-                    console.warn('Skipping team assignment save:', { prodId, hasTeamToSave });
+                    console.warn('No team members to save for this hour');
                 }
 
                 // Save all downtimes (new ones without id, update ones with id)
@@ -2281,6 +2465,92 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     summary: 'Error',
                     detail: 'Failed to fetch production record'
                 });
+            }
+        });
+    }
+
+    /**
+     * Fetch the real production ID from backend and then save team assignments
+     * This handles the case where hourlyProductionId is a composite string or object
+     * @param hour - The hour production state
+     * @param teamToSave - The team to save (captured BEFORE async call to avoid race condition)
+     */
+    fetchProductionIdThenSaveTeam(hour: HourlyProductionState, teamToSave: EmployeeWithAssignment[]): void {
+        const productionData = hour.hourlyProductionId as any;
+
+        console.log('fetchProductionIdThenSaveTeam called with team size:', teamToSave.length);
+
+        if (teamToSave.length === 0) {
+            console.warn('No team to save for hour:', hour.hour);
+            return;
+        }
+
+        // Check if it's already a valid numeric ID
+        if (typeof productionData === 'number' && productionData > 0) {
+            this.saveTeamAssignmentsForHour(productionData, teamToSave);
+            return;
+        }
+
+        // Check if it's a numeric string
+        if (typeof productionData === 'string' && !isNaN(Number(productionData)) && Number(productionData) > 0) {
+            this.saveTeamAssignmentsForHour(Number(productionData), teamToSave);
+            return;
+        }
+
+        // It's a composite string like "2023-01-15_1_1" - need to fetch real ID
+        // Parse composite string if needed
+        let queryParams: any;
+
+        if (typeof productionData === 'string' && productionData.includes('_')) {
+            const parts = productionData.split('_');
+            if (parts.length >= 3) {
+                queryParams = {
+                    date: parts[0],
+                    shift: parseInt(parts[1]),
+                    hour: parseInt(parts[2]),
+                    partId: this.session.part?.Id_Part,
+                    lineId: this.session.productionLine?.id
+                };
+            }
+        } else if (typeof productionData === 'object' && productionData?.date) {
+            queryParams = {
+                date: productionData.date,
+                shift: productionData.shift,
+                hour: productionData.hour,
+                partId: this.session.part?.Id_Part,
+                lineId: this.session.productionLine?.id
+            };
+        }
+
+        if (!queryParams) {
+            console.error('Unable to parse production ID for team assignment:', productionData);
+            return;
+        }
+
+        console.log('Fetching production ID for team assignments:', queryParams);
+
+        // Fetch the production ID from backend
+        this.productionService.getHourlyProductions(queryParams).subscribe({
+            next: (productions: any[]) => {
+                if (productions && productions.length > 0) {
+                    const production = productions[0];
+                    const realId = production.id || production.Id_HourlyProd;
+
+                    if (realId) {
+                        console.log('Found real production ID for team assignment:', realId);
+                        // Update the hour's ID for future use
+                        hour.hourlyProductionId = realId;
+                        // Now save team assignments with the real ID and captured team
+                        this.saveTeamAssignmentsForHour(realId, teamToSave);
+                    } else {
+                        console.error('Production found but no ID extracted:', production);
+                    }
+                } else {
+                    console.error('No production found for team assignment:', queryParams);
+                }
+            },
+            error: (error) => {
+                console.error('Error fetching production ID for team assignment:', error);
             }
         });
     }
@@ -3050,7 +3320,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         return this.session.hours.map((hour, index) => ({
             'Heure': `H${index + 1}`,
             'Plage Horaire': hour.timeRange,
-            'Type': hour.hourType === 'normal' ? 'Normal' : (hour.hourType === 'setup' ? 'Setup' : (hour.hourType === 'break' ? 'Pause' : 'Extra Break')),
+            'Type': this.getHourTypeLabel(hour.hourType),
             'Statut': hour.status === 'completed' ? 'Termine' : (hour.status === 'in_progress' ? 'En cours' : 'Non demarre'),
             'Output': hour.output ?? '-',
             'Target': hour.target,
@@ -3267,7 +3537,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             const hourlyData = this.session.hours.map((hour, index) => [
                 `H${index + 1}`,
                 hour.timeRange,
-                hour.hourType === 'normal' ? 'Normal' : (hour.hourType === 'setup' ? 'Setup' : 'Pause'),
+                this.getHourTypeLabel(hour.hourType),
                 hour.status === 'completed' ? 'OK' : (hour.status === 'in_progress' ? 'En cours' : '-'),
                 hour.output?.toString() ?? '-',
                 hour.target.toString(),
