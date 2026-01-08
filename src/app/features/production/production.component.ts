@@ -725,17 +725,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
                             // Track for shift-level team
                             allEmployeeIds.add(empId);
 
-                            // Load employee details
+                            // Load employee details for additional fields (picture, qualification, etc.)
                             this.employeeService.getEmployee(empId).subscribe({
                                 next: (employee: any) => {
-                                    const workstation = this.workstations.find(w =>
-                                        w.Id_Workstation === (assignment.Id_Workstation || assignment.workstation)
-                                    );
+                                    // Parse employee name from assignment (format: "FirstName LastName")
+                                    const nameParts = (assignment.employee_name || '').split(' ');
+                                    const firstName = nameParts[0] || employee.first_name || employee.Prenom_Emp || '';
+                                    const lastName = nameParts.slice(1).join(' ') || employee.last_name || employee.Nom_Emp || '';
 
                                     const newMember: EmployeeWithAssignment = {
                                         Id_Emp: employee.id || employee.Id_Emp,
-                                        Nom_Emp: employee.last_name || employee.Nom_Emp || '',
-                                        Prenom_Emp: employee.first_name || employee.Prenom_Emp || '',
+                                        Nom_Emp: lastName,
+                                        Prenom_Emp: firstName,
                                         DateNaissance_Emp: employee.birth_date || employee.DateNaissance_Emp || new Date(),
                                         Genre_Emp: employee.gender || employee.Genre_Emp || 'M',
                                         Categorie_Emp: employee.category || employee.Categorie_Emp || 'operator',
@@ -743,9 +744,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                         Departement_Emp: employee.department || employee.Departement_Emp || 'Production',
                                         Picture: this.getEmployeePictureUrl(employee.picture || employee.Picture),
                                         EmpStatus: employee.status || employee.EmpStatus || 'active',
-                                        workstation: workstation?.Name_Workstation || 'Unknown',
-                                        qualification: employee.current_qualification || 'Not Qualified',
-                                        qualificationLevel: employee.current_qualification ? 1 : 0
+                                        // Use badge number from assignment (employee_id field) or employee data
+                                        BadgeNumber: assignment.employee_id || employee.badge_number || employee.BadgeNumber || employee.employee_id,
+                                        badgeId: assignment.employee_id || employee.badge_number || employee.BadgeNumber || employee.employee_id,
+                                        // Use workstation name directly from assignment
+                                        workstation: assignment.workstation_name || 'Unknown',
+                                        workstationId: assignment.Id_Workstation,
+                                        // Use machine data directly from assignment
+                                        machine: assignment.machine_name || undefined,
+                                        machineId: assignment.machine_id || undefined,
+                                        // Use qualification from employee data
+                                        qualification: employee.current_qualification || employee.current_qualification_name || 'Not Qualified',
+                                        qualificationLevel: employee.current_qualification_level || (employee.current_qualification ? 1 : 0)
                                     };
 
                                     // Add to hour-specific team (avoid duplicates)

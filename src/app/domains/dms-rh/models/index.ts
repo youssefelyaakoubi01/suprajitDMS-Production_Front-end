@@ -19,3 +19,6 @@ export * from './user.model';
 
 // Dashboard & Stats
 export * from './dashboard.model';
+
+// Presence & Working Hours (synced from Production)
+export * from './presence.model';

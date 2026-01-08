@@ -96,6 +96,12 @@ export const DMS_RH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/formateurs/formateurs-list.component').then(m => m.FormateursListComponent),
         title: 'Formateurs'
+    },
+    {
+        path: 'presences',
+        loadComponent: () =>
+            import('./features/presences/presences-list.component').then(m => m.PresencesListComponent),
+        title: 'Gestion des Présences'
     }
 ];
 

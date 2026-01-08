@@ -249,7 +249,15 @@ export class ProductionService {
                     Id_Assignment: a.id,
                     Id_Emp: a.employee?.id || a.employee,
                     Id_Workstation: a.workstation?.id || a.workstation,
-                    Id_HourlyProd: a.hourly_production
+                    Id_HourlyProd: a.hourly_production,
+                    // Include all backend fields for proper display
+                    employee_name: a.employee_name,
+                    employee_id: a.employee_id, // Badge number
+                    workstation_name: a.workstation_name,
+                    machine_id: a.machine,
+                    machine_name: a.machine_name,
+                    machine_code: a.machine_code,
+                    assigned_at: a.assigned_at
                 }));
             })
         );

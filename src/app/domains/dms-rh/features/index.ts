@@ -40,3 +40,6 @@ export * from './affectations';
 
 // Qualifications
 export * from './qualifications';
+
+// Presences (synced from Production)
+export * from './presences';

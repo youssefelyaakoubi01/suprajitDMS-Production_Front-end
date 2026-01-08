@@ -1092,6 +1092,7 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     searchTerm = signal('');
     selectedResult = signal<string | null>(null);
     badgeFilter = signal<string | null>(null);
+    badgeEmployeeId = signal<number | null>(null); // Employee ID found by badge search
     badgeScan = '';
 
     showQualificationDialog = false;
@@ -1112,22 +1113,55 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         const resultFilter = this.selectedResult();
         const badge = this.badgeFilter();
 
-        // Filter by badge (exact or partial match)
+        // Filter by badge - use employee ID from API search if available
+        const badgeEmpId = this.badgeEmployeeId();
         if (badge) {
-            const badgeLower = badge.toLowerCase();
-            result = result.filter(q =>
-                q.employee_badge?.toLowerCase().includes(badgeLower)
-            );
+            if (badgeEmpId) {
+                // We have the employee ID from badge search - filter by it
+                result = result.filter(q => q.employee === badgeEmpId);
+            } else {
+                // Fallback to text matching
+                const badgeLower = badge.toLowerCase().trim();
+                result = result.filter(q => {
+                    // Check employee_badge field
+                    if (q.employee_badge?.toLowerCase().includes(badgeLower)) {
+                        return true;
+                    }
+                    // Fallback: check if badge matches employee ID (as string)
+                    if (q.employee && String(q.employee).includes(badgeLower)) {
+                        return true;
+                    }
+                    // Check nested Employee object if available
+                    if (q.Employee?.BadgeNumber?.toLowerCase().includes(badgeLower)) {
+                        return true;
+                    }
+                    return false;
+                });
+            }
         }
 
         // Filter by search term (includes badge search as well)
         if (term) {
-            const termLower = term.toLowerCase();
-            result = result.filter(q =>
-                q.employee_name?.toLowerCase().includes(termLower) ||
-                q.formation_name?.toLowerCase().includes(termLower) ||
-                q.employee_badge?.toLowerCase().includes(termLower)
-            );
+            const termLower = term.toLowerCase().trim();
+            result = result.filter(q => {
+                // Search by name
+                if (q.employee_name?.toLowerCase().includes(termLower)) {
+                    return true;
+                }
+                // Search by formation name
+                if (q.formation_name?.toLowerCase().includes(termLower)) {
+                    return true;
+                }
+                // Search by badge
+                if (q.employee_badge?.toLowerCase().includes(termLower)) {
+                    return true;
+                }
+                // Fallback: search by employee ID
+                if (q.employee && String(q.employee).includes(termLower)) {
+                    return true;
+                }
+                return false;
+            });
         }
 
         // Filter by result
@@ -1200,15 +1234,39 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
 
     /**
      * Handle badge scan - triggered on Enter key or button click
+     * Searches for employee by badge via API, then filters qualifications
      */
     onBadgeScan(): void {
         if (this.badgeScan && this.badgeScan.trim()) {
-            this.badgeFilter.set(this.badgeScan.trim());
-            this.messageService.add({
-                severity: 'info',
-                summary: 'Filtre Badge',
-                detail: `Recherche par badge: ${this.badgeScan.trim()}`,
-                life: 2000
+            const badge = this.badgeScan.trim();
+            this.badgeFilter.set(badge);
+            this.badgeEmployeeId.set(null); // Reset while searching
+
+            // Try to find employee by badge via API
+            this.hrService.getEmployeeByBadge(badge).pipe(
+                takeUntil(this.destroy$)
+            ).subscribe({
+                next: (employee: any) => {
+                    const empId = employee.id || employee.Id_Emp;
+                    this.badgeEmployeeId.set(empId);
+                    const empName = employee.full_name || employee.first_name + ' ' + employee.last_name ||
+                                   employee.Prenom_Emp + ' ' + employee.Nom_Emp;
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Employé trouvé',
+                        detail: `${empName} (Badge: ${badge})`,
+                        life: 3000
+                    });
+                },
+                error: () => {
+                    // Employee not found by badge - use text filtering as fallback
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Badge non trouvé',
+                        detail: `Aucun employé avec le badge "${badge}". Recherche textuelle activée.`,
+                        life: 3000
+                    });
+                }
             });
         }
     }
@@ -1231,6 +1289,7 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     clearBadgeFilter(): void {
         this.badgeScan = '';
         this.badgeFilter.set(null);
+        this.badgeEmployeeId.set(null);
     }
 
     getRowClass(result: string): string {

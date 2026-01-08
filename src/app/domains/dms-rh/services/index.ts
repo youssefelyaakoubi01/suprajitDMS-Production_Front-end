@@ -9,3 +9,4 @@ export * from './formation.service';
 export * from './license.service';
 export * from './dashboard.service';
 export * from './export.service';
+export * from './presence.service';
