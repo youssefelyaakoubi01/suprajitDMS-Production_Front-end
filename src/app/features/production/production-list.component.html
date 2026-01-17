@@ -63,6 +63,8 @@
                     optionLabel="Name_Project"
                     placeholder="All projects"
                     [showClear]="true"
+                    [filter]="true"
+                    filterPlaceholder="Search projects..."
                     (onChange)="onFilterChange()"
                     [style]="{ width: '200px' }"></p-select>
             </div>
@@ -74,8 +76,9 @@
                     optionLabel="name"
                     placeholder="All lines"
                     [showClear]="true"
-                    [disabled]="!filterProject"
-                    (onChange)="onFilterChange()"
+                    [filter]="true"
+                    filterPlaceholder="Search lines..."
+                    (onChange)="onLineFilterChange()"
                     [style]="{ width: '200px' }"></p-select>
             </div>
 
@@ -86,7 +89,8 @@
                     optionLabel="PN_Part"
                     placeholder="All parts"
                     [showClear]="true"
-                    [disabled]="!filterProject"
+                    [filter]="true"
+                    filterPlaceholder="Search parts..."
                     (onChange)="onFilterChange()"
                     [style]="{ width: '200px' }"></p-select>
             </div>
@@ -182,13 +186,20 @@
                                 [rounded]="true"
                                 [text]="true"
                                 severity="secondary"
-                                pTooltip="View Details"
+                                pTooltip="Quick Preview"
+                                (onClick)="openDetailPreview(production)"></p-button>
+                            <p-button
+                                icon="pi pi-external-link"
+                                [rounded]="true"
+                                [text]="true"
+                                severity="info"
+                                pTooltip="Open Full Page"
                                 (onClick)="viewDetails(production)"></p-button>
                             <p-button
                                 icon="pi pi-pencil"
                                 [rounded]="true"
                                 [text]="true"
-                                severity="info"
+                                severity="warn"
                                 pTooltip="Edit"
                                 (onClick)="editProduction(production)"></p-button>
                             <p-button
@@ -221,6 +232,182 @@
         </p-table>
     </p-card>
 </div>
+
+<!-- Production Detail Preview Drawer -->
+<p-drawer
+    [(visible)]="showDetailDrawer"
+    position="right"
+    [style]="{ width: '450px' }"
+    (onHide)="closeDetailPreview()">
+
+    <ng-template pTemplate="header">
+        <div class="flex align-items-center gap-2">
+            <i class="pi pi-chart-bar text-xl"></i>
+            <span class="font-semibold text-lg">Production Details</span>
+        </div>
+    </ng-template>
+
+    <div *ngIf="selectedProduction" class="detail-drawer-content p-3">
+        <!-- Header Info -->
+        <div class="mb-4">
+            <div class="flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h3 class="m-0 text-lg font-semibold">{{ selectedProduction.projectName || 'N/A' }}</h3>
+                    <p class="m-0 text-sm text-color-secondary">{{ selectedProduction.lineName || 'N/A' }}</p>
+                </div>
+                <p-tag [value]="(selectedProduction.efficiency || 0) + '%'"
+                       [severity]="getEfficiencySeverity(selectedProduction.efficiency || 0)">
+                </p-tag>
+            </div>
+
+            <div class="grid">
+                <div class="col-6">
+                    <span class="text-sm text-color-secondary">Date</span>
+                    <p class="m-0 font-medium">{{ selectedProduction.Date_HourlyProd | date:'dd/MM/yyyy' }}</p>
+                </div>
+                <div class="col-6">
+                    <span class="text-sm text-color-secondary">Shift</span>
+                    <p class="m-0 font-medium">{{ selectedProduction.shiftName || selectedProduction.Shift_HourlyProd }}</p>
+                </div>
+                <div class="col-6">
+                    <span class="text-sm text-color-secondary">Part</span>
+                    <p class="m-0 font-medium">{{ selectedProduction.partNumber || 'N/A' }}</p>
+                </div>
+                <div class="col-6">
+                    <span class="text-sm text-color-secondary">Hour</span>
+                    <p class="m-0 font-medium">H{{ selectedProduction.Hour_HourlyProd }}</p>
+                </div>
+            </div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <!-- Output Summary -->
+        <div class="mb-4">
+            <h4 class="mt-0 mb-3"><i class="pi pi-box mr-2"></i>Output</h4>
+            <div class="grid text-center">
+                <div class="col-4">
+                    <div class="text-2xl font-bold text-primary">{{ selectedProduction.Result_HourlyProdPN }}</div>
+                    <div class="text-sm text-color-secondary">Output</div>
+                </div>
+                <div class="col-4">
+                    <div class="text-2xl font-bold">{{ selectedProduction.Target_HourlyProdPN }}</div>
+                    <div class="text-sm text-color-secondary">Target</div>
+                </div>
+                <div class="col-4">
+                    <div class="text-2xl font-bold">{{ selectedProduction.efficiency || 0 }}%</div>
+                    <div class="text-sm text-color-secondary">Efficiency</div>
+                </div>
+            </div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <!-- Accordions for Details -->
+        <p-accordion [multiple]="true" [value]="['0', '1', '2']">
+            <!-- Team Members -->
+            <p-accordion-panel value="0">
+                <p-accordion-header>
+                    <div class="flex align-items-center gap-2">
+                        <i class="pi pi-users"></i>
+                        <span>Team Members</span>
+                        <p-tag [value]="detailTeamMembers.length.toString()" severity="info" class="ml-2"></p-tag>
+                    </div>
+                </p-accordion-header>
+                <p-accordion-content>
+                    <div *ngIf="isLoadingDetails">
+                        <p-skeleton height="2rem" class="mb-2"></p-skeleton>
+                        <p-skeleton height="2rem" class="mb-2"></p-skeleton>
+                    </div>
+
+                    <div *ngIf="!isLoadingDetails && detailTeamMembers.length === 0" class="text-center text-color-secondary p-3">
+                        <i class="pi pi-info-circle mr-2"></i>No team assignments
+                    </div>
+
+                    <div *ngFor="let member of detailTeamMembers" class="flex align-items-center gap-2 p-2 border-bottom-1 surface-border">
+                        <p-avatar icon="pi pi-user" shape="circle"></p-avatar>
+                        <div>
+                            <div class="font-medium">{{ member.name }}</div>
+                            <div class="text-sm text-color-secondary">{{ member.workstation }} | {{ member.badge }}</div>
+                        </div>
+                    </div>
+                </p-accordion-content>
+            </p-accordion-panel>
+
+            <!-- Downtimes -->
+            <p-accordion-panel value="1">
+                <p-accordion-header>
+                    <div class="flex align-items-center gap-2">
+                        <i class="pi pi-exclamation-triangle"></i>
+                        <span>Downtimes</span>
+                        <p-tag [value]="totalDowntime + ' min'" [severity]="totalDowntime > 0 ? 'warn' : 'success'" class="ml-2"></p-tag>
+                    </div>
+                </p-accordion-header>
+                <p-accordion-content>
+                    <div *ngIf="detailDowntimes.length === 0" class="text-center text-color-secondary p-3">
+                        <i class="pi pi-check-circle text-green-500 mr-2"></i>No downtimes
+                    </div>
+
+                    <div *ngFor="let dt of detailDowntimes" class="flex justify-content-between align-items-center p-2 border-bottom-1 surface-border">
+                        <div>
+                            <div class="font-medium">{{ dt.problem }}</div>
+                            <div class="text-sm text-color-secondary">{{ dt.comment || '-' }}</div>
+                        </div>
+                        <p-tag [value]="dt.duration + ' min'" severity="warn"></p-tag>
+                    </div>
+                </p-accordion-content>
+            </p-accordion-panel>
+
+            <!-- Shift Breakdown -->
+            <p-accordion-panel value="2">
+                <p-accordion-header>
+                    <div class="flex align-items-center gap-2">
+                        <i class="pi pi-clock"></i>
+                        <span>Shift Breakdown</span>
+                        <p-tag [value]="detailHourlyData.length + ' hours'" severity="secondary" class="ml-2"></p-tag>
+                    </div>
+                </p-accordion-header>
+                <p-accordion-content>
+                    <div *ngIf="detailHourlyData.length > 0" class="p-2 surface-100 border-round mb-3">
+                        <div class="grid text-center">
+                            <div class="col-4">
+                                <div class="font-bold">{{ shiftTotals.output }}</div>
+                                <div class="text-xs">Total Output</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="font-bold">{{ shiftTotals.target }}</div>
+                                <div class="text-xs">Total Target</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="font-bold">{{ shiftTotals.efficiency }}%</div>
+                                <div class="text-xs">Shift Eff.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div *ngIf="detailHourlyData.length === 0" class="text-center text-color-secondary p-3">
+                        <i class="pi pi-info-circle mr-2"></i>No hourly data available
+                    </div>
+
+                    <div *ngFor="let h of detailHourlyData" class="mb-2">
+                        <div class="flex justify-content-between text-sm mb-1">
+                            <span>H{{ h.hour }}</span>
+                            <span>{{ h.output }}/{{ h.target }} ({{ h.efficiency }}%)</span>
+                        </div>
+                        <p-progressBar [value]="h.efficiency" [showValue]="false" styleClass="h-1rem"></p-progressBar>
+                    </div>
+                </p-accordion-content>
+            </p-accordion-panel>
+        </p-accordion>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <div class="flex gap-2">
+            <p-button label="Edit" icon="pi pi-pencil" (onClick)="editProduction(selectedProduction!)" class="flex-1"></p-button>
+            <p-button label="Full Page" icon="pi pi-external-link" [outlined]="true" (onClick)="goToFullPage()" class="flex-1"></p-button>
+        </div>
+    </ng-template>
+</p-drawer>
 
 <p-toast position="top-right"></p-toast>
 <p-confirmDialog></p-confirmDialog>

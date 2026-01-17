@@ -21,9 +21,8 @@ import { ProductionService } from '../../../core/services/production.service';
 interface Workstation {
     id?: number;
     name: string;
-    code: string;
-    production_line: number;
-    production_line_name?: string;
+    project: number;
+    project_name?: string;
     description?: string;
     machines_count?: number;
     is_active: boolean;
@@ -91,9 +90,8 @@ interface Workstation {
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
                         <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
-                        <th>Production Line</th>
+                        <th>Project</th>
                         <th style="width: 120px">Machines</th>
                         <th style="width: 100px">Status</th>
                         <th style="width: 150px">Actions</th>
@@ -103,10 +101,9 @@ interface Workstation {
                 <ng-template pTemplate="body" let-ws>
                     <tr>
                         <td>{{ ws.id }}</td>
-                        <td><strong class="text-primary">{{ ws.code }}</strong></td>
                         <td>{{ ws.name }}</td>
                         <td>
-                            <p-tag [value]="ws.production_line_name || getLineName(ws.production_line)" severity="info"></p-tag>
+                            <p-tag [value]="ws.project_name || getProjectName(ws.project)" severity="info"></p-tag>
                         </td>
                         <td class="text-center">
                             <p-badge [value]="ws.machines_count || 0" severity="secondary"></p-badge>
@@ -136,7 +133,7 @@ interface Workstation {
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="7" class="text-center p-4">
+                        <td colspan="6" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No workstations found.</span>
                         </td>
@@ -156,30 +153,17 @@ interface Workstation {
             <ng-template pTemplate="content">
                 <div class="form-grid">
                     <div class="form-field">
-                        <label for="productionLine">Production Line <span class="required">*</span></label>
+                        <label for="project">Project <span class="required">*</span></label>
                         <p-select
-                            id="productionLine"
-                            [(ngModel)]="workstation.production_line"
-                            [options]="productionLines"
+                            id="project"
+                            [(ngModel)]="workstation.project"
+                            [options]="projects"
                             optionLabel="name"
                             optionValue="id"
-                            placeholder="Select Production Line"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !workstation.production_line}">
+                            placeholder="Select Project"
+                            [ngClass]="{'ng-invalid ng-dirty': submitted && !workstation.project}">
                         </p-select>
-                        <small class="error-message" *ngIf="submitted && !workstation.production_line">Production line is required.</small>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="code">Code <span class="required">*</span></label>
-                        <input
-                            type="text"
-                            pInputText
-                            id="code"
-                            [(ngModel)]="workstation.code"
-                            required
-                            placeholder="e.g., WS001"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !workstation.code}" />
-                        <small class="error-message" *ngIf="submitted && !workstation.code">Code is required.</small>
+                        <small class="error-message" *ngIf="submitted && !workstation.project">Project is required.</small>
                     </div>
 
                     <div class="form-field">
@@ -227,7 +211,7 @@ interface Workstation {
 })
 export class WorkstationsComponent implements OnInit {
     workstations: Workstation[] = [];
-    productionLines: any[] = [];
+    projects: any[] = [];
     workstation: Partial<Workstation> = {};
 
     wsDialog = false;
@@ -248,11 +232,11 @@ export class WorkstationsComponent implements OnInit {
     loadData(): void {
         this.loading = true;
 
-        this.productionService.getProductionLines().subscribe({
+        this.productionService.getProjects().subscribe({
             next: (data: any) => {
-                this.productionLines = (data.results || data).map((l: any) => ({
-                    id: l.id,
-                    name: l.name
+                this.projects = (data.results || data).map((p: any) => ({
+                    id: p.id,
+                    name: p.name
                 }));
             }
         });
@@ -269,15 +253,14 @@ export class WorkstationsComponent implements OnInit {
         });
     }
 
-    getLineName(lineId: number): string {
-        return this.productionLines.find(l => l.id === lineId)?.name || 'Unknown';
+    getProjectName(projectId: number): string {
+        return this.projects.find(p => p.id === projectId)?.name || 'Unknown';
     }
 
     openNew(): void {
         this.workstation = {
-            code: '',
             name: '',
-            production_line: undefined,
+            project: undefined,
             description: '',
             is_active: true
         };
@@ -301,7 +284,7 @@ export class WorkstationsComponent implements OnInit {
     saveWorkstation(): void {
         this.submitted = true;
 
-        if (!this.workstation.code || !this.workstation.name || !this.workstation.production_line) {
+        if (!this.workstation.name || !this.workstation.project) {
             this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Please fill all required fields' });
             return;
         }

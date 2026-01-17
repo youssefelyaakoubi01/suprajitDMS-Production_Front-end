@@ -31,8 +31,10 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { MessageService, ConfirmationService } from 'primeng/api';
 
 import { HRService } from '@core/services/hr.service';
+import { ProductionService } from '@core/services/production.service';
 import { QualificationStateService } from '@core/state/qualification-state.service';
 import { Qualification, Employee, Formation, Formateur } from '@core/models/employee.model';
+import { Project, Workstation } from '@core/models/production.model';
 import { environment } from '../../../../../environments/environment';
 import { EmployeeAutocompleteComponent } from '@shared/components/employee-autocomplete/employee-autocomplete.component';
 
@@ -365,6 +367,27 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                         </app-employee-autocomplete>
                     </div>
                 </div>
+                <div class="form-row two-cols">
+                    <div class="form-group">
+                        <label><i class="pi pi-briefcase"></i> Projet</label>
+                        <p-select formControlName="project" [options]="projects"
+                                  optionLabel="name" optionValue="id" [filter]="true"
+                                  placeholder="Sélectionner un projet"
+                                  [showClear]="true"
+                                  (onChange)="onProjectChange($event.value)"
+                                  appendTo="body"
+                                  styleClass="w-full"></p-select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="pi pi-sitemap"></i> Poste</label>
+                        <p-select formControlName="poste" [options]="filteredWorkstations"
+                                  optionLabel="name" optionValue="id" [filter]="true"
+                                  placeholder="Sélectionner un poste"
+                                  [showClear]="true"
+                                  appendTo="body"
+                                  styleClass="w-full"></p-select>
+                    </div>
+                </div>
                 <div class="form-row">
                     <div class="form-group full">
                         <label><i class="pi pi-book"></i> Formation *</label>
@@ -373,18 +396,6 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                                   placeholder="Sélectionner une formation"
                                   appendTo="body"
                                   styleClass="w-full"></p-select>
-                    </div>
-                </div>
-                <div class="form-row two-cols">
-                    <div class="form-group">
-                        <label><i class="pi pi-calendar"></i> Date de début *</label>
-                        <p-datepicker formControlName="start_date" [showIcon]="true"
-                                      dateFormat="dd/mm/yy" appendTo="body" styleClass="w-full"></p-datepicker>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="pi pi-calendar-times"></i> Date de fin *</label>
-                        <p-datepicker formControlName="end_date" [showIcon]="true"
-                                      dateFormat="dd/mm/yy" appendTo="body" styleClass="w-full"></p-datepicker>
                     </div>
                 </div>
                 <div class="form-row two-cols">
@@ -404,6 +415,18 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                                   placeholder="Sélectionner le résultat"
                                   appendTo="body"
                                   styleClass="w-full"></p-select>
+                    </div>
+                </div>
+                <div class="form-row two-cols">
+                    <div class="form-group">
+                        <label><i class="pi pi-calendar"></i> Date de début *</label>
+                        <p-datepicker formControlName="start_date" [showIcon]="true"
+                                      dateFormat="dd/mm/yy" appendTo="body" styleClass="w-full"></p-datepicker>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="pi pi-calendar-times"></i> Date de fin *</label>
+                        <p-datepicker formControlName="end_date" [showIcon]="true"
+                                      dateFormat="dd/mm/yy" appendTo="body" styleClass="w-full"></p-datepicker>
                     </div>
                 </div>
             </form>
@@ -1086,6 +1109,9 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
 
     formations: Formation[] = [];
     formateurs: Formateur[] = [];
+    projects: Project[] = [];
+    workstations: Workstation[] = [];
+    filteredWorkstations: Workstation[] = [];
     loading = false;
 
     // Use signals for reactive filtering
@@ -1176,6 +1202,7 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
 
     constructor(
         private hrService: HRService,
+        private productionService: ProductionService,
         private fb: FormBuilder,
         private messageService: MessageService,
         private confirmationService: ConfirmationService
@@ -1195,11 +1222,13 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     private initForm(): void {
         this.qualificationForm = this.fb.group({
             employee: [null, Validators.required],
+            project: [null],
+            poste: [null],
             formation: [null, Validators.required],
-            start_date: [null, Validators.required],
-            end_date: [null, Validators.required],
             trainer: [null],
-            test_result: ['pending', Validators.required]
+            test_result: ['pending', Validators.required],
+            start_date: [null, Validators.required],
+            end_date: [null, Validators.required]
         });
     }
 
@@ -1208,14 +1237,37 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         forkJoin({
             qualifications: this.hrService.getQualifications().pipe(catchError(() => of([]))),
             formations: this.hrService.getFormations().pipe(catchError(() => of([]))),
-            formateurs: this.hrService.getFormateurs().pipe(catchError(() => of([])))
+            formateurs: this.hrService.getFormateurs().pipe(catchError(() => of([]))),
+            projects: this.productionService.getProjects().pipe(catchError(() => of([]))),
+            workstations: this.productionService.getWorkstations().pipe(catchError(() => of([])))
         }).pipe(takeUntil(this.destroy$)).subscribe({
             next: (data) => {
                 this.formations = data.formations;
                 this.formateurs = data.formateurs;
+                this.projects = data.projects;
+                this.workstations = data.workstations;
+                this.filteredWorkstations = data.workstations;
                 this.loading = false;
             }
         });
+    }
+
+    /**
+     * Filter workstations when project changes
+     * Uses direct Workstation → Project relation for simplified filtering
+     */
+    onProjectChange(projectId: number | null): void {
+        if (projectId) {
+            // Direct filtering by project (no need to load production lines)
+            this.filteredWorkstations = this.workstations.filter(
+                w => w.project === projectId
+            );
+        } else {
+            // No project selected - show all workstations
+            this.filteredWorkstations = this.workstations;
+        }
+        // Reset poste when project changes
+        this.qualificationForm.get('poste')?.setValue(null);
     }
 
     getResultCount(result: string): number {
@@ -1353,6 +1405,8 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     openNewQualificationDialog(): void {
         this.editingQualification = null;
         this.qualificationForm.reset({ test_result: 'pending' });
+        // Reset workstations filter to show all
+        this.filteredWorkstations = this.workstations;
         this.showQualificationDialog = true;
     }
 
@@ -1362,16 +1416,31 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         console.log('qual.end_date:', qual.end_date, 'type:', typeof qual.end_date);
 
         this.editingQualification = qual;
+
+        // If a project is defined, filter workstations using direct project relation
+        if (qual.project) {
+            this.filteredWorkstations = this.workstations.filter(
+                w => w.project === qual.project
+            );
+        } else {
+            this.filteredWorkstations = this.workstations;
+        }
+        this.patchQualificationForm(qual);
+        this.showQualificationDialog = true;
+    }
+
+    private patchQualificationForm(qual: Qualification): void {
         this.qualificationForm.patchValue({
             employee: qual.employee,
+            project: qual.project,
+            poste: qual.poste,
             formation: qual.formation,
-            start_date: qual.start_date ? new Date(qual.start_date as string) : null,
-            end_date: qual.end_date ? new Date(qual.end_date as string) : null,
             trainer: qual.trainer,
-            test_result: qual.test_result
+            test_result: qual.test_result,
+            start_date: qual.start_date ? new Date(qual.start_date as string) : null,
+            end_date: qual.end_date ? new Date(qual.end_date as string) : null
         });
         console.log('Form value after patch:', this.qualificationForm.value);
-        this.showQualificationDialog = true;
     }
 
     saveQualification(): void {
@@ -1389,6 +1458,8 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         // Prepare payload with correct field names and formats
         const payload: any = {
             employee: formValue.employee,
+            project: formValue.project || null,
+            poste: formValue.poste || null,
             formation: formValue.formation,
             start_date: formatDate(formValue.start_date),
             end_date: formatDate(formValue.end_date),

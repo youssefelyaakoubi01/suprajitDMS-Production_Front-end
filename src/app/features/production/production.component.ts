@@ -1,7 +1,7 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { interval, Subscription, forkJoin } from 'rxjs';
 import { CardModule } from 'primeng/card';
 import { SelectModule } from 'primeng/select';
@@ -20,7 +20,16 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageModule } from 'primeng/message';
 import { CheckboxModule } from 'primeng/checkbox';
 import { TooltipModule } from 'primeng/tooltip';
-import { MessageService } from 'primeng/api';
+import { MessageService, ConfirmationService } from 'primeng/api';
+// New PrimeNG UX improvement imports
+import { StepperModule } from 'primeng/stepper';
+import { SkeletonModule } from 'primeng/skeleton';
+import { FloatLabelModule } from 'primeng/floatlabel';
+import { DrawerModule } from 'primeng/drawer';
+import { MeterGroupModule } from 'primeng/metergroup';
+import { ConfirmPopupModule } from 'primeng/confirmpopup';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { ProductionService } from './production.service';
 import { EmployeeService } from '../../core/services/employee.service';
 import { HRService } from '../../core/services/hr.service';
@@ -43,7 +52,9 @@ import {
     HourProductionInput,
     DowntimeExtended,
     HourStatus,
-    HourType
+    HourType,
+    WorkflowStep,
+    MeterItem
 } from '../../core/models/production-session.model';
 import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '../../core/models/employee.model';
 import { environment } from '../../../environments/environment';
@@ -78,9 +89,18 @@ import { saveAs } from 'file-saver';
         ProgressBarModule,
         MessageModule,
         CheckboxModule,
-        TooltipModule
+        TooltipModule,
+        // New UX improvement modules
+        StepperModule,
+        SkeletonModule,
+        FloatLabelModule,
+        DrawerModule,
+        MeterGroupModule,
+        ConfirmPopupModule,
+        IconFieldModule,
+        InputIconModule
     ],
-    providers: [MessageService],
+    providers: [MessageService, ConfirmationService],
     templateUrl: './production.component.html',
     styleUrls: ['./production.component.scss']
 })
@@ -202,6 +222,31 @@ export class ProductionComponent implements OnInit, OnDestroy {
     // Shift Report Dialog
     showShiftReportDialog = false;
 
+    // ========== UX IMPROVEMENTS ==========
+    // Stepper Navigation (workflow steps: 1=Setup, 2=Team, 3=Tracker)
+    currentStep: WorkflowStep = 1;
+
+    // Loading States for Skeleton
+    isLoadingReferenceData = true;
+    isLoadingTeamData = false;
+    isLoadingHourData = false;
+
+    // Mobile/Tablet Detection
+    isMobileView = false;
+    private readonly MOBILE_BREAKPOINT = 768;
+    private readonly TABLET_BREAKPOINT = 1024;
+
+    // Hour Production Drawer (mobile alternative to dialog)
+    showHourDrawer = false;
+
+    // Quick Entry Mode
+    showQuickEntryForHour: number | null = null;
+
+    // Smart Team Confirmation (auto-confirm after H1)
+    showTeamModifyButton = false;
+
+    // ========== END UX IMPROVEMENTS ==========
+
     // Real-time tracking
     currentTime: Date = new Date();
     hourProgress = 0;
@@ -256,11 +301,231 @@ export class ProductionComponent implements OnInit, OnDestroy {
     constructor(
         private fb: FormBuilder,
         private route: ActivatedRoute,
+        private router: Router,
         private productionService: ProductionService,
         private employeeService: EmployeeService,
         private hrService: HRService,
-        private messageService: MessageService
-    ) {}
+        private messageService: MessageService,
+        private confirmationService: ConfirmationService
+    ) {
+        // Initialize mobile detection
+        this.checkMobileView();
+    }
+
+    // ========== UX IMPROVEMENT METHODS ==========
+
+    /**
+     * Listen for window resize to detect mobile/tablet view
+     */
+    @HostListener('window:resize', ['$event'])
+    onResize(): void {
+        this.checkMobileView();
+    }
+
+    /**
+     * Check if current viewport is mobile or tablet
+     */
+    private checkMobileView(): void {
+        if (typeof window !== 'undefined') {
+            this.isMobileView = window.innerWidth <= this.TABLET_BREAKPOINT;
+        }
+    }
+
+    /**
+     * Get efficiency meter data for MeterGroup visualization
+     */
+    get efficiencyMeterData(): MeterItem[] {
+        const efficiency = this.shiftOverallEfficiency;
+        let color = '#EF4444'; // danger red
+        if (efficiency >= 95) {
+            color = '#10B981'; // success green
+        } else if (efficiency >= 80) {
+            color = '#F59E0B'; // warning amber
+        }
+        return [{ label: 'Efficiency', value: efficiency, color }];
+    }
+
+    /**
+     * Navigate to a specific workflow step
+     */
+    goToStep(step: WorkflowStep): void {
+        // Only allow forward navigation if previous steps are complete
+        if (step === 2 && !this.session.isSetupComplete) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Setup Required',
+                detail: 'Please complete shift setup first'
+            });
+            return;
+        }
+        if (step === 3 && !this.session.isTeamComplete) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Team Required',
+                detail: 'Please assign team members first'
+            });
+            return;
+        }
+        this.currentStep = step;
+    }
+
+    /**
+     * Update step based on session state
+     */
+    updateCurrentStep(): void {
+        if (this.session.isSetupComplete && this.session.isTeamComplete) {
+            this.currentStep = 3;
+        } else if (this.session.isSetupComplete) {
+            this.currentStep = 2;
+        } else {
+            this.currentStep = 1;
+        }
+    }
+
+    /**
+     * Toggle quick entry mode for a specific hour
+     */
+    toggleQuickEntry(hourIndex: number): void {
+        if (this.showQuickEntryForHour === hourIndex) {
+            this.showQuickEntryForHour = null;
+        } else {
+            this.showQuickEntryForHour = hourIndex;
+            // Initialize quick output value
+            if (this.session.hours[hourIndex]) {
+                this.session.hours[hourIndex].quickOutput = this.session.hours[hourIndex].output;
+                this.session.hours[hourIndex].quickEntryMode = true;
+            }
+        }
+    }
+
+    /**
+     * Quick save hour production (simplified flow)
+     */
+    quickSaveHour(hourIndex: number): void {
+        const hour = this.session.hours[hourIndex];
+        if (!hour || hour.quickOutput === null || hour.quickOutput === undefined) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Invalid Input',
+                detail: 'Please enter an output value'
+            });
+            return;
+        }
+
+        // Use quick entry values
+        hour.output = hour.quickOutput;
+        hour.scrap = 0;
+        hour.efficiency = hour.target > 0 ? Math.round((hour.output / hour.target) * 100) : 0;
+        hour.status = 'completed';
+        hour.quickEntryMode = false;
+
+        // Copy team from previous hour or initial team
+        if (hourIndex > 0 && this.session.hours[hourIndex - 1]?.team?.length > 0) {
+            hour.team = [...this.session.hours[hourIndex - 1].team];
+        } else {
+            hour.team = [...this.team];
+        }
+
+        this.showQuickEntryForHour = null;
+
+        // Save to backend
+        this.saveHourProductionToBackend(hourIndex, hour.output, 0, []);
+    }
+
+    /**
+     * Open full dialog from quick entry mode
+     */
+    openFullDialogFromQuickEntry(hourIndex: number): void {
+        this.showQuickEntryForHour = null;
+        if (this.session.hours[hourIndex]) {
+            this.session.hours[hourIndex].quickEntryMode = false;
+        }
+        this.openHourDialog(hourIndex);
+    }
+
+    /**
+     * Open hour drawer for mobile view
+     */
+    openHourDrawer(hourIndex: number): void {
+        this.selectedHourIndex = hourIndex;
+        this.initializeHourDialogData(hourIndex);
+        this.initializeHourTeam(hourIndex);
+        this.showHourDrawer = true;
+    }
+
+    /**
+     * Close hour drawer
+     */
+    closeHourDrawer(): void {
+        this.showHourDrawer = false;
+        this.resetHourDialogState();
+    }
+
+    /**
+     * Initialize hour dialog data (shared between dialog and drawer)
+     */
+    private initializeHourDialogData(hourIndex: number): void {
+        const hour = this.session.hours[hourIndex];
+        if (hour) {
+            this.hourProductionInput = {
+                output: hour.output || 0,
+                scrap: hour.scrap || 0,
+                hasDowntime: hour.totalDowntime > 0,
+                downtimes: hour.downtimes.map(dt => ({
+                    id: dt.id || dt.Id_Downtime,
+                    duration: dt.Total_Downtime,
+                    problemId: dt.Id_DowntimeProblems,
+                    machineId: dt.machine,
+                    comment: dt.Comment_Downtime
+                }))
+            };
+        }
+    }
+
+    /**
+     * Reset hour dialog state
+     */
+    private resetHourDialogState(): void {
+        this.hourProductionInput = {
+            output: 0,
+            scrap: 0,
+            hasDowntime: false,
+            downtimes: []
+        };
+        this.teamConfirmed = false;
+        this.showTeamConfirmationStep = true;
+        this.showTeamModifyButton = false;
+        this.showAddDowntimeForm = false;
+        this.editingDowntimeDialogIndex = null;
+    }
+
+    /**
+     * Get hour status label for mobile card view
+     */
+    getHourStatusLabelMobile(status: HourStatus): string {
+        const labels: Record<HourStatus, string> = {
+            'not_started': 'Not Started',
+            'in_progress': 'In Progress',
+            'completed': 'Completed'
+        };
+        return labels[status] || status;
+    }
+
+    /**
+     * Save hour production to backend (shared method)
+     */
+    private saveHourProductionToBackend(hourIndex: number, output: number, scrap: number, downtimes: any[]): void {
+        // This method will be called by both quick save and full dialog save
+        // Implementation is already in saveHourProduction method
+        this.selectedHourIndex = hourIndex;
+        this.hourProductionInput.output = output;
+        this.hourProductionInput.scrap = scrap;
+        this.hourProductionInput.downtimes = downtimes;
+        // Trigger existing save logic
+        // Note: The actual save is handled by the existing saveHourProduction method
+    }
+
+    // ========== END UX IMPROVEMENT METHODS ==========
 
     ngOnInit(): void {
         this.initForms();
@@ -488,6 +753,25 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     // This properly populates both hour.team and session.team
                     const headcount = productions[0].HC_HourlyProdPN || 0;
                     this.loadTeamAssignmentsPerHour(productions, headcount);
+                } else {
+                    // No productions found - preserve team from localStorage/session
+                    console.log('No productions found in DB - preserving existing team');
+                    if (this.session.team && this.session.team.length > 0) {
+                        // Team already restored from localStorage, ensure teamState is in sync
+                        if (this.teamState.team().length === 0) {
+                            console.log('Syncing session.team to teamState:', this.session.team.length, 'members');
+                            this.teamState.setTeam(this.session.team);
+                        }
+                        this.session.isTeamComplete = true;
+                    } else {
+                        // Try loading from localStorage as fallback
+                        const localStorageTeam = this.teamState.loadFromLocalStorage();
+                        if (localStorageTeam && localStorageTeam.length > 0) {
+                            console.log('Restored team from localStorage:', localStorageTeam.length, 'members');
+                            this.session.team = localStorageTeam;
+                            this.session.isTeamComplete = true;
+                        }
+                    }
                 }
 
                 // Open the selected hour dialog if in edit mode
@@ -798,6 +1082,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         }
 
         console.log(`Team loading complete: ${totalAssignmentsFound} total assignments found, headcount was ${headcount}`);
+        console.log(`Current session.team length: ${this.session.team?.length || 0}, teamState length: ${this.teamState.team().length}`);
 
         if (totalAssignmentsFound === 0 && headcount > 0) {
             // No team assignments in database but headcount was recorded
@@ -823,6 +1108,26 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     detail: `This production was recorded with ${headcount} team members, but individual assignments were not saved. You can re-assign the team if needed.`,
                     life: 8000
                 });
+            }
+        } else if (totalAssignmentsFound === 0 && headcount === 0) {
+            // No team assignments in DB and no headcount recorded
+            // Preserve existing team from session/localStorage if available
+            if (this.session.team && this.session.team.length > 0) {
+                console.log('Preserving existing session team:', this.session.team.length, 'members');
+                // Ensure teamState is in sync
+                if (this.teamState.team().length === 0) {
+                    this.teamState.setTeam(this.session.team);
+                }
+                this.session.isTeamComplete = true;
+            } else {
+                // Try to load from localStorage as fallback
+                const localStorageTeam = this.teamState.loadFromLocalStorage();
+                if (localStorageTeam && localStorageTeam.length > 0) {
+                    console.log('No DB or session team, restored from localStorage:', localStorageTeam.length, 'members');
+                    this.session.team = localStorageTeam;
+                    this.session.isTeamComplete = true;
+                    this.teamState.setTeam(localStorageTeam);
+                }
             }
         } else if (totalAssignmentsFound > 0) {
             this.session.isTeamComplete = true;
@@ -1071,37 +1376,47 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     loadReferenceData(): void {
-        this.productionService.getShifts().subscribe(shifts => this.shifts = shifts);
-        this.productionService.getProjects().subscribe(projects => this.projects = projects);
-        this.productionService.getDowntimeProblems().subscribe(problems => this.downtimeProblems = problems);
-        this.productionService.getActiveShiftTypes().subscribe({
-            next: (shiftTypes) => {
-                this.shiftTypes = shiftTypes;
-                console.log('Loaded shift types:', shiftTypes);
-                // Update hourTypeOptions with database values
-                if (shiftTypes && shiftTypes.length > 0) {
-                    this.hourTypeOptions = shiftTypes.map(st => ({
+        // Set loading state for skeleton display
+        this.isLoadingReferenceData = true;
+
+        // Use forkJoin to load all reference data in parallel
+        forkJoin({
+            shifts: this.productionService.getShifts(),
+            projects: this.productionService.getProjects(),
+            downtimeProblems: this.productionService.getDowntimeProblems(),
+            shiftTypes: this.productionService.getActiveShiftTypes(),
+            zones: this.productionService.getActiveZones()
+        }).subscribe({
+            next: (results) => {
+                this.shifts = results.shifts;
+                this.projects = results.projects;
+                this.downtimeProblems = results.downtimeProblems;
+                this.zones = results.zones;
+
+                // Process shift types
+                this.shiftTypes = results.shiftTypes;
+                console.log('Loaded shift types:', results.shiftTypes);
+                if (results.shiftTypes && results.shiftTypes.length > 0) {
+                    this.hourTypeOptions = results.shiftTypes.map(st => ({
                         label: `${st.name} (${st.target_percentage}%)`,
                         value: st.code
                     }));
                     console.log('Updated hourTypeOptions:', this.hourTypeOptions);
-
                     // Synchronize existing hours with valid shift type codes (with delay to ensure hours are loaded)
                     setTimeout(() => this.syncHoursWithShiftTypes(), 100);
                 }
+
+                // Clear loading state
+                this.isLoadingReferenceData = false;
             },
             error: (err) => {
-                console.error('Error loading shift types:', err);
-                // Keep fallback options if loading fails
-            }
-        });
-        this.productionService.getActiveZones().subscribe({
-            next: (zones) => {
-                this.zones = zones;
-                console.log('Loaded zones:', zones);
-            },
-            error: (err) => {
-                console.error('Error loading zones:', err);
+                console.error('Error loading reference data:', err);
+                this.isLoadingReferenceData = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Loading Error',
+                    detail: 'Failed to load reference data. Please refresh the page.'
+                });
             }
         });
     }
@@ -1196,6 +1511,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Save session to localStorage
         this.saveSessionToStorage();
+
+        // Update stepper to step 2 (Team Assignment)
+        this.updateCurrentStep();
 
         this.messageService.add({
             severity: 'success',
@@ -1637,6 +1955,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
         }
 
         this.session.isTeamComplete = true;
+
+        // Update stepper to step 3 (Hourly Tracker)
+        this.updateCurrentStep();
+
         this.messageService.add({
             severity: 'success',
             summary: 'Team Complete',
@@ -1962,10 +2284,11 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Initialize the hour team when opening the dialog
+     * Initialize the hour team when opening the dialog (with smart auto-confirmation)
      */
     initializeHourTeam(hourIndex: number): void {
         const hour = this.session.hours[hourIndex];
+        const previousTeam = this.getPreviousHourTeam(hourIndex);
 
         // If hour already has a saved team, use it (deep copy with fallback)
         if (hour.team && hour.team.length > 0) {
@@ -1975,11 +2298,28 @@ export class ProductionComponent implements OnInit, OnDestroy {
             }));
             this.teamConfirmed = true;
             this.showTeamConfirmationStep = false;
-        } else {
-            // Initialize with previous hour's team for the confirmation question
-            this.currentHourTeam = this.getPreviousHourTeam(hourIndex);
+            this.showTeamModifyButton = true;
+        }
+        // Smart auto-confirm: For hours after H1, auto-confirm if previous hour has team
+        else if (hourIndex > 0 && previousTeam.length > 0) {
+            this.currentHourTeam = [...previousTeam];
+            this.teamConfirmed = true;
+            this.showTeamConfirmationStep = false;
+            this.showTeamModifyButton = true; // Show discrete "Modify" button
+        }
+        // For H1, auto-confirm if initial team assignment exists
+        else if (hourIndex === 0 && this.team.length > 0) {
+            this.currentHourTeam = [...this.team];
+            this.teamConfirmed = true;
+            this.showTeamConfirmationStep = false;
+            this.showTeamModifyButton = true;
+        }
+        // No previous team, show confirmation step
+        else {
+            this.currentHourTeam = previousTeam;
             this.teamConfirmed = false;
             this.showTeamConfirmationStep = true;
+            this.showTeamModifyButton = false;
         }
     }
 
@@ -2603,10 +2943,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
             const downtimePayload: any = {
                 Total_Downtime: dt.duration,
                 Comment_Downtime: dt.comment,
-                Id_DowntimeProblems: dt.problemId,
                 Id_HourlyProd: hourlyProductionId,
                 Id_Downtime: dt.id // Include ID for updates
             };
+
+            // Only include problemId if it's a valid non-zero value
+            if (dt.problemId && dt.problemId > 0) {
+                downtimePayload.Id_DowntimeProblems = dt.problemId;
+            }
 
             // Include machine if specified
             if (dt.machineId) {
@@ -2721,11 +3065,21 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     confirmAddDowntimeInDialog(): void {
-        if (this.newDowntimeInput.duration <= 0 || this.newDowntimeInput.problemId === 0) {
+        if (this.newDowntimeInput.duration <= 0) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Invalid Input',
-                detail: 'Please enter duration and select a problem category'
+                detail: 'Please enter a valid duration'
+            });
+            return;
+        }
+
+        // Validate Description is required
+        if (!this.newDowntimeInput.comment || this.newDowntimeInput.comment.trim() === '') {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Required Field',
+                detail: 'Description is required'
             });
             return;
         }
@@ -2812,11 +3166,21 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         const hour = this.session.hours[this.downtimeHourIndex];
 
-        if (this.downtimeInput.Total_Downtime <= 0 || this.downtimeInput.Id_DowntimeProblems === 0) {
+        if (this.downtimeInput.Total_Downtime <= 0) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Invalid Input',
-                detail: 'Please enter duration and select a problem'
+                detail: 'Please enter a valid duration'
+            });
+            return;
+        }
+
+        // Validate Description is required
+        if (!this.downtimeInput.Comment_Downtime || this.downtimeInput.Comment_Downtime.trim() === '') {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Required Field',
+                detail: 'Description is required'
             });
             return;
         }
@@ -2945,6 +3309,63 @@ export class ProductionComponent implements OnInit, OnDestroy {
         if (level >= 3) return 'info';
         if (level >= 2) return 'warn';
         return 'danger';
+    }
+
+    /**
+     * Create a new production - clears current session and starts fresh
+     */
+    createNewProduction(): void {
+        // Confirm if there's unsaved data
+        if (this.hasUnsavedChanges()) {
+            this.confirmationService.confirm({
+                message: 'You have unsaved changes. Are you sure you want to start a new production?',
+                header: 'Confirm New Production',
+                icon: 'pi pi-exclamation-triangle',
+                acceptLabel: 'Yes, Start New',
+                rejectLabel: 'Cancel',
+                accept: () => {
+                    this.startNewProduction();
+                }
+            });
+        } else {
+            this.startNewProduction();
+        }
+    }
+
+    /**
+     * Start a new production by clearing state and navigating
+     */
+    private startNewProduction(): void {
+        // Clear localStorage session
+        localStorage.removeItem('dms_production_session');
+
+        // Reset component state
+        this.mode = 'new';
+        this.loadedProductionId = null;
+        this.resetSession();
+
+        // Navigate to clean URL
+        this.router.navigate(['/dms-production/production'], {
+            queryParams: { mode: 'new' }
+        });
+
+        // Show success message
+        this.messageService.add({
+            severity: 'info',
+            summary: 'New Production',
+            detail: 'Ready to start a new production entry',
+            life: 3000
+        });
+    }
+
+    /**
+     * Check if there are unsaved changes in the current session
+     */
+    private hasUnsavedChanges(): boolean {
+        // Check if any data has been entered
+        return this.session.isSetupComplete ||
+               this.session.team.length > 0 ||
+               this.session.hours.some(h => (h.output ?? 0) > 0);
     }
 
     resetSession(): void {

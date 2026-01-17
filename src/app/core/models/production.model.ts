@@ -79,11 +79,27 @@ export interface DowntimeProblem {
 }
 
 export interface Workstation {
-    Id_Workstation: number;
-    Name_Workstation: string;
-    Code_Workstation: string;
-    Id_ProdLine: number;
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    production_line: number;
+    production_line_name?: string;
+    project?: number;
+    project_name?: string;
+    process_order?: number;
+    process_mode?: string;
+    typ_order?: number;
+    cycle_time_seconds?: number;
+    max_operators?: number;
+    is_critical?: boolean;
+    is_active?: boolean;
     machines_count?: number;
+    // Legacy fields for backward compatibility
+    Id_Workstation?: number;
+    Name_Workstation?: string;
+    Code_Workstation?: string;
+    Id_ProdLine?: number;
 }
 
 export interface Machine {

@@ -160,6 +160,29 @@
     }
 }
 
+// Detail Preview Drawer styles
+:host ::ng-deep .p-drawer {
+    .p-accordion .p-accordion-header-link {
+        padding: 0.75rem 1rem;
+    }
+
+    .p-accordion .p-accordion-content {
+        padding: 0.5rem;
+    }
+
+    .p-progressbar {
+        height: 0.5rem;
+        border-radius: 4px;
+    }
+}
+
+.detail-drawer-content {
+    h4 {
+        font-size: 1rem;
+        color: var(--text-color);
+    }
+}
+
 // Responsive
 @media (max-width: 768px) {
     .filter-row {

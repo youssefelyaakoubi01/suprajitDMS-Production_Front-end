@@ -119,6 +119,21 @@ interface DowntimeWithDetails extends Downtime {
                 <p-card styleClass="h-full">
                     <ng-template pTemplate="header">
                         <div class="p-3">
+                            <span class="font-semibold">Downtime by Machine</span>
+                        </div>
+                    </ng-template>
+                    <div class="chart-container">
+                        <p-chart type="bar" [data]="machineChartData"
+                                 [options]="horizontalBarChartOptions"></p-chart>
+                    </div>
+                </p-card>
+            </div>
+
+            <!-- Trend Chart Row -->
+            <div class="charts-grid charts-grid-full mb-4">
+                <p-card styleClass="h-full">
+                    <ng-template pTemplate="header">
+                        <div class="p-3">
                             <span class="font-semibold">Downtime Trend (Last 7 Days)</span>
                         </div>
                     </ng-template>
@@ -466,6 +481,10 @@ interface DowntimeWithDetails extends Downtime {
             @media (max-width: 992px) {
                 grid-template-columns: 1fr;
             }
+
+            &.charts-grid-full {
+                grid-template-columns: 1fr;
+            }
         }
 
         .chart-container {
@@ -566,6 +585,7 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     // Charts
     categoryChartData: any;
     trendChartData: any;
+    machineChartData: any;
     pieChartOptions = {
         plugins: { legend: { position: 'bottom' } },
         maintainAspectRatio: false
@@ -573,6 +593,12 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
     barChartOptions = {
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } },
+        maintainAspectRatio: false
+    };
+    horizontalBarChartOptions = {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true } },
         maintainAspectRatio: false
     };
 
@@ -698,8 +724,42 @@ export class DowntimeListComponent implements OnInit, OnDestroy {
             }]
         };
 
+        // Machine chart - downtime by machine
+        this.buildMachineChart();
+
         // Trend chart - Real data for last 7 days
         this.buildTrendChart();
+    }
+
+    private buildMachineChart(): void {
+        const machineMap = new Map<string, number>();
+        this.downtimes.forEach(dt => {
+            const machineName = dt.machine_name || 'No Machine';
+            machineMap.set(machineName, (machineMap.get(machineName) || 0) + (dt.Total_Downtime || 0));
+        });
+
+        // Sort by downtime descending and take top 10
+        const sortedMachines = Array.from(machineMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+
+        // Generate colors based on severity
+        const colors = sortedMachines.map(([_, value]) => {
+            if (value > 120) return '#EF4444'; // Red for > 2 hours
+            if (value > 60) return '#F59E0B';  // Orange for > 1 hour
+            if (value > 30) return '#3B82F6';  // Blue for > 30 min
+            return '#10B981';                   // Green for <= 30 min
+        });
+
+        this.machineChartData = {
+            labels: sortedMachines.map(([name]) => name),
+            datasets: [{
+                label: 'Downtime (min)',
+                data: sortedMachines.map(([_, value]) => value),
+                backgroundColor: colors,
+                borderRadius: 4
+            }]
+        };
     }
 
     private buildTrendChart(): void {

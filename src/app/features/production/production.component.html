@@ -5,9 +5,103 @@
             <h1 class="page-title">Production Workflow - Hourly Tracking</h1>
             <p class="page-subtitle">Manage shift setup, team assignment, and hourly production tracking</p>
         </div>
-        <div class="header-time">
+        <div class="header-actions">
+            <!-- Create New Production button - only visible when viewing/editing existing production -->
+            <p-button *ngIf="mode !== 'new'"
+                      label="Create New Production"
+                      icon="pi pi-plus"
+                      severity="success"
+                      (onClick)="createNewProduction()"
+                      pTooltip="Start a new production entry">
+            </p-button>
             <span class="current-time">{{ currentTime | date:'HH:mm:ss' }}</span>
             <span class="current-date">{{ currentTime | date:'dd/MM/yyyy' }}</span>
+        </div>
+    </div>
+
+    <!-- ========== STEPPER NAVIGATION ========== -->
+    <div class="workflow-stepper-container">
+        <div class="flex justify-content-center align-items-center gap-2 md:gap-4 flex-wrap py-3">
+            <!-- Step 1: Shift Setup -->
+            <button
+                type="button"
+                class="workflow-step flex align-items-center gap-2 px-3 py-2 md:px-4 md:py-3 border-round-3xl cursor-pointer transition-all transition-duration-200"
+                [ngClass]="{
+                    'bg-primary text-primary-contrast border-primary': currentStep === 1 && !session.isSetupComplete,
+                    'bg-green-500 text-white border-green-500': session.isSetupComplete,
+                    'bg-surface-100 text-surface-600 border-surface-300': currentStep < 1 && !session.isSetupComplete
+                }"
+                (click)="goToStep(1)">
+                <span
+                    class="flex align-items-center justify-content-center border-circle w-2rem h-2rem md:w-2rem md:h-2rem text-sm font-bold"
+                    [ngClass]="{
+                        'bg-primary-reverse text-primary': currentStep === 1 && !session.isSetupComplete,
+                        'bg-white text-green-500': session.isSetupComplete,
+                        'bg-surface-200 text-surface-500': currentStep < 1 && !session.isSetupComplete
+                    }">
+                    <i *ngIf="session.isSetupComplete" class="pi pi-check text-sm"></i>
+                    <span *ngIf="!session.isSetupComplete">1</span>
+                </span>
+                <span class="font-medium text-sm md:text-base hidden md:inline">Shift Setup</span>
+                <i class="pi pi-cog md:hidden"></i>
+            </button>
+
+            <!-- Connector 1-2 -->
+            <i class="pi pi-arrow-right text-surface-400"></i>
+
+            <!-- Step 2: Team Assignment -->
+            <button
+                type="button"
+                class="workflow-step flex align-items-center gap-2 px-3 py-2 md:px-4 md:py-3 border-round-3xl cursor-pointer transition-all transition-duration-200"
+                [ngClass]="{
+                    'bg-primary text-primary-contrast border-primary': currentStep === 2 && !session.isTeamComplete,
+                    'bg-green-500 text-white border-green-500': session.isTeamComplete,
+                    'bg-surface-100 text-surface-400 border-surface-200 opacity-60': !session.isSetupComplete,
+                    'bg-surface-100 text-surface-600 border-surface-300': session.isSetupComplete && currentStep < 2 && !session.isTeamComplete
+                }"
+                [disabled]="!session.isSetupComplete"
+                (click)="goToStep(2)">
+                <span
+                    class="flex align-items-center justify-content-center border-circle w-2rem h-2rem md:w-2rem md:h-2rem text-sm font-bold"
+                    [ngClass]="{
+                        'bg-primary-reverse text-primary': currentStep === 2 && !session.isTeamComplete,
+                        'bg-white text-green-500': session.isTeamComplete,
+                        'bg-surface-200 text-surface-400': !session.isSetupComplete,
+                        'bg-surface-200 text-surface-500': session.isSetupComplete && currentStep < 2 && !session.isTeamComplete
+                    }">
+                    <i *ngIf="session.isTeamComplete" class="pi pi-check text-sm"></i>
+                    <span *ngIf="!session.isTeamComplete">2</span>
+                </span>
+                <span class="font-medium text-sm md:text-base hidden md:inline">Team Assignment</span>
+                <i class="pi pi-users md:hidden"></i>
+            </button>
+
+            <!-- Connector 2-3 -->
+            <i class="pi pi-arrow-right text-surface-400"></i>
+
+            <!-- Step 3: Hourly Tracking -->
+            <button
+                type="button"
+                class="workflow-step flex align-items-center gap-2 px-3 py-2 md:px-4 md:py-3 border-round-3xl cursor-pointer transition-all transition-duration-200"
+                [ngClass]="{
+                    'bg-primary text-primary-contrast border-primary': currentStep === 3,
+                    'bg-surface-100 text-surface-400 border-surface-200 opacity-60': !session.isTeamComplete,
+                    'bg-surface-100 text-surface-600 border-surface-300': session.isTeamComplete && currentStep < 3
+                }"
+                [disabled]="!session.isTeamComplete"
+                (click)="goToStep(3)">
+                <span
+                    class="flex align-items-center justify-content-center border-circle w-2rem h-2rem md:w-2rem md:h-2rem text-sm font-bold"
+                    [ngClass]="{
+                        'bg-primary-reverse text-primary': currentStep === 3,
+                        'bg-surface-200 text-surface-400': !session.isTeamComplete,
+                        'bg-surface-200 text-surface-500': session.isTeamComplete && currentStep < 3
+                    }">
+                    3
+                </span>
+                <span class="font-medium text-sm md:text-base hidden md:inline">Hourly Tracking</span>
+                <i class="pi pi-clock md:hidden"></i>
+            </button>
         </div>
     </div>
 
@@ -66,6 +160,18 @@
         </p-card>
     </div>
 
+    <!-- ========== EFFICIENCY METER VISUALIZATION ========== -->
+    <div class="efficiency-meter-container" *ngIf="session.isSetupComplete && session.isTeamComplete && completedHours > 0">
+        <p-meterGroup [value]="efficiencyMeterData" [max]="100" styleClass="efficiency-meter">
+            <ng-template pTemplate="label" let-value>
+                <div class="meter-label-row">
+                    <span class="meter-label">Shift Efficiency: <strong>{{ shiftOverallEfficiency }}%</strong></span>
+                    <span class="meter-target">Target: 95%</span>
+                </div>
+            </ng-template>
+        </p-meterGroup>
+    </div>
+
     <!-- SHIFT SETUP -->
     <p-card styleClass="setup-card">
         <ng-template pTemplate="header">
@@ -89,91 +195,147 @@
         </ng-template>
 
         <div *ngIf="!session.isSetupComplete">
-            <form [formGroup]="shiftSetupForm" class="setup-form">
+            <!-- Skeleton Loading State -->
+            <div *ngIf="isLoadingReferenceData" class="setup-form">
+                <div class="form-grid">
+                    <div class="form-field" *ngFor="let i of [1,2,3,4,5,6,7]">
+                        <p-skeleton height="1rem" width="30%" styleClass="mb-2"></p-skeleton>
+                        <p-skeleton height="2.5rem"></p-skeleton>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <p-skeleton height="2.5rem" width="200px"></p-skeleton>
+                </div>
+            </div>
+
+            <!-- Actual Form -->
+            <form *ngIf="!isLoadingReferenceData" [formGroup]="shiftSetupForm" class="setup-form">
                 <div class="form-grid">
                     <div class="form-field">
-                        <label for="shift">Shift *</label>
-                        <p-select
-                            id="shift"
-                            formControlName="shift"
-                            [options]="shifts"
-                            optionLabel="name"
-                            placeholder="Select Shift"
-                            [style]="{ width: '100%' }">
-                        </p-select>
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="shift"
+                                formControlName="shift"
+                                [options]="shifts"
+                                optionLabel="name"
+                                placeholder="Select Shift"
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('shift')?.invalid && shiftSetupForm.get('shift')?.touched">
+                            </p-select>
+                            <label for="shift">Shift *</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('shift')?.invalid && shiftSetupForm.get('shift')?.touched"
+                            severity="error" text="Shift is required" styleClass="mt-1 validation-message">
+                        </p-message>
                     </div>
 
                     <div class="form-field">
-                        <label for="date">Date *</label>
-                        <p-datepicker
-                            id="date"
-                            formControlName="date"
-                            [showIcon]="true"
-                            dateFormat="dd/mm/yy"
-                            [style]="{ width: '100%' }">
-                        </p-datepicker>
+                        <p-floatLabel variant="on">
+                            <p-datepicker
+                                id="date"
+                                formControlName="date"
+                                [showIcon]="true"
+                                dateFormat="dd/mm/yy"
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('date')?.invalid && shiftSetupForm.get('date')?.touched">
+                            </p-datepicker>
+                            <label for="date">Date *</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('date')?.invalid && shiftSetupForm.get('date')?.touched"
+                            severity="error" text="Date is required" styleClass="mt-1 validation-message">
+                        </p-message>
                     </div>
 
                     <div class="form-field">
-                        <label for="project">Project *</label>
-                        <p-select
-                            id="project"
-                            formControlName="project"
-                            [options]="projects"
-                            optionLabel="Name_Project"
-                            placeholder="Select Project"
-                            [style]="{ width: '100%' }">
-                        </p-select>
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="project"
+                                formControlName="project"
+                                [options]="projects"
+                                optionLabel="Name_Project"
+                                placeholder="Select Project"
+                                [filter]="true"
+                                filterBy="Name_Project"
+                                filterPlaceholder="Rechercher un projet..."
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('project')?.invalid && shiftSetupForm.get('project')?.touched">
+                            </p-select>
+                            <label for="project">Project *</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('project')?.invalid && shiftSetupForm.get('project')?.touched"
+                            severity="error" text="Project is required" styleClass="mt-1 validation-message">
+                        </p-message>
                     </div>
 
                     <div class="form-field">
-                        <label for="productionLine">Production Line *</label>
-                        <p-select
-                            id="productionLine"
-                            formControlName="productionLine"
-                            [options]="productionLines"
-                            optionLabel="name"
-                            placeholder="Select Line"
-                            [style]="{ width: '100%' }">
-                        </p-select>
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="productionLine"
+                                formControlName="productionLine"
+                                [options]="productionLines"
+                                optionLabel="name"
+                                placeholder="Select Line"
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('productionLine')?.invalid && shiftSetupForm.get('productionLine')?.touched">
+                            </p-select>
+                            <label for="productionLine">Production Line *</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('productionLine')?.invalid && shiftSetupForm.get('productionLine')?.touched"
+                            severity="error" text="Production Line is required" styleClass="mt-1 validation-message">
+                        </p-message>
                     </div>
 
                     <div class="form-field">
-                        <label for="partNumber">Part Number *</label>
-                        <p-select
-                            id="partNumber"
-                            formControlName="partNumber"
-                            [options]="parts"
-                            optionLabel="PN_Part"
-                            placeholder="Select Part"
-                            [style]="{ width: '100%' }">
-                        </p-select>
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="partNumber"
+                                formControlName="partNumber"
+                                [options]="parts"
+                                optionLabel="PN_Part"
+                                placeholder="Select Part"
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('partNumber')?.invalid && shiftSetupForm.get('partNumber')?.touched">
+                            </p-select>
+                            <label for="partNumber">Part Number *</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('partNumber')?.invalid && shiftSetupForm.get('partNumber')?.touched"
+                            severity="error" text="Part Number is required" styleClass="mt-1 validation-message">
+                        </p-message>
                     </div>
 
                     <div class="form-field">
-                        <label for="zone">Zone</label>
-                        <p-select
-                            id="zone"
-                            formControlName="zone"
-                            [options]="zones"
-                            optionLabel="name"
-                            placeholder="Select Zone"
-                            [showClear]="true"
-                            [style]="{ width: '100%' }">
-                        </p-select>
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="zone"
+                                formControlName="zone"
+                                [options]="zones"
+                                optionLabel="name"
+                                placeholder="Select Zone"
+                                [showClear]="true"
+                                appendTo="body"
+                                styleClass="w-full">
+                            </p-select>
+                            <label for="zone">Zone</label>
+                        </p-floatLabel>
                     </div>
 
                     <div class="form-field">
-                        <label for="orderNo">Order NO</label>
-                        <input
-                            id="orderNo"
-                            type="text"
-                            pInputText
-                            [(ngModel)]="session.orderNo"
-                            [ngModelOptions]="{standalone: true}"
-                            (ngModelChange)="onOrderNoChange()"
-                            placeholder="Enter Order Number"
-                            class="w-full">
+                        <p-floatLabel variant="on">
+                            <input
+                                id="orderNo"
+                                type="text"
+                                pInputText
+                                [(ngModel)]="session.orderNo"
+                                [ngModelOptions]="{standalone: true}"
+                                (ngModelChange)="onOrderNoChange()"
+                                class="w-full">
+                            <label for="orderNo">Order NO</label>
+                        </p-floatLabel>
                     </div>
                 </div>
 
@@ -181,6 +343,7 @@
                     <p-button
                         label="Complete Shift Setup"
                         icon="pi pi-check"
+                        styleClass="action-button-touch"
                         [disabled]="shiftSetupForm.invalid"
                         (click)="completeShiftSetup()">
                     </p-button>
@@ -252,77 +415,93 @@
                 <div class="form-row">
                     <div class="form-field flex-grow">
                         <label for="employeeScan"><i class="pi pi-id-card"></i> Scan Employee Badge</label>
-                        <div class="p-inputgroup">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search" />
                             <input
                                 id="employeeScan"
                                 type="text"
                                 pInputText
                                 [(ngModel)]="employeeIdScan"
-                                placeholder="Scan employee badge"
+                                placeholder="Scannez ou saisissez le badge..."
                                 (keyup.enter)="addEmployee()"
-                                class="w-full">
-                            <p-button
-                                icon="pi pi-plus"
-                                label="Add Employee"
-                                (click)="addEmployee()">
-                            </p-button>
-                        </div>
+                                class="w-full badge-scan-input">
+                        </p-iconfield>
                         <small class="text-color-secondary mt-1 block">
-                            <i class="pi pi-info-circle"></i> Workstation and machine will be auto-filled from employee's default assignment
+                            <i class="pi pi-info-circle"></i> Appuyez sur Entrée pour ajouter l'employé
                         </small>
                     </div>
                 </div>
             </div>
 
             <!-- Manual Workstation Selection (shown when no default assignment exists) -->
-            <div *ngIf="showManualWorkstationSelection" class="manual-selection-form surface-ground p-3 border-round mt-3">
-                <div class="flex align-items-center gap-2 mb-3">
-                    <i class="pi pi-exclamation-circle text-orange-500 text-xl"></i>
-                    <span class="font-semibold">Manual Selection Required</span>
-                    <span class="text-color-secondary ml-2" *ngIf="pendingEmployeeData">
-                        for {{ pendingEmployeeData.first_name }} {{ pendingEmployeeData.last_name }}
-                    </span>
+            <div *ngIf="showManualWorkstationSelection" class="manual-selection-card">
+                <div class="manual-selection-header">
+                    <div class="header-icon">
+                        <i class="pi pi-exclamation-triangle"></i>
+                    </div>
+                    <div class="header-content">
+                        <h4 class="header-title">Sélection Manuelle Requise</h4>
+                        <p class="header-subtitle" *ngIf="pendingEmployeeData">
+                            L'employé <strong>{{ pendingEmployeeData.first_name }} {{ pendingEmployeeData.last_name }}</strong> n'a pas d'affectation par défaut
+                        </p>
+                    </div>
+                    <p-button
+                        icon="pi pi-times"
+                        [rounded]="true"
+                        [text]="true"
+                        severity="secondary"
+                        (click)="cancelManualSelection()"
+                        pTooltip="Annuler">
+                    </p-button>
                 </div>
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="workstation"><i class="pi pi-desktop"></i> Workstation *</label>
-                        <p-select
-                            id="workstation"
-                            [(ngModel)]="selectedWorkstation"
-                            [options]="workstations"
-                            optionLabel="Name_Workstation"
-                            placeholder="Select Workstation"
-                            (onChange)="onWorkstationChange()"
-                            [style]="{ width: '250px' }">
-                        </p-select>
+
+                <div class="manual-selection-body">
+                    <div class="selection-grid">
+                        <div class="selection-field">
+                            <label for="workstation">
+                                <i class="pi pi-desktop"></i> Poste de travail *
+                            </label>
+                            <p-select
+                                id="workstation"
+                                [(ngModel)]="selectedWorkstation"
+                                [options]="workstations"
+                                optionLabel="Name_Workstation"
+                                placeholder="Sélectionner un poste..."
+                                (onChange)="onWorkstationChange()"
+                                appendTo="body"
+                                styleClass="w-full">
+                            </p-select>
+                        </div>
+
+                        <div class="selection-field">
+                            <label for="machineAssignment">
+                                <i class="pi pi-cog"></i> Machine (optionnel)
+                            </label>
+                            <p-select
+                                id="machineAssignment"
+                                [(ngModel)]="selectedMachineForAssignment"
+                                [options]="filteredMachinesForAssignment"
+                                optionLabel="name"
+                                placeholder="Sélectionner une machine..."
+                                [showClear]="true"
+                                [disabled]="!selectedWorkstation"
+                                [filter]="true"
+                                filterPlaceholder="Rechercher..."
+                                [virtualScroll]="true"
+                                [virtualScrollItemSize]="38"
+                                appendTo="body"
+                                styleClass="w-full">
+                            </p-select>
+                        </div>
                     </div>
 
-                    <div class="form-field">
-                        <label for="machineAssignment"><i class="pi pi-cog"></i> Machine</label>
-                        <p-select
-                            id="machineAssignment"
-                            [(ngModel)]="selectedMachineForAssignment"
-                            [options]="filteredMachinesForAssignment"
-                            optionLabel="name"
-                            placeholder="Select Machine (Optional)"
-                            [showClear]="true"
-                            [disabled]="!selectedWorkstation"
-                            [style]="{ width: '250px' }">
-                        </p-select>
-                    </div>
-
-                    <div class="form-field button-field flex gap-2">
+                    <div class="selection-actions">
                         <p-button
                             icon="pi pi-check"
-                            label="Confirm"
+                            label="Confirmer l'affectation"
                             (click)="addEmployeeManual()"
-                            [disabled]="!selectedWorkstation">
-                        </p-button>
-                        <p-button
-                            icon="pi pi-times"
-                            label="Cancel"
-                            severity="secondary"
-                            (click)="cancelManualSelection()">
+                            [disabled]="!selectedWorkstation"
+                            styleClass="action-button-touch">
                         </p-button>
                     </div>
                 </div>
@@ -420,7 +599,8 @@
             </div>
         </ng-template>
 
-        <p-table [value]="session.hours" styleClass="hourly-tracker-table" [rowHover]="true">
+        <!-- ========== DESKTOP TABLE VIEW ========== -->
+        <p-table *ngIf="!isMobileView" [value]="session.hours" styleClass="hourly-tracker-table" [rowHover]="true">
             <ng-template pTemplate="header">
                 <tr>
                     <th style="width: 80px">Hour</th>
@@ -436,7 +616,37 @@
                 </tr>
             </ng-template>
             <ng-template pTemplate="body" let-hour let-i="rowIndex">
-                <tr [ngClass]="{'hour-overtime': hour.isOvertime, 'hour-completed': hour.status === 'completed', 'hour-in-progress': hour.status === 'in_progress'}">
+                <!-- Quick Entry Row -->
+                <tr *ngIf="showQuickEntryForHour === i && hour.status !== 'completed'" class="quick-entry-row-wrapper">
+                    <td colspan="10">
+                        <div class="quick-entry-row">
+                            <span class="quick-entry-hour">H{{ hour.hour }}</span>
+                            <p-inputNumber
+                                [(ngModel)]="hour.quickOutput"
+                                [showButtons]="true"
+                                buttonLayout="horizontal"
+                                [min]="0"
+                                placeholder="Output"
+                                inputStyleClass="quick-entry-input"
+                                decrementButtonClass="touch-target"
+                                incrementButtonClass="touch-target">
+                            </p-inputNumber>
+                            <span class="quick-entry-target">/ {{ hour.target }}</span>
+                            <p-button icon="pi pi-check" severity="success" styleClass="action-button-touch"
+                                (onClick)="quickSaveHour(i)" pTooltip="Quick Save">
+                            </p-button>
+                            <p-button icon="pi pi-ellipsis-h" [text]="true" styleClass="action-button-touch"
+                                (onClick)="openFullDialogFromQuickEntry(i)" pTooltip="More Options">
+                            </p-button>
+                            <p-button icon="pi pi-times" [text]="true" severity="secondary" styleClass="action-button-touch"
+                                (onClick)="showQuickEntryForHour = null" pTooltip="Cancel">
+                            </p-button>
+                        </div>
+                    </td>
+                </tr>
+                <!-- Normal Row -->
+                <tr *ngIf="showQuickEntryForHour !== i || hour.status === 'completed'"
+                    [ngClass]="{'hour-overtime': hour.isOvertime, 'hour-completed': hour.status === 'completed', 'hour-in-progress': hour.status === 'in_progress'}">
                     <td>
                         <div class="hour-number">
                             <i [class]="'pi ' + getHourStatusIcon(hour.status)"></i>
@@ -499,12 +709,25 @@
                     </td>
                     <td>
                         <div class="action-buttons">
+                            <!-- Quick Entry Button for not started hours -->
+                            <p-button
+                                *ngIf="hour.status === 'not_started'"
+                                icon="pi pi-bolt"
+                                severity="secondary"
+                                [text]="true"
+                                size="small"
+                                styleClass="action-button-touch"
+                                pTooltip="Quick Entry"
+                                (click)="toggleQuickEntry(i)">
+                            </p-button>
+                            <!-- Full Entry/Edit Button -->
                             <p-button
                                 *ngIf="hour.status === 'not_started' || hour.status === 'completed'"
                                 [label]="hour.status === 'completed' ? 'Edit' : 'Enter'"
                                 [icon]="hour.status === 'completed' ? 'pi pi-pencil' : 'pi pi-play'"
                                 [severity]="hour.status === 'completed' ? 'info' : 'success'"
                                 size="small"
+                                styleClass="action-button-touch"
                                 (click)="openHourDialog(i)">
                             </p-button>
                         </div>
@@ -523,6 +746,72 @@
                 </tr>
             </ng-template>
         </p-table>
+
+        <!-- ========== MOBILE CARD VIEW ========== -->
+        <div *ngIf="isMobileView" class="hour-cards">
+            <div *ngFor="let hour of session.hours; let i = index"
+                 class="hour-card"
+                 [class.completed]="hour.status === 'completed'"
+                 [class.in-progress]="hour.status === 'in_progress'">
+                <div class="hour-card-header">
+                    <div class="hour-card-title">
+                        <i [class]="'pi ' + getHourStatusIcon(hour.status)"></i>
+                        <span class="hour-number-mobile">H{{ hour.hour }}</span>
+                        <span class="hour-time-mobile">{{ hour.timeRange }}</span>
+                    </div>
+                    <p-tag [value]="getHourStatusLabelMobile(hour.status)"
+                        [severity]="hour.status === 'completed' ? 'success' : hour.status === 'in_progress' ? 'warn' : 'secondary'">
+                    </p-tag>
+                </div>
+
+                <!-- Completed Hour Metrics -->
+                <div class="hour-card-metrics" *ngIf="hour.status === 'completed'">
+                    <div class="metric-item">
+                        <span class="metric-label-mobile">Output</span>
+                        <span class="metric-value-mobile">{{ hour.output }} / {{ hour.target }}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label-mobile">Efficiency</span>
+                        <p-tag [value]="hour.efficiency + '%'" [severity]="getEfficiencySeverity(hour.efficiency)"></p-tag>
+                    </div>
+                    <div class="metric-item" *ngIf="hour.scrap">
+                        <span class="metric-label-mobile">Scrap</span>
+                        <span class="metric-value-mobile scrap">{{ hour.scrap }}</span>
+                    </div>
+                    <div class="metric-item" *ngIf="hour.totalDowntime > 0">
+                        <span class="metric-label-mobile">Downtime</span>
+                        <span class="metric-value-mobile downtime">{{ hour.totalDowntime }} min</span>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="hour-card-actions">
+                    <p-button
+                        *ngIf="hour.status !== 'completed'"
+                        label="Enter Production"
+                        icon="pi pi-play"
+                        severity="success"
+                        styleClass="w-full action-button-touch"
+                        (onClick)="openHourDrawer(i)">
+                    </p-button>
+                    <p-button
+                        *ngIf="hour.status === 'completed'"
+                        label="Edit"
+                        icon="pi pi-pencil"
+                        severity="info"
+                        [outlined]="true"
+                        styleClass="w-full action-button-touch"
+                        (onClick)="openHourDrawer(i)">
+                    </p-button>
+                </div>
+            </div>
+
+            <!-- Empty State for Mobile -->
+            <div *ngIf="session.hours.length === 0" class="empty-state-mobile">
+                <i class="pi pi-clock"></i>
+                <p>No hours configured</p>
+            </div>
+        </div>
 
         <!-- Shift Summary Footer -->
         <div class="tracker-footer">
@@ -633,15 +922,18 @@
 
             <!-- Badge scan pour ajout -->
             <div class="team-add-form">
-                <div class="p-inputgroup">
+                <p-iconfield styleClass="w-full">
+                    <p-inputicon styleClass="pi pi-search" />
                     <input
                         pInputText
                         [(ngModel)]="employeeScanForHour"
-                        placeholder="Scanner badge employe"
+                        placeholder="Scannez ou saisissez le badge..."
                         (keyup.enter)="addEmployeeToHourTeam()"
-                        class="w-full">
-                    <p-button icon="pi pi-plus" label="Ajouter" (click)="addEmployeeToHourTeam()"></p-button>
-                </div>
+                        class="w-full badge-scan-input">
+                </p-iconfield>
+                <small class="text-color-secondary mt-1 block">
+                    <i class="pi pi-info-circle"></i> Appuyez sur Entrée pour ajouter
+                </small>
             </div>
 
             <!-- Liste des employes de l'heure -->
@@ -716,8 +1008,11 @@
                 <p-inputNumber
                     [(ngModel)]="hourProductionInput.output"
                     [showButtons]="true"
+                    buttonLayout="horizontal"
                     [min]="0"
-                    inputStyleClass="large-input">
+                    inputStyleClass="large-input"
+                    decrementButtonClass="input-number-btn"
+                    incrementButtonClass="input-number-btn">
                 </p-inputNumber>
                 <span class="input-helper">Target: {{ session.hours[selectedHourIndex].target }}</span>
             </div>
@@ -727,8 +1022,11 @@
                 <p-inputNumber
                     [(ngModel)]="hourProductionInput.scrap"
                     [showButtons]="true"
+                    buttonLayout="horizontal"
                     [min]="0"
-                    inputStyleClass="large-input scrap-input">
+                    inputStyleClass="large-input scrap-input"
+                    decrementButtonClass="input-number-btn"
+                    incrementButtonClass="input-number-btn">
                 </p-inputNumber>
                 <span class="input-helper">Target: ≤ {{ session.hours[selectedHourIndex].scrapTarget }}</span>
             </div>
@@ -806,23 +1104,13 @@
                             [min]="1"
                             [max]="60"
                             [showButtons]="true"
+                            buttonLayout="horizontal"
                             suffix=" min"
-                            [style]="{ width: '100%' }">
+                            inputStyleClass="input-number-styled"
+                            decrementButtonClass="input-number-btn"
+                            incrementButtonClass="input-number-btn"
+                            styleClass="w-full">
                         </p-inputNumber>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="newDowntimeProblem">Problem Category *</label>
-                        <p-select
-                            id="newDowntimeProblem"
-                            [(ngModel)]="newDowntimeInput.problemId"
-                            [options]="downtimeProblems"
-                            optionLabel="Name_DowntimeProblems"
-                            optionValue="Id_DowntimeProblems"
-                            placeholder="Select Problem"
-                            appendTo="body"
-                            [style]="{ width: '100%' }">
-                        </p-select>
                     </div>
 
                     <div class="form-field">
@@ -835,6 +1123,10 @@
                             optionValue="id"
                             placeholder="Select Machine (Optional)"
                             [showClear]="true"
+                            [filter]="true"
+                            filterPlaceholder="Search machine..."
+                            [virtualScroll]="true"
+                            [virtualScrollItemSize]="38"
                             appendTo="body"
                             [style]="{ width: '100%' }">
                         </p-select>
@@ -842,7 +1134,7 @@
                 </div>
 
                 <div class="form-field">
-                    <label for="newDowntimeComment">Description</label>
+                    <label for="newDowntimeComment">Description *</label>
                     <textarea
                         id="newDowntimeComment"
                         pTextarea
@@ -908,20 +1200,6 @@
         <p-divider></p-divider>
 
         <div class="form-field">
-            <label for="addDowntimeProblem">Problem Category *</label>
-            <p-select
-                id="addDowntimeProblem"
-                [(ngModel)]="downtimeInput.Id_DowntimeProblems"
-                [options]="downtimeProblems"
-                optionLabel="Name_DowntimeProblems"
-                optionValue="Id_DowntimeProblems"
-                placeholder="Select problem"
-                appendTo="body"
-                [style]="{ width: '100%' }">
-            </p-select>
-        </div>
-
-        <div class="form-field">
             <label for="addDowntimeDuration">Duration (minutes) *</label>
             <p-inputNumber
                 id="addDowntimeDuration"
@@ -929,13 +1207,17 @@
                 [min]="1"
                 [max]="60"
                 [showButtons]="true"
+                buttonLayout="horizontal"
                 suffix=" min"
-                [style]="{ width: '100%' }">
+                inputStyleClass="input-number-styled"
+                decrementButtonClass="input-number-btn"
+                incrementButtonClass="input-number-btn"
+                styleClass="w-full">
             </p-inputNumber>
         </div>
 
         <div class="form-field">
-            <label for="addDowntimeComment">Description</label>
+            <label for="addDowntimeComment">Description *</label>
             <textarea
                 id="addDowntimeComment"
                 pTextarea
@@ -1230,5 +1512,170 @@
         </div>
     </ng-template>
 </p-dialog>
+
+<!-- ========== MOBILE HOUR PRODUCTION DRAWER ========== -->
+<p-drawer
+    [(visible)]="showHourDrawer"
+    [fullScreen]="true"
+    [showCloseIcon]="true"
+    styleClass="hour-production-drawer">
+
+    <ng-template pTemplate="header">
+        <div class="drawer-header">
+            <i class="pi pi-clock text-primary text-xl"></i>
+            <span class="drawer-title">Production - Heure {{ selectedHourIndex !== null && session.hours[selectedHourIndex] ? session.hours[selectedHourIndex].hour : '' }}</span>
+        </div>
+    </ng-template>
+
+    <ng-template pTemplate="content">
+        <div class="drawer-content" *ngIf="selectedHourIndex !== null && session.hours[selectedHourIndex]">
+            <!-- Hour Info -->
+            <div class="drawer-info-bar">
+                <span><i class="pi pi-clock"></i> {{ session.hours[selectedHourIndex].timeRange }}</span>
+                <span><i class="pi pi-calendar"></i> {{ session.date | date:'dd/MM/yyyy' }}</span>
+            </div>
+
+            <!-- Team Section (with smart auto-confirm) -->
+            <div class="drawer-section" *ngIf="!teamConfirmed">
+                <h4 class="section-title"><i class="pi pi-users"></i> Team Confirmation</h4>
+                <div class="team-auto-confirm" *ngIf="showTeamModifyButton">
+                    <p class="text-center">Team auto-confirmed from previous hour</p>
+                    <p-button label="Modify Team" icon="pi pi-pencil" [outlined]="true"
+                        styleClass="w-full" (onClick)="confirmTeamDifferent()">
+                    </p-button>
+                </div>
+                <div class="team-confirm-prompt" *ngIf="!showTeamModifyButton && showTeamConfirmationStep">
+                    <p class="text-center mb-3">Same team as previous hour?</p>
+                    <div class="flex gap-2 justify-content-center">
+                        <p-button label="Yes, same team" icon="pi pi-check" severity="success"
+                            styleClass="action-button-touch" (onClick)="confirmTeamSameAsPrevious()">
+                        </p-button>
+                        <p-button label="No, modify" icon="pi pi-pencil" severity="warn"
+                            styleClass="action-button-touch" (onClick)="confirmTeamDifferent()">
+                        </p-button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Confirmed Summary -->
+            <div class="drawer-section team-confirmed-banner" *ngIf="teamConfirmed">
+                <div class="flex align-items-center justify-content-between">
+                    <span><i class="pi pi-users"></i> Team: {{ currentHourTeam.length }} employees</span>
+                    <p-button label="Modify" icon="pi pi-pencil" [text]="true" size="small"
+                        (onClick)="confirmTeamDifferent()">
+                    </p-button>
+                </div>
+            </div>
+
+            <!-- Production Metrics Section -->
+            <div class="drawer-section" *ngIf="teamConfirmed">
+                <h4 class="section-title"><i class="pi pi-box"></i> Production Metrics</h4>
+
+                <div class="drawer-metric-input">
+                    <label>Output</label>
+                    <p-inputNumber
+                        [(ngModel)]="hourProductionInput.output"
+                        [showButtons]="true"
+                        buttonLayout="horizontal"
+                        [min]="0"
+                        inputStyleClass="large-input"
+                        decrementButtonClass="input-number-btn"
+                        incrementButtonClass="input-number-btn"
+                        styleClass="w-full">
+                    </p-inputNumber>
+                    <span class="input-helper">Target: {{ session.hours[selectedHourIndex].target }}</span>
+                </div>
+
+                <div class="drawer-metric-input mt-3">
+                    <label>Scrap</label>
+                    <p-inputNumber
+                        [(ngModel)]="hourProductionInput.scrap"
+                        [showButtons]="true"
+                        buttonLayout="horizontal"
+                        [min]="0"
+                        inputStyleClass="large-input scrap-input"
+                        decrementButtonClass="input-number-btn"
+                        incrementButtonClass="input-number-btn"
+                        styleClass="w-full">
+                    </p-inputNumber>
+                </div>
+            </div>
+
+            <!-- Downtimes Section -->
+            <div class="drawer-section" *ngIf="teamConfirmed">
+                <h4 class="section-title">
+                    <i class="pi pi-exclamation-triangle"></i> Downtimes
+                    <span class="downtime-count-badge" *ngIf="hourProductionInput.downtimes && hourProductionInput.downtimes.length > 0">
+                        ({{ hourProductionInput.downtimes.length }})
+                    </span>
+                </h4>
+
+                <!-- Existing Downtimes -->
+                <div class="downtimes-list" *ngIf="hourProductionInput.downtimes && hourProductionInput.downtimes.length > 0">
+                    <div class="downtime-item" *ngFor="let dt of hourProductionInput.downtimes; let idx = index">
+                        <div class="downtime-item-content">
+                            <span class="downtime-duration"><i class="pi pi-clock"></i> {{ dt.duration }} min</span>
+                            <p-tag [value]="getDowntimeProblemName(dt.problemId)" severity="warn"></p-tag>
+                        </div>
+                        <p-button icon="pi pi-trash" severity="danger" [text]="true"
+                            (onClick)="removeDowntimeFromDialog(idx)">
+                        </p-button>
+                    </div>
+                </div>
+
+                <!-- Add Downtime Button -->
+                <p-button
+                    *ngIf="!showAddDowntimeForm"
+                    label="Add Downtime"
+                    icon="pi pi-plus"
+                    [outlined]="true"
+                    styleClass="w-full mt-2 action-button-touch"
+                    (onClick)="showAddDowntimeForm = true; resetNewDowntimeForm()">
+                </p-button>
+
+                <!-- Add Downtime Form -->
+                <div *ngIf="showAddDowntimeForm" class="new-downtime-form mt-3">
+                    <div class="form-field">
+                        <label>Duration (minutes) *</label>
+                        <p-inputNumber
+                            [(ngModel)]="newDowntimeInput.duration"
+                            [min]="1" [max]="60"
+                            [showButtons]="true"
+                            buttonLayout="horizontal"
+                            suffix=" min"
+                            inputStyleClass="input-number-styled"
+                            decrementButtonClass="input-number-btn"
+                            incrementButtonClass="input-number-btn"
+                            styleClass="w-full">
+                        </p-inputNumber>
+                    </div>
+                    <div class="form-field mt-2">
+                        <label>Description *</label>
+                        <textarea pTextarea [(ngModel)]="newDowntimeInput.comment" rows="2" class="w-full" placeholder="Describe the downtime issue..."></textarea>
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <p-button label="Add" icon="pi pi-check" styleClass="flex-1 action-button-touch"
+                            (onClick)="confirmAddDowntimeInDialog()">
+                        </p-button>
+                        <p-button label="Cancel" icon="pi pi-times" severity="secondary" [outlined]="true"
+                            styleClass="flex-1 action-button-touch" (onClick)="cancelAddDowntimeInDialog()">
+                        </p-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </ng-template>
+
+    <ng-template pTemplate="footer">
+        <div class="drawer-footer">
+            <p-button label="Cancel" icon="pi pi-times" severity="secondary" [outlined]="true"
+                styleClass="flex-1 action-button-touch" (onClick)="closeHourDrawer()">
+            </p-button>
+            <p-button label="Save" icon="pi pi-check" severity="success"
+                styleClass="flex-1 action-button-touch" [disabled]="!teamConfirmed" (onClick)="saveHourProduction()">
+            </p-button>
+        </div>
+    </ng-template>
+</p-drawer>
 
 <p-toast position="top-right"></p-toast>

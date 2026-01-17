@@ -15,6 +15,7 @@ export interface DashboardResponse {
     production_lines: ProductionLine[];
     output_chart: { labels: string[]; data: number[]; targets: number[] };
     downtime_chart: { labels: string[]; data: number[] };
+    machine_downtime_chart?: { labels: string[]; data: number[] };
     last_updated: string;
 }
 

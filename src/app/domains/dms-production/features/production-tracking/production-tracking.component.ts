@@ -877,10 +877,10 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
         const declaration = this.currentDowntimeDeclaration;
 
         const downtime = {
-            Total_Downtime: declaration?.duration || this.currentDowntime,
-            Comment_Downtime: declaration?.reason || this.downtimeComment,
-            Id_HourlyProd: hourlyProdId,
-            Id_DowntimeProblems: declaration?.problemType || this.selectedProblem,
+            duration: declaration?.duration || this.currentDowntime,
+            comment: declaration?.reason || this.downtimeComment,
+            hourly_production: hourlyProdId,
+            problem: declaration?.problemType || this.selectedProblem,
             machine: declaration?.machine || undefined
         };
 

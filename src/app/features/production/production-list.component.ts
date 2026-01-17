@@ -13,6 +13,12 @@ import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TooltipModule } from 'primeng/tooltip';
 import { MenuModule } from 'primeng/menu';
+import { DrawerModule } from 'primeng/drawer';
+import { SkeletonModule } from 'primeng/skeleton';
+import { DividerModule } from 'primeng/divider';
+import { AccordionModule } from 'primeng/accordion';
+import { AvatarModule } from 'primeng/avatar';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from './production.service';
 import { ExportService } from '../../core/services/export.service';
@@ -48,7 +54,13 @@ interface ProductionListItem extends HourlyProduction {
         ToastModule,
         ConfirmDialogModule,
         TooltipModule,
-        MenuModule
+        MenuModule,
+        DrawerModule,
+        SkeletonModule,
+        DividerModule,
+        AccordionModule,
+        AvatarModule,
+        ProgressBarModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './production-list.component.html',
@@ -70,9 +82,21 @@ export class ProductionListComponent implements OnInit {
     shifts: Shift[] = [];
     projects: Project[] = [];
     productionLines: ProductionLine[] = [];
+    allProductionLines: ProductionLine[] = []; // Store all lines for independent filtering
     parts: Part[] = [];
+    allParts: Part[] = []; // Store all parts for independent filtering
 
     isLoading = false;
+
+    // Detail Preview Drawer
+    showDetailDrawer = false;
+    selectedProduction: ProductionListItem | null = null;
+    isLoadingDetails = false;
+
+    // Detail data for drawer
+    detailTeamMembers: { name: string; workstation: string; badge: string }[] = [];
+    detailDowntimes: { duration: number; problem: string; comment: string }[] = [];
+    detailHourlyData: { hour: number; output: number; target: number; efficiency: number }[] = [];
 
     // Export menu items
     exportMenuItems: MenuItem[] = [
@@ -111,6 +135,18 @@ export class ProductionListComponent implements OnInit {
             // Load productions after we have projects data
             this.loadProductions();
         });
+
+        // Load all production lines for independent filtering
+        this.productionService.getProductionLines().subscribe(lines => {
+            this.allProductionLines = lines;
+            this.productionLines = lines; // Initially show all lines
+        });
+
+        // Load all parts for independent filtering
+        this.productionService.getParts().subscribe(parts => {
+            this.allParts = parts;
+            this.parts = parts; // Initially show all parts
+        });
     }
 
     loadFilterOptions(): void {
@@ -139,6 +175,9 @@ export class ProductionListComponent implements OnInit {
         if (this.filterPart) {
             params.partId = this.filterPart.Id_Part;
         }
+        if (this.filterProject) {
+            params.projectId = this.filterProject.Id_Project;
+        }
 
         console.log('Loading productions with params:', params);
 
@@ -166,17 +205,41 @@ export class ProductionListComponent implements OnInit {
 
     onFilterChange(): void {
         if (this.filterProject) {
-            this.productionService.getProductionLines(this.filterProject.Id_Project)
-                .subscribe(lines => this.productionLines = lines);
-            this.productionService.getParts(this.filterProject.Id_Project)
-                .subscribe(parts => this.parts = parts);
+            // Filter lines and parts by selected project
+            this.productionLines = this.allProductionLines.filter(
+                line => line.projectId === this.filterProject!.Id_Project
+            );
+            this.parts = this.allParts.filter(
+                part => part.Id_Project === this.filterProject!.Id_Project
+            );
+            // Clear line/part selection if not in filtered list
+            if (this.filterLine && !this.productionLines.find(l => l.id === this.filterLine!.id)) {
+                this.filterLine = null;
+            }
+            if (this.filterPart && !this.parts.find(p => p.Id_Part === this.filterPart!.Id_Part)) {
+                this.filterPart = null;
+            }
         } else {
-            this.productionLines = [];
-            this.parts = [];
-            this.filterLine = null;
-            this.filterPart = null;
+            // Show all lines and parts when no project selected
+            this.productionLines = this.allProductionLines;
+            this.parts = this.allParts;
         }
 
+        this.loadProductions();
+    }
+
+    onLineFilterChange(): void {
+        // When a line is selected, auto-select its project
+        if (this.filterLine && !this.filterProject) {
+            const project = this.projects.find(p => p.Id_Project === this.filterLine!.projectId);
+            if (project) {
+                this.filterProject = project;
+                // Filter parts by project
+                this.parts = this.allParts.filter(
+                    part => part.Id_Project === project.Id_Project
+                );
+            }
+        }
         this.loadProductions();
     }
 
@@ -199,8 +262,9 @@ export class ProductionListComponent implements OnInit {
         this.filterLine = null;
         this.filterPart = null;
         this.globalFilterValue = '';
-        this.productionLines = [];
-        this.parts = [];
+        // Reset to show all lines and parts
+        this.productionLines = this.allProductionLines;
+        this.parts = this.allParts;
         this.loadProductions();
     }
 
@@ -423,5 +487,107 @@ export class ProductionListComponent implements OnInit {
                 }
             });
         }
+    }
+
+    // ==========================================
+    // Detail Preview Drawer Methods
+    // ==========================================
+
+    openDetailPreview(production: ProductionListItem): void {
+        this.selectedProduction = production;
+        this.showDetailDrawer = true;
+        this.isLoadingDetails = true;
+        this.loadProductionDetailData(production);
+    }
+
+    closeDetailPreview(): void {
+        this.showDetailDrawer = false;
+        this.selectedProduction = null;
+        this.detailTeamMembers = [];
+        this.detailDowntimes = [];
+        this.detailHourlyData = [];
+    }
+
+    loadProductionDetailData(production: ProductionListItem): void {
+        const hourlyProdId = production.Id_HourlyProd;
+
+        // Load team assignments
+        this.productionService.getTeamAssignments(hourlyProdId).subscribe({
+            next: (assignments: any[]) => {
+                this.detailTeamMembers = assignments.map(a => ({
+                    name: a.employee_name || 'Unknown Employee',
+                    workstation: a.workstation_name || '-',
+                    badge: a.employee_id || '-'
+                }));
+                this.isLoadingDetails = false;
+            },
+            error: () => {
+                this.detailTeamMembers = [];
+                this.isLoadingDetails = false;
+            }
+        });
+
+        // Load downtimes
+        this.productionService.getDowntimes(hourlyProdId).subscribe({
+            next: (downtimes: any[]) => {
+                this.detailDowntimes = downtimes.map(d => ({
+                    duration: d.Total_Downtime || d.duration || 0,
+                    problem: d.problem_name || 'Unknown',
+                    comment: d.Comment_Downtime || d.comment || ''
+                }));
+            },
+            error: () => this.detailDowntimes = []
+        });
+
+        // Load shift hourly data
+        this.loadShiftHourlyData(production);
+    }
+
+    loadShiftHourlyData(production: ProductionListItem): void {
+        const dateStr = production.Date_HourlyProd instanceof Date
+            ? production.Date_HourlyProd.toISOString().split('T')[0]
+            : String(production.Date_HourlyProd).split('T')[0];
+
+        this.productionService.getHourlyProductions({
+            date: dateStr,
+            shift: production.Shift_HourlyProd,
+            lineId: production.Id_ProdLine,
+            partId: production.Id_Part
+        }).subscribe({
+            next: (productions) => {
+                this.detailHourlyData = productions
+                    .sort((a, b) => a.Hour_HourlyProd - b.Hour_HourlyProd)
+                    .map(p => ({
+                        hour: p.Hour_HourlyProd,
+                        output: p.Result_HourlyProdPN,
+                        target: p.Target_HourlyProdPN,
+                        efficiency: p.Target_HourlyProdPN > 0
+                            ? Math.round((p.Result_HourlyProdPN / p.Target_HourlyProdPN) * 100)
+                            : 0
+                    }));
+            },
+            error: () => this.detailHourlyData = []
+        });
+    }
+
+    goToFullPage(): void {
+        if (this.selectedProduction) {
+            this.viewDetails(this.selectedProduction);
+            this.closeDetailPreview();
+        }
+    }
+
+    get totalDowntime(): number {
+        return this.detailDowntimes.reduce((sum, d) => sum + d.duration, 0);
+    }
+
+    get shiftTotals(): { output: number; target: number; efficiency: number } {
+        const output = this.detailHourlyData.reduce((sum, h) => sum + h.output, 0);
+        const target = this.detailHourlyData.reduce((sum, h) => sum + h.target, 0);
+        return {
+            output,
+            target,
+            efficiency: target > 0 ? Math.round((output / target) * 100) : 0
+        };
     }
 }

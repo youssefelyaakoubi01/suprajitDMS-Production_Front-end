@@ -170,6 +170,7 @@ export interface Qualification {
     employee: number;
     formation: number;
     project: number | null;
+    poste: number | null;
     trainer: number | null;
     // Joined fields (read-only from API)
     employee_name?: string;
@@ -177,6 +178,7 @@ export interface Qualification {
     employee_picture?: string;
     formation_name?: string;
     project_name?: string;
+    poste_name?: string;
     trainer_name?: string;
     Employee?: Employee;
     Formation?: Formation;

@@ -66,6 +66,12 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
         loadComponent: () =>
             import('@features/settings/user-settings.component').then(m => m.UserSettingsComponent),
         title: 'User Settings'
+    },
+    {
+        path: 'qualified-employees',
+        loadComponent: () =>
+            import('./features/qualified-employees/qualified-employees.component').then(m => m.QualifiedEmployeesComponent),
+        title: 'Qualified Employees'
     }
 ];
 

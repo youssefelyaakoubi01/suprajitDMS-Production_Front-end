@@ -371,11 +371,15 @@ export class ProductionService {
 
         const apiData: any = {
             duration: data.Total_Downtime,
-            comment: data.Comment_Downtime,
-            problem: data.Id_DowntimeProblems,
+            comment: data.Comment_Downtime || '',
             hourly_production: hourlyProductionValue,
             machine: (data as any).machine || null
         };
+
+        // Only include problem if it's a valid non-zero value
+        if (data.Id_DowntimeProblems && data.Id_DowntimeProblems > 0) {
+            apiData.problem = data.Id_DowntimeProblems;
+        }
 
         console.log('Downtime API data being sent:', apiData);
 
@@ -389,11 +393,16 @@ export class ProductionService {
     updateDowntime(id: number, data: Partial<Downtime>): Observable<Downtime> {
         const apiData: any = {
             duration: data.Total_Downtime,
-            comment: data.Comment_Downtime,
-            problem: data.Id_DowntimeProblems,
+            comment: data.Comment_Downtime || '',
             hourly_production: data.Id_HourlyProd,
             machine: (data as any).machine || null
         };
+
+        // Only include problem if it's a valid non-zero value
+        if (data.Id_DowntimeProblems && data.Id_DowntimeProblems > 0) {
+            apiData.problem = data.Id_DowntimeProblems;
+        }
+
         return this.coreService.updateDowntime(id, apiData);
     }
 
@@ -407,6 +416,7 @@ export class ProductionService {
         hour?: number;
         lineId?: number;
         partId?: number;
+        projectId?: number;
     }): Observable<HourlyProduction[]> {
         // Map front-end parameter names to Django API parameter names
         const apiParams: any = {};
@@ -415,6 +425,7 @@ export class ProductionService {
         if (params?.hour !== undefined) apiParams.hour = params.hour;
         if (params?.lineId) apiParams.production_line = params.lineId;  // Django expects 'production_line'
         if (params?.partId) apiParams.part = params.partId;  // Django expects 'part'
+        if (params?.projectId) apiParams.production_line__project = params.projectId;  // Django expects 'production_line__project'
 
         return this.coreService.getHourlyProduction(apiParams).pipe(
             map((response: any) => {

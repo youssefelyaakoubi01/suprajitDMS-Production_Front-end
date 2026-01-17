@@ -140,15 +140,31 @@ import { KPI, ProductionLine, Project } from '@core/models';
                     </div>
                 </p-card>
 
-                <!-- Downtime Analysis Chart -->
+                <!-- Downtime by Category Chart -->
                 <p-card styleClass="chart-card">
                     <ng-template pTemplate="header">
                         <div class="card-header">
-                            <h3 class="card-title">Downtime Analysis</h3>
+                            <h3 class="card-title">Downtime by Category</h3>
                         </div>
                     </ng-template>
                     <div class="chart-container">
                         <p-chart type="bar" [data]="downtimeChartData" [options]="horizontalChartOptions"></p-chart>
+                    </div>
+                </p-card>
+            </div>
+
+            <!-- Downtime by Machine Chart Row -->
+            <div class="charts-grid charts-grid-full">
+                <p-card styleClass="chart-card">
+                    <ng-template pTemplate="header">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="pi pi-cog mr-2"></i>Downtime by Machine
+                            </h3>
+                        </div>
+                    </ng-template>
+                    <div class="chart-container">
+                        <p-chart type="bar" [data]="machineDowntimeChartData" [options]="horizontalChartOptions"></p-chart>
                     </div>
                 </p-card>
             </div>
@@ -281,6 +297,10 @@ import { KPI, ProductionLine, Project } from '@core/models';
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
+
+            &.charts-grid-full {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 992px) {
@@ -331,6 +351,7 @@ export class ProductionDashboardComponent implements OnInit, OnDestroy {
     // Chart data
     outputChartData: any;
     downtimeChartData: any;
+    machineDowntimeChartData: any;
     chartOptions: any;
     horizontalChartOptions: any;
 
@@ -389,6 +410,7 @@ export class ProductionDashboardComponent implements OnInit, OnDestroy {
                     this.productionLines = data.production_lines;
                     this.setupOutputChart(data.output_chart);
                     this.setupDowntimeChart(data.downtime_chart);
+                    this.setupMachineDowntimeChart(data.machine_downtime_chart);
                     this.lastUpdated = new Date(data.last_updated);
                     this.loading = false;
                     this.refreshed.emit();
@@ -420,6 +442,7 @@ export class ProductionDashboardComponent implements OnInit, OnDestroy {
                     this.productionLines = data.production_lines;
                     this.setupOutputChart(data.output_chart);
                     this.setupDowntimeChart(data.downtime_chart);
+                    this.setupMachineDowntimeChart(data.machine_downtime_chart);
                     this.lastUpdated = new Date(data.last_updated);
                     this.refreshed.emit();
                 }
@@ -550,6 +573,40 @@ export class ProductionDashboardComponent implements OnInit, OnDestroy {
                     borderRadius: 4
                 }
             ]
+        };
+    }
+
+    private setupMachineDowntimeChart(data?: { labels: string[]; data: number[] }): void {
+        if (!data || !data.labels || data.labels.length === 0) {
+            // Default empty chart if no machine data
+            this.machineDowntimeChartData = {
+                labels: ['No Data'],
+                datasets: [{
+                    label: 'Minutes',
+                    data: [0],
+                    backgroundColor: ['#9CA3AF'],
+                    borderRadius: 4
+                }]
+            };
+            return;
+        }
+
+        // Generate colors based on downtime severity
+        const colors = data.data.map(value => {
+            if (value > 120) return '#EF4444'; // Red for > 2 hours
+            if (value > 60) return '#F59E0B';  // Orange for > 1 hour
+            if (value > 30) return '#3B82F6';  // Blue for > 30 min
+            return '#10B981';                   // Green for <= 30 min
+        });
+
+        this.machineDowntimeChartData = {
+            labels: data.labels,
+            datasets: [{
+                label: 'Minutes',
+                data: data.data,
+                backgroundColor: colors,
+                borderRadius: 4
+            }]
         };
     }
 }

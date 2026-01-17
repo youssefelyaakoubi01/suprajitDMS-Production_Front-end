@@ -47,6 +47,11 @@ export class AppDmsMenu {
                         label: 'Declare Downtime',
                         icon: 'pi pi-fw pi-exclamation-triangle',
                         routerLink: ['/dms-production/downtime-declaration']
+                    },
+                    {
+                        label: 'Qualified Employees',
+                        icon: 'pi pi-fw pi-verified',
+                        routerLink: ['/dms-production/qualified-employees']
                     }
                 ]
             },

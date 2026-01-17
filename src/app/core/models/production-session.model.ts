@@ -35,6 +35,8 @@ export interface HourlyProductionState {
     totalDowntime: number; // Sum of all downtimes in minutes
     hourlyProductionId: number | null; // ID after save
     team: EmployeeWithAssignment[]; // Team assigned to this specific hour
+    quickEntryMode?: boolean; // Enable quick entry mode for simple hours
+    quickOutput?: number | null; // Quick entry output value
 }
 
 // Target percentages for each hour type
@@ -104,4 +106,15 @@ export interface HourProductionInput {
         machineId?: number;
         comment: string;
     };
+}
+
+// Workflow step type for stepper navigation
+export type WorkflowStep = 1 | 2 | 3;
+
+// MeterGroup item for efficiency visualization
+export interface MeterItem {
+    label: string;
+    value: number;
+    color: string;
+    icon?: string;
 }
