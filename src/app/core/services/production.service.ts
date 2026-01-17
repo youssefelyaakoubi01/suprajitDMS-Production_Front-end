@@ -261,6 +261,10 @@ export class ProductionService {
         return this.api.patch<HourlyProduction>(`${this.endpoint}/hourly/${hourlyProductionId}`, { shift_type: shiftTypeId });
     }
 
+    patchHourlyProductionOrderNo(hourlyProductionId: number, orderNo: string): Observable<HourlyProduction> {
+        return this.api.patch<HourlyProduction>(`${this.endpoint}/hourly/${hourlyProductionId}`, { order_no: orderNo });
+    }
+
     // Downtime
     getDowntimes(hourlyProdId?: number): Observable<Downtime[]> {
         const params = hourlyProdId ? { hourly_production: hourlyProdId } : undefined;

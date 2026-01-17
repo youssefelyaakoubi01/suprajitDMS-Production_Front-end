@@ -2020,6 +2020,29 @@ export class ProductionComponent implements OnInit, OnDestroy {
     onOrderNoChange(): void {
         // Save session to localStorage when order number is modified
         this.saveSessionToStorage();
+
+        // Update existing hourly production records with new order_no
+        this.updateExistingRecordsOrderNo();
+    }
+
+    private updateExistingRecordsOrderNo(): void {
+        if (!this.session.orderNo) return;
+
+        // Get all hours that have been saved (have hourlyProductionId)
+        const savedHours = this.session.hours.filter(h => h.hourlyProductionId && typeof h.hourlyProductionId === 'number');
+
+        if (savedHours.length === 0) return;
+
+        // Update each saved record with the new order_no
+        savedHours.forEach(hour => {
+            this.productionService.updateHourlyProductionOrderNo(
+                hour.hourlyProductionId as number,
+                this.session.orderNo
+            ).subscribe({
+                next: () => console.log(`Updated order_no for hour ${hour.hour}`),
+                error: (err) => console.error(`Failed to update order_no for hour ${hour.hour}:`, err)
+            });
+        });
     }
 
     onHourTypeChange(hourIndex: number, newType: HourType): void {

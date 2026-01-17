@@ -488,6 +488,10 @@ export class ProductionService {
         return this.coreService.patchHourlyProductionShiftType(hourlyProductionId, shiftTypeId);
     }
 
+    updateHourlyProductionOrderNo(id: number, orderNo: string): Observable<HourlyProduction> {
+        return this.coreService.patchHourlyProductionOrderNo(id, orderNo);
+    }
+
     /**
      * Format a Date object to YYYY-MM-DD string using local timezone
      * This prevents timezone conversion issues where toISOString() would shift the date
