@@ -176,8 +176,22 @@ interface QualifiedEmployee {
                               optionValue="id"
                               placeholder="All Projects"
                               [showClear]="true"
+                              [filter]="true"
+                              filterBy="name"
+                              filterPlaceholder="Search project..."
                               appendTo="body"
                               styleClass="filter-select">
+                    </p-select>
+                </div>
+                <div class="filter-group">
+                    <p-select [options]="statusOptions"
+                              [ngModel]="selectedStatus()"
+                              (ngModelChange)="selectedStatus.set($event)"
+                              optionLabel="label"
+                              optionValue="value"
+                              placeholder="Filter by Status"
+                              appendTo="body"
+                              [style]="{ minWidth: '150px' }">
                     </p-select>
                 </div>
                 <div class="filter-group">
@@ -245,7 +259,6 @@ interface QualifiedEmployee {
                                 Formation
                                 <p-sortIcon field="formation_name"></p-sortIcon>
                             </th>
-                            <th style="width: 80px" class="text-center">Level</th>
                             <th pSortableColumn="qualification_end" style="width: 130px">
                                 Valid Until
                                 <p-sortIcon field="qualification_end"></p-sortIcon>
@@ -285,11 +298,6 @@ interface QualifiedEmployee {
                                     <span class="formation-name">{{ emp.formation_name }}</span>
                                 </div>
                             </td>
-                            <td class="text-center">
-                                <span class="level-badge" [ngClass]="'level-' + emp.qualification_level">
-                                    {{ emp.qualification_level }}
-                                </span>
-                            </td>
                             <td>
                                 <span class="date-cell">
                                     <i class="pi pi-calendar"></i>
@@ -306,7 +314,7 @@ interface QualifiedEmployee {
 
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="8">
+                            <td colspan="7">
                                 <div class="empty-state">
                                     <div class="empty-icon">
                                         <i class="pi pi-verified"></i>
@@ -696,37 +704,6 @@ interface QualifiedEmployee {
             }
         }
 
-        .level-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 0.875rem;
-
-            &.level-1 {
-                background: rgba(239, 68, 68, 0.1);
-                color: #DC2626;
-            }
-
-            &.level-2 {
-                background: rgba(245, 158, 11, 0.1);
-                color: #D97706;
-            }
-
-            &.level-3 {
-                background: rgba(16, 185, 129, 0.1);
-                color: #059669;
-            }
-
-            &.level-4 {
-                background: rgba(59, 130, 246, 0.1);
-                color: #2563EB;
-            }
-        }
-
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -821,6 +798,12 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
     badgeEmployeeId = signal<number | null>(null);
     selectedProject = signal<number | null>(null);
     searchTerm = signal('');
+    selectedStatus = signal<'all' | 'valid' | 'expired'>('all');
+    statusOptions = [
+        { label: 'All', value: 'all' },
+        { label: 'Valid', value: 'valid' },
+        { label: 'Expired', value: 'expired' }
+    ];
 
     // Computed: Transform qualifications to QualifiedEmployee display format
     private qualifiedEmployees = computed(() => {
@@ -861,6 +844,14 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
                 e.employee_name?.toLowerCase().includes(termLower) ||
                 e.formation_name?.toLowerCase().includes(termLower)
             );
+        }
+
+        // Filter by status
+        const status = this.selectedStatus();
+        if (status === 'valid') {
+            result = result.filter(e => e.is_valid);
+        } else if (status === 'expired') {
+            result = result.filter(e => !e.is_valid);
         }
 
         return result;
