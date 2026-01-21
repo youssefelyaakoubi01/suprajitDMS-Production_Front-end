@@ -188,6 +188,18 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                               styleClass="filter-select">
                     </p-select>
                 </div>
+                <div class="filter-group">
+                    <p-select [options]="projects"
+                              [ngModel]="selectedProject()"
+                              (ngModelChange)="selectedProject.set($event)"
+                              optionLabel="name"
+                              optionValue="id"
+                              placeholder="Tous les projets"
+                              [showClear]="true"
+                              appendTo="body"
+                              styleClass="filter-select">
+                    </p-select>
+                </div>
                 <div class="filter-chips">
                     <button *ngFor="let result of resultOptions"
                             pButton pRipple
@@ -255,6 +267,10 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                                 <p-sortIcon field="end_date"></p-sortIcon>
                             </th>
                             <th style="width: 150px">Formateur</th>
+                            <th pSortableColumn="project_name" style="width: 150px">
+                                Projet
+                                <p-sortIcon field="project_name"></p-sortIcon>
+                            </th>
                             <th pSortableColumn="test_result" style="width: 130px">
                                 Résultat
                                 <p-sortIcon field="test_result"></p-sortIcon>
@@ -308,6 +324,15 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                                 </ng-template>
                             </td>
                             <td>
+                                <p-tag *ngIf="qual.project_name; else noProject"
+                                       [value]="qual.project_name"
+                                       severity="info">
+                                </p-tag>
+                                <ng-template #noProject>
+                                    <span class="no-data">-</span>
+                                </ng-template>
+                            </td>
+                            <td>
                                 <div class="result-badge" [ngClass]="'result-' + (qual.test_result || 'pending').toLowerCase().replace(' ', '-')">
                                     <i [class]="getResultIcon(qual.test_result)"></i>
                                     <span>{{ getResultLabel(qual.test_result) }}</span>
@@ -332,13 +357,13 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
 
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="7">
+                            <td colspan="8">
                                 <div class="hr-empty-state compact">
                                     <div class="empty-icon">
                                         <i class="pi pi-verified"></i>
                                     </div>
                                     <h3>Aucune qualification trouvée</h3>
-                                    <p>{{ searchTerm() || selectedResult() ? 'Essayez de modifier vos filtres' : 'Commencez par ajouter une qualification' }}</p>
+                                    <p>{{ searchTerm() || selectedResult() || selectedProject() ? 'Essayez de modifier vos filtres' : 'Commencez par ajouter une qualification' }}</p>
                                     <button pButton pRipple label="Nouvelle Qualification" icon="pi pi-plus"
                                             class="p-button-primary"
                                             (click)="openNewQualificationDialog()">
@@ -1120,6 +1145,7 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     badgeFilter = signal<string | null>(null);
     badgeEmployeeId = signal<number | null>(null); // Employee ID found by badge search
     badgeScan = '';
+    selectedProject = signal<number | null>(null);
 
     showQualificationDialog = false;
     editingQualification: Qualification | null = null;
@@ -1188,6 +1214,12 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
                 }
                 return false;
             });
+        }
+
+        // Filter by project
+        const projectId = this.selectedProject();
+        if (projectId) {
+            result = result.filter(q => q.project === projectId);
         }
 
         // Filter by result

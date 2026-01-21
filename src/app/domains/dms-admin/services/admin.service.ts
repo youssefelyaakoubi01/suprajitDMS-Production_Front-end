@@ -222,11 +222,11 @@ export class AdminService {
     // ==================== EMPLOYEES FOR LINKING ====================
 
     getAvailableEmployees(): Observable<{ id: number; name: string; badge?: string }[]> {
-        return this.api.get<any[]>('employees').pipe(
+        return this.api.get<any[]>('employees/minimal').pipe(
             map(employees => employees.map(emp => ({
-                id: emp.Id_Emp || emp.id,
-                name: `${emp.Prenom_Emp || emp.first_name || ''} ${emp.Nom_Emp || emp.last_name || ''}`.trim(),
-                badge: emp.Badge_Emp || emp.badge
+                id: emp.id,
+                name: emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
+                badge: emp.employee_id
             }))),
             catchError(() => of([]))
         );
