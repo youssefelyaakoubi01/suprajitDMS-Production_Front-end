@@ -331,16 +331,23 @@ export class ProductionService {
             production_line: data.production_line || data.Id_ProdLine,
             machine: data.machine || null,
             result: data.result ?? data.Result_HourlyProdPN ?? 0,
-            target: data.target ?? data.Target_HourlyProdPN ?? 0,
-            headcount: data.headcount ?? data.HC_HourlyProdPN ?? 0,
+            scrap: data.scrap ?? data.Scrap_HourlyProdPN ?? 0,
             // Order Number
-            order_no: data.order_no || '',
+            order_no: data.order_no ?? '',
             // Production Supervisors & Key Personnel
             line_leader: data.line_leader || '',
             quality_agent: data.quality_agent || '',
             maintenance_tech: data.maintenance_tech || '',
             pqc: data.pqc || ''
         };
+
+        // Only include target and headcount if they are provided (to avoid overwriting with 0)
+        if (data.target !== undefined || data.Target_HourlyProdPN !== undefined) {
+            apiData.target = data.target ?? data.Target_HourlyProdPN ?? 0;
+        }
+        if (data.headcount !== undefined || data.HC_HourlyProdPN !== undefined) {
+            apiData.headcount = data.headcount ?? data.HC_HourlyProdPN ?? 0;
+        }
 
         return this.coreService.updateHourlyProduction(id, apiData);
     }
@@ -439,12 +446,15 @@ export class ProductionService {
                     Result_HourlyProdPN: p.result,
                     Target_HourlyProdPN: p.target,
                     HC_HourlyProdPN: p.headcount,
+                    Scrap_HourlyProdPN: p.scrap,
                     Id_ProdLine: p.production_line,
                     // Additional fields for display
                     shiftName: p.shift_name,
                     projectName: p.project_name,
                     lineName: p.line_name,
                     partNumber: p.part_number,
+                    // Order number
+                    order_no: p.order_no,
                     // Shift type info for hour type persistence
                     shift_type: p.shift_type,
                     shift_type_code: p.shift_type_code,

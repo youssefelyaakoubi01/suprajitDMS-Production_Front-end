@@ -326,14 +326,19 @@
 
                     <div class="form-field">
                         <p-floatLabel variant="on">
-                            <input
-                                id="orderNo"
-                                type="text"
-                                pInputText
-                                [(ngModel)]="session.orderNo"
-                                [ngModelOptions]="{standalone: true}"
-                                (ngModelChange)="onOrderNoChange()"
-                                class="w-full">
+                            <p-iconfield>
+                                <input
+                                    id="orderNo"
+                                    type="text"
+                                    pInputText
+                                    [(ngModel)]="session.orderNo"
+                                    [ngModelOptions]="{standalone: true}"
+                                    (ngModelChange)="onOrderNoChange()"
+                                    class="w-full">
+                                <p-inputicon *ngIf="isUpdatingOrderNo">
+                                    <i class="pi pi-spin pi-spinner"></i>
+                                </p-inputicon>
+                            </p-iconfield>
                             <label for="orderNo">Order NO</label>
                         </p-floatLabel>
                     </div>
@@ -1679,3 +1684,4 @@
 </p-drawer>
 
 <p-toast position="top-right"></p-toast>
+<p-confirmDialog></p-confirmDialog>

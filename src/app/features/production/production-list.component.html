@@ -409,5 +409,150 @@
     </ng-template>
 </p-drawer>
 
+<!-- Edit Production Dialog -->
+<p-dialog
+    [(visible)]="showEditDialog"
+    [modal]="true"
+    [style]="{ width: '700px' }"
+    [breakpoints]="{ '768px': '95vw' }"
+    header="Modifier l'enregistrement"
+    (onHide)="hideEditDialog()">
+
+    <div *ngIf="editingProduction" class="edit-dialog-content">
+
+        <!-- SECTION 1: Info Context (read-only OU éditable selon mode) -->
+        <div class="info-banner mb-4">
+            <!-- Mode simple: affichage lecture seule -->
+            <div *ngIf="!isAdvancedMode">
+                <div class="grid">
+                    <div class="col-6 md:col-3">
+                        <span class="text-sm text-color-secondary">Date</span>
+                        <p class="m-0 font-medium">{{ formatDate(editingProduction.Date_HourlyProd) }}</p>
+                    </div>
+                    <div class="col-6 md:col-3">
+                        <span class="text-sm text-color-secondary">Shift</span>
+                        <p class="m-0 font-medium">{{ editingProduction.shiftName }}</p>
+                    </div>
+                    <div class="col-6 md:col-3">
+                        <span class="text-sm text-color-secondary">Heure</span>
+                        <p class="m-0 font-medium">H{{ editingProduction.Hour_HourlyProd }}</p>
+                    </div>
+                    <div class="col-6 md:col-3">
+                        <span class="text-sm text-color-secondary">Ligne</span>
+                        <p class="m-0 font-medium">{{ editingProduction.lineName }}</p>
+                    </div>
+                </div>
+                <div class="grid mt-2">
+                    <div class="col-4">
+                        <span class="text-sm text-color-secondary">Projet</span>
+                        <p class="m-0 font-medium">{{ editingProduction.projectName }}</p>
+                    </div>
+                    <div class="col-4">
+                        <span class="text-sm text-color-secondary">Part Number</span>
+                        <p class="m-0 font-medium">{{ editingProduction.partNumber }}</p>
+                    </div>
+                    <div class="col-4">
+                        <span class="text-sm text-color-secondary">Order NO</span>
+                        <p class="m-0 font-medium">{{ editingProduction.orderNo || '-' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode avancé: champs éditables -->
+            <div *ngIf="isAdvancedMode" class="grid p-fluid">
+                <div class="col-12 md:col-6 mb-3">
+                    <label class="block mb-2 font-medium">Date</label>
+                    <p-datepicker [(ngModel)]="editAdvanced.date" [showIcon]="true" dateFormat="dd/mm/yy"></p-datepicker>
+                </div>
+                <div class="col-12 md:col-6 mb-3">
+                    <label class="block mb-2 font-medium">Shift</label>
+                    <p-select [(ngModel)]="editAdvanced.shift" [options]="shifts" optionLabel="name" placeholder="Sélectionner un shift"></p-select>
+                </div>
+                <div class="col-12 md:col-6 mb-3">
+                    <label class="block mb-2 font-medium">Ligne de production</label>
+                    <p-select [(ngModel)]="editAdvanced.line" [options]="allProductionLines" optionLabel="name" [filter]="true" placeholder="Sélectionner une ligne"></p-select>
+                </div>
+                <div class="col-12 md:col-6 mb-3">
+                    <label class="block mb-2 font-medium">Part Number</label>
+                    <p-select [(ngModel)]="editAdvanced.part" [options]="allParts" optionLabel="PN_Part" [filter]="true" placeholder="Sélectionner un part"></p-select>
+                </div>
+                <div class="col-12">
+                    <div class="p-3 surface-200 border-round text-sm">
+                        <i class="pi pi-info-circle mr-2"></i>
+                        <strong>Heure:</strong> H{{ editingProduction.Hour_HourlyProd }} (non modifiable)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p-divider></p-divider>
+
+        <!-- SECTION 2: Champs production éditables -->
+        <div class="grid p-fluid">
+            <!-- Order NO -->
+            <div class="col-12 mb-3">
+                <label for="editOrderNo" class="block mb-2 font-medium">Order NO</label>
+                <input pInputText id="editOrderNo" [(ngModel)]="editForm.orderNo" placeholder="Numéro de commande">
+            </div>
+
+            <div class="col-12 md:col-6 mb-3">
+                <label for="editOutput" class="block mb-2 font-medium">Output (Résultat)</label>
+                <p-inputNumber id="editOutput" [(ngModel)]="editForm.output" [min]="0" [showButtons]="true"
+                    buttonLayout="horizontal" spinnerMode="horizontal"
+                    decrementButtonClass="p-button-secondary" incrementButtonClass="p-button-secondary"
+                    incrementButtonIcon="pi pi-plus" decrementButtonIcon="pi pi-minus">
+                </p-inputNumber>
+            </div>
+
+            <div class="col-12 md:col-6 mb-3">
+                <label class="block mb-2 font-medium">Target</label>
+                <div class="p-3 surface-200 border-round">
+                    <span class="text-xl font-semibold">{{ editForm.target }}</span>
+                </div>
+            </div>
+
+            <div class="col-12 md:col-6 mb-3">
+                <label class="block mb-2 font-medium">Effectif (HC)</label>
+                <div class="p-3 surface-200 border-round">
+                    <span class="text-xl font-semibold">{{ editForm.headcount }}</span>
+                </div>
+            </div>
+
+            <div class="col-12 md:col-6 mb-3">
+                <label for="editScrap" class="block mb-2 font-medium">Scrap (Rebut)</label>
+                <p-inputNumber id="editScrap" [(ngModel)]="editForm.scrap" [min]="0" [showButtons]="true"
+                    buttonLayout="horizontal" spinnerMode="horizontal"
+                    decrementButtonClass="p-button-secondary" incrementButtonClass="p-button-secondary"
+                    incrementButtonIcon="pi pi-plus" decrementButtonIcon="pi pi-minus">
+                </p-inputNumber>
+            </div>
+        </div>
+
+        <!-- Aperçu efficience calculée -->
+        <div class="efficiency-preview mt-3 p-3 surface-100 border-round">
+            <div class="flex justify-content-between align-items-center">
+                <span class="font-medium">Efficience calculée:</span>
+                <p-tag [value]="getEditEfficiency() + '%'" [severity]="getEfficiencySeverity(getEditEfficiency())"></p-tag>
+            </div>
+        </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <div class="flex justify-content-between w-full">
+            <p-button
+                [label]="isAdvancedMode ? 'Mode simple' : 'Édition avancée'"
+                [icon]="isAdvancedMode ? 'pi pi-chevron-up' : 'pi pi-cog'"
+                [text]="true"
+                (onClick)="toggleAdvancedMode()"
+                pTooltip="Modifier Date, Shift, Ligne, Part">
+            </p-button>
+            <div class="flex gap-2">
+                <p-button label="Annuler" icon="pi pi-times" [text]="true" severity="secondary" (onClick)="hideEditDialog()"></p-button>
+                <p-button label="Enregistrer" icon="pi pi-check" [loading]="isSaving" (onClick)="saveEditedProduction()"></p-button>
+            </div>
+        </div>
+    </ng-template>
+</p-dialog>
+
 <p-toast position="top-right"></p-toast>
 <p-confirmDialog></p-confirmDialog>

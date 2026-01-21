@@ -2,7 +2,8 @@ import { Component, OnInit, OnDestroy, inject, HostListener } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { interval, Subscription, forkJoin } from 'rxjs';
+import { interval, Subscription, forkJoin, Subject, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, map, catchError, takeUntil } from 'rxjs/operators';
 import { CardModule } from 'primeng/card';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -14,6 +15,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { DialogModule } from 'primeng/dialog';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DividerModule } from 'primeng/divider';
 import { AvatarModule } from 'primeng/avatar';
 import { ProgressBarModule } from 'primeng/progressbar';
@@ -98,7 +100,8 @@ import { saveAs } from 'file-saver';
         MeterGroupModule,
         ConfirmPopupModule,
         IconFieldModule,
-        InputIconModule
+        InputIconModule,
+        ConfirmDialogModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './production.component.html',
@@ -251,6 +254,11 @@ export class ProductionComponent implements OnInit, OnDestroy {
     currentTime: Date = new Date();
     hourProgress = 0;
     private timerSubscription?: Subscription;
+
+    // Debouncing for Order No changes
+    private orderNoChange$ = new Subject<string>();
+    private destroy$ = new Subject<void>();
+    isUpdatingOrderNo = false;
 
     // Mode (from query params)
     mode: 'new' | 'view' | 'edit' = 'new';
@@ -541,24 +549,38 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 }
             }, 1500);
         }
+
+        // Setup debounced Order No change handler
+        this.orderNoChange$.pipe(
+            debounceTime(500),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.saveSessionToStorage();
+            this.updateExistingRecordsOrderNo();
+        });
     }
 
     checkQueryParams(): void {
         this.route.queryParams.subscribe(params => {
             console.log('Query params received:', params);
 
-            if (params['mode']) {
-                this.mode = params['mode'] as 'view' | 'edit';
-            }
             if (params['id']) {
                 // Handle both numeric IDs and string IDs
                 const idValue = params['id'];
                 if (!isNaN(Number(idValue))) {
                     this.loadedProductionId = Number(idValue);
+                    // Set mode to view if not explicitly provided (fixes hidden button issue)
+                    if (!params['mode']) {
+                        this.mode = 'view';
+                    }
                 } else {
                     console.warn('Invalid production ID format:', idValue);
                     this.loadedProductionId = null;
                 }
+            }
+            if (params['mode']) {
+                this.mode = params['mode'] as 'view' | 'edit';
             }
 
             // If we have all params, load production data after reference data is loaded
@@ -1297,6 +1319,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.timerSubscription?.unsubscribe();
+        this.destroy$.next();
+        this.destroy$.complete();
     }
 
     startRealTimeUpdates(): void {
@@ -2018,30 +2042,72 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     onOrderNoChange(): void {
-        // Save session to localStorage when order number is modified
-        this.saveSessionToStorage();
-
-        // Update existing hourly production records with new order_no
-        this.updateExistingRecordsOrderNo();
+        // Emit to debounced Subject - saves to localStorage and updates backend after 500ms of inactivity
+        this.orderNoChange$.next(this.session.orderNo);
     }
 
     private updateExistingRecordsOrderNo(): void {
         if (!this.session.orderNo) return;
 
         // Get all hours that have been saved (have hourlyProductionId)
-        const savedHours = this.session.hours.filter(h => h.hourlyProductionId && typeof h.hourlyProductionId === 'number');
+        const savedHours = this.session.hours.filter(
+            h => h.hourlyProductionId && typeof h.hourlyProductionId === 'number'
+        );
 
         if (savedHours.length === 0) return;
 
-        // Update each saved record with the new order_no
-        savedHours.forEach(hour => {
+        this.isUpdatingOrderNo = true;
+
+        // Create observables for all updates with error handling per request
+        const updateObservables = savedHours.map(hour =>
             this.productionService.updateHourlyProductionOrderNo(
                 hour.hourlyProductionId as number,
                 this.session.orderNo
-            ).subscribe({
-                next: () => console.log(`Updated order_no for hour ${hour.hour}`),
-                error: (err) => console.error(`Failed to update order_no for hour ${hour.hour}:`, err)
-            });
+            ).pipe(
+                map(() => ({ success: true, hour: hour.hour })),
+                catchError(err => of({ success: false, hour: hour.hour, error: err }))
+            )
+        );
+
+        // Execute all updates in parallel and show appropriate toast
+        forkJoin(updateObservables).subscribe({
+            next: (results) => {
+                this.isUpdatingOrderNo = false;
+                const successCount = results.filter(r => r.success).length;
+                const errorCount = results.filter(r => !r.success).length;
+
+                if (errorCount === 0 && successCount > 0) {
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Order No Updated',
+                        detail: `Updated ${successCount} record${successCount > 1 ? 's' : ''}`,
+                        life: 2000
+                    });
+                } else if (errorCount > 0 && successCount > 0) {
+                    this.messageService.add({
+                        severity: 'warn',
+                        summary: 'Partial Update',
+                        detail: `${successCount} updated, ${errorCount} failed`,
+                        life: 4000
+                    });
+                } else if (errorCount > 0) {
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Update Failed',
+                        detail: `${errorCount} record${errorCount > 1 ? 's' : ''} failed to update`,
+                        life: 4000
+                    });
+                }
+            },
+            error: () => {
+                this.isUpdatingOrderNo = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Update Failed',
+                    detail: 'Failed to update Order No',
+                    life: 4000
+                });
+            }
         });
     }
 

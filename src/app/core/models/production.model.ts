@@ -20,6 +20,7 @@ export interface HourlyProduction {
     HC_HourlyProdPN: number;
     Id_ProdLine: number;
     Scrap_HourlyProdPN?: number;
+    order_no?: string;
 }
 
 export interface Part {

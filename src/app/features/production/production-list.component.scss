@@ -199,3 +199,21 @@
         }
     }
 }
+
+// Edit Dialog Styles
+.info-banner {
+    background: var(--surface-100);
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.efficiency-preview {
+    border: 1px solid var(--surface-border);
+}
+
+:host ::ng-deep .edit-dialog-content {
+    .p-inputnumber {
+        width: 100%;
+    }
+}

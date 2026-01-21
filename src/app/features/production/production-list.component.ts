@@ -16,6 +16,8 @@ import { MenuModule } from 'primeng/menu';
 import { DrawerModule } from 'primeng/drawer';
 import { SkeletonModule } from 'primeng/skeleton';
 import { DividerModule } from 'primeng/divider';
+import { DialogModule } from 'primeng/dialog';
+import { InputNumberModule } from 'primeng/inputnumber';
 import { AccordionModule } from 'primeng/accordion';
 import { AvatarModule } from 'primeng/avatar';
 import { ProgressBarModule } from 'primeng/progressbar';
@@ -36,6 +38,7 @@ interface ProductionListItem extends HourlyProduction {
     partNumber?: string;
     shiftName?: string;
     efficiency?: number;
+    orderNo?: string;
 }
 
 @Component({
@@ -60,7 +63,9 @@ interface ProductionListItem extends HourlyProduction {
         DividerModule,
         AccordionModule,
         AvatarModule,
-        ProgressBarModule
+        ProgressBarModule,
+        DialogModule,
+        InputNumberModule
     ],
     providers: [MessageService, ConfirmationService],
     templateUrl: './production-list.component.html',
@@ -111,6 +116,26 @@ export class ProductionListComponent implements OnInit {
             command: () => this.exportToCsv()
         }
     ];
+
+    // Edit Production Dialog
+    showEditDialog = false;
+    editingProduction: ProductionListItem | null = null;
+    isAdvancedMode = false;
+    editForm = {
+        output: 0,
+        target: 0,
+        headcount: 0,
+        scrap: 0,
+        orderNo: ''
+    };
+    // Champs avancés éditables
+    editAdvanced = {
+        date: null as Date | null,
+        shift: null as Shift | null,
+        line: null as ProductionLine | null,
+        part: null as Part | null
+    };
+    isSaving = false;
 
     constructor(
         private productionService: ProductionService,
@@ -291,18 +316,24 @@ export class ProductionListComponent implements OnInit {
     }
 
     editProduction(production: ProductionListItem): void {
-        // Navigate to production entry with all data to pre-fill the form
-        this.router.navigate(['/dms-production/production'], {
-            queryParams: {
-                id: production.Id_HourlyProd,
-                date: production.Date_HourlyProd,
-                shift: production.Shift_HourlyProd,
-                line: production.Id_ProdLine,
-                part: production.Id_Part,
-                hour: production.Hour_HourlyProd,
-                mode: 'edit'
-            }
-        });
+        // Pré-remplir le formulaire avec les données existantes - pas de navigation!
+        this.editingProduction = { ...production };
+        this.isAdvancedMode = false;
+        this.editForm = {
+            output: production.Result_HourlyProdPN || 0,
+            target: production.Target_HourlyProdPN || 0,
+            headcount: production.HC_HourlyProdPN || 0,
+            scrap: production.Scrap_HourlyProdPN || 0,
+            orderNo: production.orderNo || ''
+        };
+        // Pré-remplir les champs avancés
+        this.editAdvanced = {
+            date: production.Date_HourlyProd ? new Date(production.Date_HourlyProd) : null,
+            shift: this.shifts.find(s => String(s.id) === String(production.Shift_HourlyProd)) || null,
+            line: this.allProductionLines.find(l => l.id === production.Id_ProdLine) || null,
+            part: this.allParts.find(p => p.Id_Part === production.Id_Part) || null
+        };
+        this.showEditDialog = true;
     }
 
     deleteProduction(production: ProductionListItem): void {
@@ -335,6 +366,104 @@ export class ProductionListComponent implements OnInit {
 
     newProduction(): void {
         this.router.navigate(['/dms-production/production']);
+    }
+
+    // ==========================================
+    // Edit Production Dialog Methods
+    // ==========================================
+
+    saveEditedProduction(): void {
+        if (!this.editingProduction) return;
+
+        this.isSaving = true;
+
+        const updateData: any = {
+            result: this.editForm.output,
+            scrap: this.editForm.scrap,
+            order_no: this.editForm.orderNo
+        };
+
+        // Si mode avancé, inclure les champs modifiés
+        if (this.isAdvancedMode) {
+            if (this.editAdvanced.date) {
+                const d = this.editAdvanced.date;
+                updateData.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+            if (this.editAdvanced.shift) {
+                updateData.shift = this.editAdvanced.shift.id;
+            }
+            if (this.editAdvanced.line) {
+                updateData.production_line = this.editAdvanced.line.id;
+            }
+            if (this.editAdvanced.part) {
+                updateData.part = this.editAdvanced.part.Id_Part;
+            }
+        } else {
+            // Mode simple - garder les valeurs originales
+            updateData.date = this.editingProduction.Date_HourlyProd;
+            updateData.shift = this.editingProduction.Shift_HourlyProd;
+            updateData.hour = this.editingProduction.Hour_HourlyProd;
+            updateData.part = this.editingProduction.Id_Part;
+            updateData.production_line = this.editingProduction.Id_ProdLine;
+        }
+
+        this.productionService.updateHourlyProduction(
+            this.editingProduction.Id_HourlyProd,
+            updateData
+        ).subscribe({
+            next: () => {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Succès',
+                    detail: 'Enregistrement mis à jour avec succès'
+                });
+                this.hideEditDialog();
+                this.loadProductions();
+            },
+            error: (error) => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: error.error?.detail || 'Échec de la mise à jour'
+                });
+                this.isSaving = false;
+            }
+        });
+    }
+
+    hideEditDialog(): void {
+        this.showEditDialog = false;
+        this.editingProduction = null;
+        this.isAdvancedMode = false;
+        this.isSaving = false;
+    }
+
+    toggleAdvancedMode(): void {
+        this.isAdvancedMode = !this.isAdvancedMode;
+    }
+
+    openFullEditor(): void {
+        if (this.editingProduction) {
+            const production = this.editingProduction;
+            this.hideEditDialog();
+            this.router.navigate(['/dms-production/production'], {
+                queryParams: {
+                    id: production.Id_HourlyProd,
+                    date: production.Date_HourlyProd,
+                    shift: production.Shift_HourlyProd,
+                    line: production.Id_ProdLine,
+                    part: production.Id_Part,
+                    hour: production.Hour_HourlyProd,
+                    mode: 'edit'
+                }
+            });
+        }
+    }
+
+    getEditEfficiency(): number {
+        return this.editForm.target > 0
+            ? Math.round((this.editForm.output / this.editForm.target) * 100)
+            : 0;
     }
 
     exportData(): void {
@@ -457,7 +586,8 @@ export class ProductionListComponent implements OnInit {
         return {
             ...production,
             efficiency,
-            shiftName
+            shiftName,
+            orderNo: (production as any).order_no || production.orderNo
         };
     }
 
