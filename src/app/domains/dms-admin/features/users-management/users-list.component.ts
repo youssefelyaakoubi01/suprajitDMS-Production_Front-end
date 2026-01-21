@@ -34,6 +34,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { AdminService } from '../../services/admin.service';
 import { DMSUser, DMSUserCreate, DMS_MODULE_PERMISSIONS, DmsModulePermission } from '../../models';
+import { EmployeeAutocompleteComponent } from '@shared/components/employee-autocomplete/employee-autocomplete.component';
 
 interface StatusOption {
     label: string;
@@ -75,7 +76,8 @@ interface PositionOption {
         DividerModule,
         BadgeModule,
         InputGroupModule,
-        InputGroupAddonModule
+        InputGroupAddonModule,
+        EmployeeAutocompleteComponent
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -438,22 +440,15 @@ interface PositionOption {
                     <div class="grid">
                         <div class="col-12">
                             <label for="employee" class="block font-medium text-900 mb-2">Employé associé</label>
-                            <p-select id="employee" [options]="employees" [(ngModel)]="editingUser.employee"
-                                      optionLabel="name" optionValue="id" [filter]="true"
-                                      filterBy="name" [showClear]="true"
-                                      placeholder="Rechercher et sélectionner un employé..."
-                                      styleClass="w-full">
-                                <ng-template let-emp pTemplate="item">
-                                    <div class="flex align-items-center gap-3">
-                                        <p-avatar [label]="emp.name?.charAt(0)" shape="circle" size="normal"
-                                                  [style]="{'background': '#667eea', 'color': '#fff'}"></p-avatar>
-                                        <div>
-                                            <span class="font-medium">{{ emp.name }}</span>
-                                            <span class="text-500 text-sm ml-2" *ngIf="emp.badge">({{ emp.badge }})</span>
-                                        </div>
-                                    </div>
-                                </ng-template>
-                            </p-select>
+                            <app-employee-autocomplete
+                                [(ngModel)]="editingUser.employee"
+                                placeholder="Rechercher un employé par nom ou badge..."
+                                [showClear]="true"
+                                [returnFullObject]="false"
+                                appendTo="body"
+                                inputId="employee"
+                                styleClass="w-full">
+                            </app-employee-autocomplete>
                             <small class="text-500 block mt-1">
                                 <i class="pi pi-info-circle mr-1"></i>
                                 Lier cet utilisateur à un employé existant pour synchroniser les données
@@ -657,7 +652,6 @@ export class UsersListComponent implements OnInit, OnDestroy {
     users: DMSUser[] = [];
     filteredUsers: DMSUser[] = [];
     selectedUsers: DMSUser[] = [];
-    employees: { id: number; name: string; badge?: string }[] = [];
 
     loading = true;
     saving = false;
@@ -703,7 +697,6 @@ export class UsersListComponent implements OnInit, OnDestroy {
 
     ngOnInit(): void {
         this.loadUsers();
-        this.loadEmployees();
         this.setupSearch();
     }
 
@@ -739,16 +732,6 @@ export class UsersListComponent implements OnInit, OnDestroy {
                         detail: 'Impossible de charger les utilisateurs'
                     });
                     this.loading = false;
-                }
-            });
-    }
-
-    private loadEmployees(): void {
-        this.adminService.getAvailableEmployees()
-            .pipe(takeUntil(this.destroy$))
-            .subscribe({
-                next: (employees) => {
-                    this.employees = employees;
                 }
             });
     }
