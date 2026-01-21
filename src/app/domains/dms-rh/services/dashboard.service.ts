@@ -86,7 +86,9 @@ export class DmsRhDashboardService {
             recentHires: [],
             employeesRequiringRecyclage: 0,
             qualificationCompletionRate: 0,
-            averageVersatility: 0
+            averageVersatility: 0,
+            nonQualifiedAssignmentsActive: 0,
+            nonQualifiedAssignmentsTotal: 0
         };
     }
 }

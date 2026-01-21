@@ -38,6 +38,12 @@ import {
     EmployeePrimaryAssignment,
     AssignmentStats
 } from '../../domains/dms-rh/models/assignment.model';
+import {
+    NonQualifiedAssignment,
+    NonQualifiedAssignmentCreate,
+    NonQualifiedAssignmentStats,
+    QualificationCheckResult
+} from '../../domains/dms-rh/models/non-qualified-assignment.model';
 import { HRCacheStateService } from '../state/hr-cache-state.service';
 import { QualificationStateService } from '../state/qualification-state.service';
 import { AssignmentStateService } from '../state/assignment-state.service';
@@ -870,6 +876,71 @@ export class HRService {
      */
     getAssignmentStats(): Observable<AssignmentStats> {
         return this.api.get<AssignmentStats>(`${this.endpoint}/workstation-assignments/stats`);
+    }
+
+    // ==================== NON-QUALIFIED ASSIGNMENTS ====================
+
+    /**
+     * Check if an employee is qualified for a specific workstation
+     */
+    checkQualificationForWorkstation(employeeId: number, workstationId: number): Observable<QualificationCheckResult> {
+        return this.api.get<QualificationCheckResult>(`${this.endpoint}/qualifications/check-workstation`, {
+            employee_id: employeeId,
+            workstation_id: workstationId
+        });
+    }
+
+    /**
+     * Get all non-qualified assignments
+     */
+    getNonQualifiedAssignments(params?: {
+        status?: string;
+        production_line_id?: number;
+        search?: string;
+    }): Observable<NonQualifiedAssignment[]> {
+        return this.api.get<NonQualifiedAssignment[]>(
+            `${this.endpoint}/non-qualified-assignments`,
+            params
+        );
+    }
+
+    /**
+     * Create a non-qualified assignment record
+     */
+    createNonQualifiedAssignment(data: NonQualifiedAssignmentCreate): Observable<NonQualifiedAssignment> {
+        return this.api.post<NonQualifiedAssignment>(
+            `${this.endpoint}/non-qualified-assignments`,
+            data
+        );
+    }
+
+    /**
+     * Acknowledge a non-qualified assignment
+     */
+    acknowledgeNonQualifiedAssignment(id: number, notes?: string): Observable<NonQualifiedAssignment> {
+        return this.api.patch<NonQualifiedAssignment>(
+            `${this.endpoint}/non-qualified-assignments/${id}/acknowledge`,
+            { notes }
+        );
+    }
+
+    /**
+     * Resolve a non-qualified assignment (employee now qualified)
+     */
+    resolveNonQualifiedAssignment(id: number, notes?: string): Observable<NonQualifiedAssignment> {
+        return this.api.patch<NonQualifiedAssignment>(
+            `${this.endpoint}/non-qualified-assignments/${id}/resolve`,
+            { notes }
+        );
+    }
+
+    /**
+     * Get statistics for non-qualified assignments
+     */
+    getNonQualifiedAssignmentStats(): Observable<NonQualifiedAssignmentStats> {
+        return this.api.get<NonQualifiedAssignmentStats>(
+            `${this.endpoint}/non-qualified-assignments/stats`
+        );
     }
 
     // ==================== CACHE GETTERS ====================

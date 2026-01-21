@@ -35,7 +35,7 @@ import { MessageService } from 'primeng/api';
 import { HRService } from '@core/services/hr.service';
 import { ProductionService } from '@core/services/production.service';
 import { Qualification } from '@core/models/employee.model';
-import { Project } from '@core/models/production.model';
+import { Project, Workstation } from '@core/models/production.model';
 import { environment } from '../../../../../environments/environment';
 
 /**
@@ -49,6 +49,7 @@ interface QualifiedEmployee {
     employee_picture?: string;
     project_id: number;
     project_name: string;
+    workstation_id: number;
     workstation_name?: string;
     formation_name: string;
     qualification_level: number;
@@ -171,7 +172,7 @@ interface QualifiedEmployee {
                 <div class="filter-group">
                     <p-select [options]="projects"
                               [ngModel]="selectedProject()"
-                              (ngModelChange)="selectedProject.set($event)"
+                              (ngModelChange)="onFilterProjectChange($event)"
                               optionLabel="name"
                               optionValue="id"
                               placeholder="All Projects"
@@ -179,6 +180,21 @@ interface QualifiedEmployee {
                               [filter]="true"
                               filterBy="name"
                               filterPlaceholder="Search project..."
+                              appendTo="body"
+                              styleClass="filter-select">
+                    </p-select>
+                </div>
+                <div class="filter-group">
+                    <p-select [options]="filteredWorkstationsForFilter()"
+                              [ngModel]="selectedPoste()"
+                              (ngModelChange)="selectedPoste.set($event)"
+                              optionLabel="name"
+                              optionValue="id"
+                              placeholder="All Workstations"
+                              [showClear]="true"
+                              [filter]="true"
+                              filterBy="name"
+                              filterPlaceholder="Search workstation..."
                               appendTo="body"
                               styleClass="filter-select">
                     </p-select>
@@ -255,10 +271,6 @@ interface QualifiedEmployee {
                                 <p-sortIcon field="project_name"></p-sortIcon>
                             </th>
                             <th>Workstation</th>
-                            <th pSortableColumn="formation_name">
-                                Formation
-                                <p-sortIcon field="formation_name"></p-sortIcon>
-                            </th>
                             <th pSortableColumn="qualification_end" style="width: 130px">
                                 Valid Until
                                 <p-sortIcon field="qualification_end"></p-sortIcon>
@@ -293,12 +305,6 @@ interface QualifiedEmployee {
                                 <span class="workstation-cell">{{ emp.workstation_name || '-' }}</span>
                             </td>
                             <td>
-                                <div class="formation-cell">
-                                    <i class="pi pi-book formation-icon"></i>
-                                    <span class="formation-name">{{ emp.formation_name }}</span>
-                                </div>
-                            </td>
-                            <td>
                                 <span class="date-cell">
                                     <i class="pi pi-calendar"></i>
                                     {{ emp.qualification_end | date:'dd/MM/yyyy' }}
@@ -314,13 +320,13 @@ interface QualifiedEmployee {
 
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="7">
+                            <td colspan="6">
                                 <div class="empty-state">
                                     <div class="empty-icon">
                                         <i class="pi pi-verified"></i>
                                     </div>
                                     <h3>No qualified employees found</h3>
-                                    <p>{{ searchTerm() || selectedProject() || badgeFilter() ? 'Try adjusting your filters' : 'No qualifications available' }}</p>
+                                    <p>{{ searchTerm() || selectedProject() || selectedPoste() || badgeFilter() ? 'Try adjusting your filters' : 'No qualifications available' }}</p>
                                 </div>
                             </td>
                         </tr>
@@ -676,22 +682,6 @@ interface QualifiedEmployee {
             font-size: 0.875rem;
         }
 
-        .formation-cell {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .formation-icon {
-            color: #10B981;
-            font-size: 0.875rem;
-        }
-
-        .formation-name {
-            font-weight: 500;
-            color: var(--text-color);
-        }
-
         .date-cell {
             display: flex;
             align-items: center;
@@ -790,6 +780,7 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
     // Data
     qualifications = signal<Qualification[]>([]);
     projects: Project[] = [];
+    workstations: Workstation[] = [];
     loading = false;
 
     // Filters
@@ -797,6 +788,7 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
     badgeFilter = signal<string | null>(null);
     badgeEmployeeId = signal<number | null>(null);
     selectedProject = signal<number | null>(null);
+    selectedPoste = signal<number | null>(null);
     searchTerm = signal('');
     selectedStatus = signal<'all' | 'valid' | 'expired'>('all');
     statusOptions = [
@@ -804,6 +796,15 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
         { label: 'Valid', value: 'valid' },
         { label: 'Expired', value: 'expired' }
     ];
+
+    // Computed: workstations filtrées pour le dropdown de filtre
+    filteredWorkstationsForFilter = computed(() => {
+        const projectId = this.selectedProject();
+        if (projectId) {
+            return this.workstations.filter(w => w.project === projectId);
+        }
+        return this.workstations;
+    });
 
     // Computed: Transform qualifications to QualifiedEmployee display format
     private qualifiedEmployees = computed(() => {
@@ -835,6 +836,12 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
         // Filter by project
         if (projectId) {
             result = result.filter(e => e.project_id === projectId);
+        }
+
+        // Filter by workstation/poste
+        const posteId = this.selectedPoste();
+        if (posteId) {
+            result = result.filter(e => e.workstation_id === posteId);
         }
 
         // Filter by search term
@@ -902,11 +909,13 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
         this.loading = true;
         forkJoin({
             qualifications: this.hrService.getQualifications().pipe(catchError(() => of([]))),
-            projects: this.productionService.getProjects().pipe(catchError(() => of([])))
+            projects: this.productionService.getProjects().pipe(catchError(() => of([]))),
+            workstations: this.productionService.getWorkstations().pipe(catchError(() => of([])))
         }).pipe(takeUntil(this.destroy$)).subscribe({
             next: (data) => {
                 this.qualifications.set(data.qualifications);
                 this.projects = data.projects;
+                this.workstations = data.workstations;
                 this.loading = false;
             },
             error: () => {
@@ -936,6 +945,7 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
             employee_picture: q.employee_picture,
             project_id: q.project || 0,
             project_name: q.project_name || '',
+            workstation_id: q.poste || 0,
             workstation_name: q.poste_name || '',
             formation_name: q.formation_name || 'Unknown Formation',
             qualification_level: q.score || 1,
@@ -991,6 +1001,15 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
         this.badgeScan = '';
         this.badgeFilter.set(null);
         this.badgeEmployeeId.set(null);
+    }
+
+    /**
+     * Handle project filter change - resets poste when project changes
+     */
+    onFilterProjectChange(projectId: number | null): void {
+        this.selectedProject.set(projectId);
+        // Reset poste when project changes
+        this.selectedPoste.set(null);
     }
 
     /**

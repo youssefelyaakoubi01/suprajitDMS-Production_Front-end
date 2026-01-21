@@ -327,6 +327,8 @@ export interface HRDashboardStats {
     employeesRequiringRecyclage: number;
     qualificationCompletionRate: number;
     averageVersatility: number;
+    nonQualifiedAssignmentsActive?: number;
+    nonQualifiedAssignmentsTotal?: number;
 }
 
 export interface FormationStats {
@@ -358,6 +360,7 @@ export interface EmployeeWithAssignment extends Employee {
     team?: Team;
     category?: EmployeeCategory;
     badgeId?: string; // Badge ID used for scanning
+    isNonQualified?: boolean; // Flag for non-qualified assignments (traceability)
 }
 
 export interface EmployeeDetail extends Employee {

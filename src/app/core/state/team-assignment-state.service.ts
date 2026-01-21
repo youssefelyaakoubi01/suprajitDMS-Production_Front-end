@@ -173,6 +173,30 @@ export class TeamAssignmentStateService {
         return this._team().find(m => m.Id_Emp === employeeId);
     }
 
+    /**
+     * Reassign an existing team member to a new workstation/machine.
+     * Returns true if member was found and updated, false otherwise.
+     */
+    reassignMember(employeeId: number, updates: Partial<EmployeeWithAssignment>): boolean {
+        const existing = this._team().find(m => m.Id_Emp === employeeId);
+        if (!existing) return false;
+
+        this._team.update(current =>
+            current.map(m => m.Id_Emp === employeeId ? { ...m, ...updates } : m)
+        );
+        return true;
+    }
+
+    /**
+     * Get IDs of all occupied workstations.
+     * Useful for filtering available workstations.
+     */
+    getOccupiedWorkstationIds(): number[] {
+        return this._team()
+            .map(m => m.workstationId)
+            .filter((id): id is number => id !== undefined);
+    }
+
     // ==================== localStorage Integration ====================
 
     /**

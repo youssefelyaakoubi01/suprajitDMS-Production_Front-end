@@ -530,7 +530,7 @@
                 <ng-template pTemplate="body" let-emp>
                     <tr>
                         <td>
-                            <p-avatar [image]="emp.Picture" shape="circle" size="large"></p-avatar>
+                            <p-avatar [image]="getEmployeePictureUrl(emp.Picture)" shape="circle" size="large"></p-avatar>
                         </td>
                         <td><span class="employee-name">{{ emp.Prenom_Emp }} {{ emp.Nom_Emp }}</span></td>
                         <td><span class="employee-badge">{{ emp.badgeId || emp.BadgeNumber || ('EMP-' + emp.Id_Emp) }}</span></td>
@@ -1278,6 +1278,116 @@
                 severity="warn"
                 (click)="confirmQualificationWarning()">
             </p-button>
+        </div>
+    </ng-template>
+</p-dialog>
+
+<!-- Explicit Assignment Dialog (Manual Selection Mode) -->
+<p-dialog
+    [(visible)]="showExplicitAssignmentDialog"
+    header="Affectation au poste"
+    [modal]="true"
+    [style]="{width: '550px'}"
+    [closable]="true"
+    (onHide)="cancelExplicitAssignment()">
+
+    <div class="explicit-assignment-content" *ngIf="pendingEmployeeData">
+        <!-- Employee Header -->
+        <div class="employee-header-dialog">
+            <p-avatar
+                [image]="getEmployeePictureUrl(pendingEmployeeData.picture)"
+                size="large"
+                shape="circle">
+            </p-avatar>
+            <div class="employee-info-dialog">
+                <h4 class="employee-name-dialog">{{ pendingEmployeeData.first_name }} {{ pendingEmployeeData.last_name }}</h4>
+                <span class="employee-badge-dialog">Badge: {{ pendingEmployeeData.badge_number }}</span>
+            </div>
+        </div>
+
+        <!-- Default Assignment Info -->
+        <p-message
+            *ngIf="pendingPrimaryAssignment"
+            severity="info"
+            styleClass="w-full mb-3">
+            <ng-template pTemplate="content">
+                <div class="flex align-items-center gap-2">
+                    <i class="pi pi-home"></i>
+                    <span>Affectation par défaut: <strong>{{ pendingPrimaryAssignment.workstation_name }}</strong></span>
+                    <span *ngIf="pendingPrimaryAssignment.machine_name" class="text-color-secondary">
+                        ({{ pendingPrimaryAssignment.machine_name }})
+                    </span>
+                </div>
+            </ng-template>
+        </p-message>
+
+        <p-divider></p-divider>
+
+        <!-- Explicit Selection -->
+        <div class="explicit-selection-form">
+            <div class="form-field mb-3">
+                <label for="explicitWorkstation" class="font-medium mb-2 block">
+                    <i class="pi pi-desktop mr-1"></i> Poste de travail *
+                </label>
+                <p-select
+                    id="explicitWorkstation"
+                    [(ngModel)]="selectedWorkstationForAssignment"
+                    [options]="availableWorkstationsForAssignment"
+                    optionLabel="Name_Workstation"
+                    placeholder="Sélectionner un poste..."
+                    (onChange)="onExplicitWorkstationChange()"
+                    [filter]="true"
+                    filterPlaceholder="Rechercher..."
+                    appendTo="body"
+                    styleClass="w-full">
+                </p-select>
+            </div>
+
+            <div class="form-field">
+                <label for="explicitMachine" class="font-medium mb-2 block">
+                    <i class="pi pi-cog mr-1"></i> Machine (optionnel)
+                </label>
+                <p-select
+                    id="explicitMachine"
+                    [(ngModel)]="selectedMachineForExplicitAssignment"
+                    [options]="filteredMachinesForExplicitAssignment"
+                    optionLabel="name"
+                    placeholder="Sélectionner une machine..."
+                    [showClear]="true"
+                    [disabled]="!selectedWorkstationForAssignment"
+                    [filter]="true"
+                    filterPlaceholder="Rechercher..."
+                    appendTo="body"
+                    styleClass="w-full">
+                </p-select>
+            </div>
+        </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+        <div class="flex justify-content-between gap-2 flex-wrap">
+            <p-button
+                *ngIf="pendingPrimaryAssignment"
+                label="Utiliser défaut"
+                icon="pi pi-home"
+                severity="secondary"
+                [outlined]="true"
+                (click)="useDefaultAssignment()">
+            </p-button>
+            <div class="flex gap-2">
+                <p-button
+                    label="Annuler"
+                    icon="pi pi-times"
+                    severity="secondary"
+                    (click)="cancelExplicitAssignment()">
+                </p-button>
+                <p-button
+                    label="Confirmer"
+                    icon="pi pi-check"
+                    [disabled]="!selectedWorkstationForAssignment"
+                    (click)="confirmExplicitAssignment()">
+                </p-button>
+            </div>
         </div>
     </ng-template>
 </p-dialog>

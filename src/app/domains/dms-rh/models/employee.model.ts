@@ -58,6 +58,7 @@ export interface EmployeeWithAssignment extends Employee {
     qualificationLevel?: number;
     team?: Team;
     category?: EmployeeCategory;
+    isNonQualified?: boolean; // Flag for non-qualified assignments (traceability)
 }
 
 export interface EmployeeDetail extends Employee {

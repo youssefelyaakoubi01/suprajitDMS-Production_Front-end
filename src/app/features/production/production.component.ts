@@ -36,6 +36,7 @@ import { ProductionService } from './production.service';
 import { EmployeeService } from '../../core/services/employee.service';
 import { HRService } from '../../core/services/hr.service';
 import { EmployeePrimaryAssignment } from '../../domains/dms-rh/models/assignment.model';
+import { NonQualifiedAssignmentCreate, QualificationCheckResult } from '../../domains/dms-rh/models/non-qualified-assignment.model';
 import {
     Project,
     ProductionLine,
@@ -177,9 +178,22 @@ export class ProductionComponent implements OnInit, OnDestroy {
     qualificationWarningMessage = '';
     pendingEmployeeData: any = null;
     pendingPrimaryAssignment: EmployeePrimaryAssignment | null = null;
+    // Pending manual assignment data (for explicit workstation selection)
+    pendingManualAssignmentData: {
+        employee: any;
+        qualificationCheck: QualificationCheckResult | null;
+        isManualSelection: boolean;
+    } | null = null;
 
     // Manual Workstation Selection (when no default assignment exists)
     showManualWorkstationSelection = false;
+
+    // Explicit Assignment Dialog (new manual selection mode)
+    showExplicitAssignmentDialog = false;
+    availableWorkstationsForAssignment: Workstation[] = [];
+    selectedWorkstationForAssignment: Workstation | null = null;
+    selectedMachineForExplicitAssignment: Machine | null = null;
+    filteredMachinesForExplicitAssignment: Machine[] = [];
 
     // Hour Production Dialog
     showHourDialog = false;
@@ -1633,17 +1647,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.employeeService.getEmployeeByBadge(cleanBadgeId).subscribe({
             next: (employee: any) => {
                 console.log('Employee found:', employee);
-                // Use signal-based state service for duplicate check
-                const alreadyAssigned = this.teamState.isEmployeeInTeam(employee.id);
-                console.log('Already assigned:', alreadyAssigned, 'Employee ID:', employee.id);
-                if (alreadyAssigned) {
-                    this.messageService.add({
-                        severity: 'warn',
-                        summary: 'Warning',
-                        detail: `${employee.first_name} ${employee.last_name} is already assigned`
-                    });
-                    return;
-                }
+                // Check if employee is already in team (for info message, no longer blocking)
+                const existingInTeam = this.teamState.isEmployeeInTeam(employee.id);
+                console.log('Already in team:', existingInTeam, 'Employee ID:', employee.id);
 
                 // Check if employee is NOT an operator (non-operators don't need workstation/qualification checks)
                 const category = (employee.category || employee.Categorie_Emp || '').toLowerCase();
@@ -1654,6 +1660,17 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     // Non-operator: Add directly without workstation/qualification checks
                     const roleFromCategory = this.getRoleFromCategory(category);
                     console.log('Non-operator detected, role:', roleFromCategory);
+
+                    if (existingInTeam) {
+                        this.messageService.add({
+                            severity: 'warn',
+                            summary: 'Déjà assigné',
+                            detail: `${employee.first_name} ${employee.last_name} est déjà dans l'équipe`
+                        });
+                        this.employeeIdScan = '';
+                        return;
+                    }
+
                     const newAssignment: EmployeeWithAssignment = {
                         Id_Emp: employee.id,
                         Nom_Emp: employee.last_name,
@@ -1677,65 +1694,36 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     return;
                 }
 
-                // Step 2: For operators - Get primary assignment from HR module
+                // Step 2: For operators - Get primary assignment from HR module, then show explicit dialog
                 this.hrService.getPrimaryAssignment(employee.id).subscribe({
                     next: (primaryAssignment: EmployeePrimaryAssignment) => {
-                        // Build the assignment with default workstation/machine
-                        const newAssignment: EmployeeWithAssignment = {
-                            Id_Emp: employee.id,
-                            Nom_Emp: employee.last_name,
-                            Prenom_Emp: employee.first_name,
-                            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
-                            Genre_Emp: employee.gender,
-                            Categorie_Emp: employee.category,
-                            DateEmbauche_Emp: new Date(employee.hire_date),
-                            Departement_Emp: employee.department,
-                            Picture: this.getEmployeePictureUrl(employee.picture),
-                            EmpStatus: employee.status,
-                            BadgeNumber: employee.badge_number || employee.BadgeNumber,
-                            badgeId: cleanBadgeId, // Save the scanned badge ID
-                            workstation: primaryAssignment.workstation_name,
-                            workstationId: primaryAssignment.workstation_id,
-                            machine: primaryAssignment.machine_name || undefined,
-                            machineId: primaryAssignment.machine_id || undefined,
-                            qualification: primaryAssignment.qualification_name || employee.current_qualification || 'Not Qualified',
-                            qualificationLevel: primaryAssignment.is_qualified ? (primaryAssignment.qualification_valid ? 3 : 2) : 0,
-                            role: 'operator' // Default role
-                        };
-
-                        // Step 3: Check qualification validity
-                        if (!primaryAssignment.qualification_valid) {
-                            // Show warning dialog
-                            const fullName = `${employee.first_name} ${employee.last_name}`;
-                            if (!primaryAssignment.is_qualified) {
-                                this.qualificationWarningMessage = `${fullName} n'est pas qualifié(e) pour le poste "${primaryAssignment.workstation_name}". Êtes-vous sûr(e) de vouloir l'ajouter ?`;
-                            } else {
-                                this.qualificationWarningMessage = `La qualification de ${fullName} pour le poste "${primaryAssignment.workstation_name}" est expirée (fin: ${primaryAssignment.qualification_end_date ? new Date(primaryAssignment.qualification_end_date).toLocaleDateString() : 'N/A'}). Êtes-vous sûr(e) de vouloir l'ajouter ?`;
-                            }
-                            this.pendingEmployeeAssignment = newAssignment;
-                            this.pendingEmployeeData = employee;
-                            this.pendingPrimaryAssignment = primaryAssignment;
-                            this.showQualificationWarningDialog = true;
-                        } else {
-                            // Qualified - add directly
-                            this.finalizeEmployeeAssignment(newAssignment, employee, cleanBadgeId);
+                        if (existingInTeam) {
+                            // Inform user they can reassign
+                            this.messageService.add({
+                                severity: 'info',
+                                summary: 'Employé déjà assigné',
+                                detail: 'Vous pouvez le réaffecter à un autre poste'
+                            });
                         }
+                        // Show explicit assignment dialog with primary assignment info
+                        this.showExplicitAssignmentForEmployee(employee, primaryAssignment, cleanBadgeId);
                     },
                     error: (error) => {
                         if (error.status === 404) {
-                            // No default assignment found - use manual selection
-                            this.messageService.add({
-                                severity: 'info',
-                                summary: 'No Default Assignment',
-                                detail: `${employee.first_name} ${employee.last_name} has no default workstation. Please select one manually.`
-                            });
-                            this.pendingEmployeeData = employee;
-                            this.showManualWorkstationSelection = true;
+                            // No default assignment found
+                            if (existingInTeam) {
+                                this.messageService.add({
+                                    severity: 'info',
+                                    summary: 'Employé déjà assigné',
+                                    detail: 'Vous pouvez le réaffecter à un autre poste'
+                                });
+                            }
+                            // Show explicit assignment dialog without primary assignment
+                            this.showExplicitAssignmentForEmployee(employee, null, cleanBadgeId);
                         } else {
                             console.error('Error fetching primary assignment:', error);
-                            // Fallback to manual selection
-                            this.pendingEmployeeData = employee;
-                            this.showManualWorkstationSelection = true;
+                            // Fallback to explicit assignment dialog
+                            this.showExplicitAssignmentForEmployee(employee, null, cleanBadgeId);
                         }
                     }
                 });
@@ -1803,17 +1791,43 @@ export class ProductionComponent implements OnInit, OnDestroy {
      * Confirm adding an unqualified/expired employee
      */
     confirmQualificationWarning(): void {
-        if (this.pendingEmployeeAssignment && this.pendingEmployeeData) {
+        if (this.pendingManualAssignmentData?.isManualSelection) {
+            // Manual assignment non-qualified case
+            this.proceedWithExplicitAssignment(
+                this.pendingManualAssignmentData.employee,
+                this.pendingManualAssignmentData.qualificationCheck,
+                true // isNonQualified
+            );
+            this.resetQualificationWarningState();
+        } else if (this.pendingEmployeeAssignment && this.pendingEmployeeData) {
+            // Default assignment non-qualified case
+            // Mark as non-qualified and record
+            this.pendingEmployeeAssignment.isNonQualified = true;
             this.finalizeEmployeeAssignment(
                 this.pendingEmployeeAssignment,
                 this.pendingEmployeeData,
                 this.employeeIdScan
             );
+            // Record for traceability
+            if (this.pendingEmployeeAssignment.workstationId) {
+                const workstation = this.workstations.find(w => w.Id_Workstation === this.pendingEmployeeAssignment!.workstationId);
+                if (workstation) {
+                    this.recordNonQualifiedAssignment(this.pendingEmployeeData, workstation);
+                }
+            }
+            this.resetQualificationWarningState();
         }
+    }
+
+    /**
+     * Reset all qualification warning related state
+     */
+    private resetQualificationWarningState(): void {
         this.showQualificationWarningDialog = false;
         this.pendingEmployeeAssignment = null;
         this.pendingEmployeeData = null;
         this.pendingPrimaryAssignment = null;
+        this.pendingManualAssignmentData = null;
         this.qualificationWarningMessage = '';
     }
 
@@ -1821,11 +1835,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
      * Cancel adding an unqualified/expired employee
      */
     cancelQualificationWarning(): void {
-        this.showQualificationWarningDialog = false;
-        this.pendingEmployeeAssignment = null;
-        this.pendingEmployeeData = null;
-        this.pendingPrimaryAssignment = null;
-        this.qualificationWarningMessage = '';
+        this.resetQualificationWarningState();
         this.employeeIdScan = '';
     }
 
@@ -1877,6 +1887,279 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.selectedWorkstation = null;
         this.selectedMachineForAssignment = null;
         this.employeeIdScan = '';
+    }
+
+    // ==================== EXPLICIT ASSIGNMENT DIALOG ====================
+
+    /**
+     * Show the explicit assignment dialog for an employee.
+     * Allows user to either use the default assignment or select a workstation manually.
+     */
+    showExplicitAssignmentForEmployee(employee: any, primaryAssignment: EmployeePrimaryAssignment | null, badgeId: string): void {
+        this.pendingEmployeeData = employee;
+        this.pendingPrimaryAssignment = primaryAssignment;
+        this.employeeIdScan = badgeId;
+
+        // Prepare available workstations (all workstations from the list)
+        this.availableWorkstationsForAssignment = [...this.workstations];
+
+        // Reset selection
+        this.selectedWorkstationForAssignment = null;
+        this.selectedMachineForExplicitAssignment = null;
+        this.filteredMachinesForExplicitAssignment = [];
+
+        // Show the dialog
+        this.showExplicitAssignmentDialog = true;
+    }
+
+    /**
+     * Use the default assignment (from HR module) to assign the employee
+     */
+    useDefaultAssignment(): void {
+        if (!this.pendingEmployeeData || !this.pendingPrimaryAssignment) {
+            return;
+        }
+
+        const employee = this.pendingEmployeeData;
+        const primaryAssignment = this.pendingPrimaryAssignment;
+        const badgeId = this.employeeIdScan.trim();
+
+        const newAssignment: EmployeeWithAssignment = {
+            Id_Emp: employee.id,
+            Nom_Emp: employee.last_name,
+            Prenom_Emp: employee.first_name,
+            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+            Genre_Emp: employee.gender,
+            Categorie_Emp: employee.category,
+            DateEmbauche_Emp: new Date(employee.hire_date),
+            Departement_Emp: employee.department,
+            Picture: this.getEmployeePictureUrl(employee.picture),
+            EmpStatus: employee.status,
+            BadgeNumber: employee.badge_number || employee.BadgeNumber,
+            badgeId: badgeId,
+            workstation: primaryAssignment.workstation_name,
+            workstationId: primaryAssignment.workstation_id,
+            machine: primaryAssignment.machine_name || undefined,
+            machineId: primaryAssignment.machine_id || undefined,
+            qualification: primaryAssignment.qualification_name || employee.current_qualification || 'Not Qualified',
+            qualificationLevel: primaryAssignment.is_qualified ? (primaryAssignment.qualification_valid ? 3 : 2) : 0,
+            role: 'operator'
+        };
+
+        // Check if employee is already in team (reassignment case)
+        const existingInTeam = this.teamState.isEmployeeInTeam(employee.id);
+
+        // Check qualification validity
+        if (!primaryAssignment.qualification_valid) {
+            // Show warning dialog
+            const fullName = `${employee.first_name} ${employee.last_name}`;
+            if (!primaryAssignment.is_qualified) {
+                this.qualificationWarningMessage = `${fullName} n'est pas qualifié(e) pour le poste "${primaryAssignment.workstation_name}". Êtes-vous sûr(e) de vouloir l'ajouter ?`;
+            } else {
+                this.qualificationWarningMessage = `La qualification de ${fullName} pour le poste "${primaryAssignment.workstation_name}" est expirée (fin: ${primaryAssignment.qualification_end_date ? new Date(primaryAssignment.qualification_end_date).toLocaleDateString() : 'N/A'}). Êtes-vous sûr(e) de vouloir l'ajouter ?`;
+            }
+            this.pendingEmployeeAssignment = newAssignment;
+            this.showExplicitAssignmentDialog = false;
+            this.showQualificationWarningDialog = true;
+        } else {
+            // Qualified - proceed with assignment
+            if (existingInTeam) {
+                // Reassign existing member
+                this.teamState.reassignMember(employee.id, {
+                    workstation: newAssignment.workstation,
+                    workstationId: newAssignment.workstationId,
+                    machine: newAssignment.machine,
+                    machineId: newAssignment.machineId,
+                    qualification: newAssignment.qualification,
+                    qualificationLevel: newAssignment.qualificationLevel
+                });
+                this.session.team = [...this.teamState.team()];
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Réaffectation',
+                    detail: `${employee.first_name} ${employee.last_name} réaffecté(e) à ${newAssignment.workstation}`
+                });
+                this.saveSessionToStorage();
+            } else {
+                // New assignment
+                this.finalizeEmployeeAssignment(newAssignment, employee, badgeId);
+            }
+            this.cancelExplicitAssignment();
+        }
+    }
+
+    /**
+     * Confirm the explicit (manual) workstation selection
+     * Now includes qualification verification before assignment
+     */
+    confirmExplicitAssignment(): void {
+        if (!this.selectedWorkstationForAssignment || !this.pendingEmployeeData) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Attention',
+                detail: 'Veuillez sélectionner un poste de travail'
+            });
+            return;
+        }
+
+        const employee = this.pendingEmployeeData;
+        const workstationId = this.selectedWorkstationForAssignment!.Id_Workstation ?? this.selectedWorkstationForAssignment!.id;
+
+        // Check qualification before assigning
+        this.hrService.checkQualificationForWorkstation(employee.id, workstationId).subscribe({
+            next: (qualificationCheck: QualificationCheckResult) => {
+                if (!qualificationCheck.qualification_valid) {
+                    // Qualification expired or missing - show warning dialog
+                    this.showQualificationWarningForManualAssignment(employee, qualificationCheck);
+                } else {
+                    // Qualified - proceed with normal assignment
+                    this.proceedWithExplicitAssignment(employee, qualificationCheck, false);
+                }
+            },
+            error: () => {
+                // On API error, allow assignment with warning (degraded mode)
+                this.showQualificationWarningForManualAssignment(employee, null);
+            }
+        });
+    }
+
+    /**
+     * Show qualification warning dialog for manual assignment
+     */
+    private showQualificationWarningForManualAssignment(employee: any, qualificationCheck: QualificationCheckResult | null): void {
+        const fullName = `${employee.first_name} ${employee.last_name}`;
+        const workstationName = this.selectedWorkstationForAssignment!.Name_Workstation;
+
+        if (!qualificationCheck || !qualificationCheck.is_qualified) {
+            this.qualificationWarningMessage = `${fullName} n'est pas qualifié(e) pour le poste "${workstationName}". Êtes-vous sûr(e) de vouloir l'ajouter ?`;
+        } else {
+            const endDateStr = qualificationCheck.qualification_end_date
+                ? new Date(qualificationCheck.qualification_end_date).toLocaleDateString()
+                : 'N/A';
+            this.qualificationWarningMessage = `La qualification de ${fullName} pour le poste "${workstationName}" est expirée (fin: ${endDateStr}). Êtes-vous sûr(e) de vouloir l'ajouter ?`;
+        }
+
+        // Store info for assignment after confirmation
+        this.pendingManualAssignmentData = {
+            employee,
+            qualificationCheck,
+            isManualSelection: true
+        };
+        this.showExplicitAssignmentDialog = false;
+        this.showQualificationWarningDialog = true;
+    }
+
+    /**
+     * Proceed with explicit assignment after qualification check
+     */
+    private proceedWithExplicitAssignment(employee: any, qualificationCheck: QualificationCheckResult | null, isNonQualified: boolean): void {
+        const badgeId = this.employeeIdScan.trim();
+
+        const newAssignment: EmployeeWithAssignment = {
+            Id_Emp: employee.id,
+            Nom_Emp: employee.last_name,
+            Prenom_Emp: employee.first_name,
+            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+            Genre_Emp: employee.gender,
+            Categorie_Emp: employee.category,
+            DateEmbauche_Emp: new Date(employee.hire_date),
+            Departement_Emp: employee.department,
+            Picture: this.getEmployeePictureUrl(employee.picture),
+            EmpStatus: employee.status,
+            BadgeNumber: employee.badge_number || employee.BadgeNumber,
+            badgeId: badgeId,
+            workstation: this.selectedWorkstationForAssignment!.Name_Workstation,
+            workstationId: this.selectedWorkstationForAssignment!.Id_Workstation,
+            machine: this.selectedMachineForExplicitAssignment?.name,
+            machineId: this.selectedMachineForExplicitAssignment?.id,
+            qualification: qualificationCheck?.qualification_name || 'Non Qualifié',
+            qualificationLevel: qualificationCheck?.is_qualified
+                ? (qualificationCheck.qualification_valid ? 3 : 2)
+                : 0,
+            role: 'operator',
+            isNonQualified: isNonQualified
+        };
+
+        // Check if employee is already in team (reassignment case)
+        const existingInTeam = this.teamState.isEmployeeInTeam(employee.id);
+
+        if (existingInTeam) {
+            // Reassign existing member
+            this.teamState.reassignMember(employee.id, {
+                workstation: newAssignment.workstation,
+                workstationId: newAssignment.workstationId,
+                machine: newAssignment.machine,
+                machineId: newAssignment.machineId,
+                qualification: newAssignment.qualification,
+                qualificationLevel: newAssignment.qualificationLevel
+            });
+            this.session.team = [...this.teamState.team()];
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Réaffectation',
+                detail: `${employee.first_name} ${employee.last_name} réaffecté(e) à ${newAssignment.workstation}${newAssignment.machine ? ' - ' + newAssignment.machine : ''}`
+            });
+            this.saveSessionToStorage();
+        } else {
+            // New assignment
+            this.finalizeEmployeeAssignment(newAssignment, employee, badgeId);
+        }
+
+        // Record non-qualified assignment for traceability if applicable
+        if (isNonQualified) {
+            this.recordNonQualifiedAssignment(employee, this.selectedWorkstationForAssignment!);
+        }
+
+        this.cancelExplicitAssignment();
+    }
+
+    /**
+     * Record a non-qualified assignment for traceability
+     */
+    private recordNonQualifiedAssignment(employee: any, workstation: Workstation): void {
+        const workstationId = workstation.Id_Workstation ?? workstation.id;
+        const assignment: NonQualifiedAssignmentCreate = {
+            employee_id: employee.id,
+            workstation_id: workstationId,
+            machine_id: this.selectedMachineForExplicitAssignment?.id,
+            reason: 'Affectation manuelle avec qualification expirée/manquante'
+        };
+
+        this.hrService.createNonQualifiedAssignment(assignment).subscribe({
+            next: () => {
+                console.log('Non-qualified assignment recorded for traceability');
+            },
+            error: (error) => {
+                console.error('Failed to record non-qualified assignment:', error);
+            }
+        });
+    }
+
+    /**
+     * Cancel the explicit assignment dialog
+     */
+    cancelExplicitAssignment(): void {
+        this.showExplicitAssignmentDialog = false;
+        this.pendingEmployeeData = null;
+        this.pendingPrimaryAssignment = null;
+        this.selectedWorkstationForAssignment = null;
+        this.selectedMachineForExplicitAssignment = null;
+        this.filteredMachinesForExplicitAssignment = [];
+        this.employeeIdScan = '';
+    }
+
+    /**
+     * Handle workstation change in explicit assignment dialog - filter machines
+     */
+    onExplicitWorkstationChange(): void {
+        if (this.selectedWorkstationForAssignment) {
+            this.filteredMachinesForExplicitAssignment = this.machines.filter(
+                m => m.workstation === this.selectedWorkstationForAssignment!.Id_Workstation
+            );
+        } else {
+            this.filteredMachinesForExplicitAssignment = [];
+        }
+        this.selectedMachineForExplicitAssignment = null;
     }
 
     getRoleLabel(role: ProductionRole): string {

@@ -102,6 +102,12 @@ export const DMS_RH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/presences/presences-list.component').then(m => m.PresencesListComponent),
         title: 'Gestion des Présences'
+    },
+    {
+        path: 'non-qualified-assignments',
+        loadComponent: () =>
+            import('./features/non-qualified-assignments/non-qualified-assignments.component').then(m => m.NonQualifiedAssignmentsComponent),
+        title: 'Affectations Non Qualifiées'
     }
 ];
 

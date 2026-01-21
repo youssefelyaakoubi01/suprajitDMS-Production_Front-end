@@ -36,6 +36,22 @@
         </div>
     </div>
 
+    <!-- Non-Qualified Assignments Alert -->
+    <div class="alert-section" *ngIf="nonQualifiedActive > 0">
+        <div class="alert-card danger">
+            <div class="alert-icon">
+                <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <div class="alert-content">
+                <h4>{{ nonQualifiedActive }} Affectation(s) Non Qualifiée(s)</h4>
+                <p>Des opérateurs ont été affectés à des postes sans qualification valide.</p>
+            </div>
+            <button pButton label="Voir détails" icon="pi pi-arrow-right"
+                    class="p-button-danger" routerLink="/dms-rh/non-qualified-assignments">
+            </button>
+        </div>
+    </div>
+
     <!-- Charts Row -->
     <div class="charts-row">
         <!-- Employees by Department -->

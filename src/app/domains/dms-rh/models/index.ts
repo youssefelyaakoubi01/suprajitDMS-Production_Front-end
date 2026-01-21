@@ -22,3 +22,6 @@ export * from './dashboard.model';
 
 // Presence & Working Hours (synced from Production)
 export * from './presence.model';
+
+// Non-Qualified Assignments (Traceability)
+export * from './non-qualified-assignment.model';

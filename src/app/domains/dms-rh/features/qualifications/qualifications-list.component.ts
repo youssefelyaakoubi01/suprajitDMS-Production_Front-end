@@ -172,7 +172,7 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                         <p-inputicon styleClass="pi pi-search"></p-inputicon>
                         <input type="text" pInputText [ngModel]="searchTerm()"
                                (ngModelChange)="searchTerm.set($event)"
-                               placeholder="Rechercher un employé ou une formation..."
+                               placeholder="Rechercher un employé, formation ou poste..."
                                class="search-input" />
                     </p-iconfield>
                 </div>
@@ -191,11 +191,29 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                 <div class="filter-group">
                     <p-select [options]="projects"
                               [ngModel]="selectedProject()"
-                              (ngModelChange)="selectedProject.set($event)"
+                              (ngModelChange)="onFilterProjectChange($event)"
                               optionLabel="name"
                               optionValue="id"
                               placeholder="Tous les projets"
                               [showClear]="true"
+                              [filter]="true"
+                              filterBy="name"
+                              filterPlaceholder="Rechercher un projet..."
+                              appendTo="body"
+                              styleClass="filter-select">
+                    </p-select>
+                </div>
+                <div class="filter-group">
+                    <p-select [options]="filteredWorkstationsForFilter()"
+                              [ngModel]="selectedPoste()"
+                              (ngModelChange)="selectedPoste.set($event)"
+                              optionLabel="name"
+                              optionValue="id"
+                              placeholder="Tous les postes"
+                              [showClear]="true"
+                              [filter]="true"
+                              filterBy="name"
+                              filterPlaceholder="Rechercher un poste..."
                               appendTo="body"
                               styleClass="filter-select">
                     </p-select>
@@ -245,7 +263,7 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
 
                 <p-table [value]="filteredQualifications()"
                          [paginator]="true" [rows]="10" [rowsPerPageOptions]="[10, 25, 50]"
-                         [globalFilterFields]="['employee_name', 'formation_name']"
+                         [globalFilterFields]="['employee_name', 'formation_name', 'poste_name']"
                          [rowHover]="true" dataKey="id"
                          styleClass="hr-table"
                          [showCurrentPageReport]="true"
@@ -270,6 +288,10 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                             <th pSortableColumn="project_name" style="width: 150px">
                                 Projet
                                 <p-sortIcon field="project_name"></p-sortIcon>
+                            </th>
+                            <th pSortableColumn="poste_name" style="width: 150px">
+                                Poste
+                                <p-sortIcon field="poste_name"></p-sortIcon>
                             </th>
                             <th pSortableColumn="test_result" style="width: 130px">
                                 Résultat
@@ -333,6 +355,15 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
                                 </ng-template>
                             </td>
                             <td>
+                                <span class="workstation-cell" *ngIf="qual.poste_name; else noWorkstation">
+                                    <i class="pi pi-sitemap"></i>
+                                    {{ qual.poste_name }}
+                                </span>
+                                <ng-template #noWorkstation>
+                                    <span class="no-data">-</span>
+                                </ng-template>
+                            </td>
+                            <td>
                                 <div class="result-badge" [ngClass]="'result-' + (qual.test_result || 'pending').toLowerCase().replace(' ', '-')">
                                     <i [class]="getResultIcon(qual.test_result)"></i>
                                     <span>{{ getResultLabel(qual.test_result) }}</span>
@@ -357,13 +388,13 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
 
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="8">
+                            <td colspan="9">
                                 <div class="hr-empty-state compact">
                                     <div class="empty-icon">
                                         <i class="pi pi-verified"></i>
                                     </div>
                                     <h3>Aucune qualification trouvée</h3>
-                                    <p>{{ searchTerm() || selectedResult() || selectedProject() ? 'Essayez de modifier vos filtres' : 'Commencez par ajouter une qualification' }}</p>
+                                    <p>{{ searchTerm() || selectedResult() || selectedProject() || selectedPoste() ? 'Essayez de modifier vos filtres' : 'Commencez par ajouter une qualification' }}</p>
                                     <button pButton pRipple label="Nouvelle Qualification" icon="pi pi-plus"
                                             class="p-button-primary"
                                             (click)="openNewQualificationDialog()">
@@ -879,6 +910,19 @@ import { EmployeeAutocompleteComponent } from '@shared/components/employee-autoc
             }
         }
 
+        .workstation-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-color);
+            font-size: 0.875rem;
+
+            i {
+                font-size: 0.75rem;
+                color: var(--hr-primary, #8B5CF6);
+            }
+        }
+
         .no-data {
             color: var(--text-color-secondary);
         }
@@ -1146,6 +1190,7 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
     badgeEmployeeId = signal<number | null>(null); // Employee ID found by badge search
     badgeScan = '';
     selectedProject = signal<number | null>(null);
+    selectedPoste = signal<number | null>(null);
 
     showQualificationDialog = false;
     editingQualification: Qualification | null = null;
@@ -1157,6 +1202,15 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         { label: 'En attente', value: 'pending' },
         { label: 'En cours', value: 'in_progress' }
     ];
+
+    // Computed: workstations filtrées pour le dropdown de filtre
+    filteredWorkstationsForFilter = computed(() => {
+        const projectId = this.selectedProject();
+        if (projectId) {
+            return this.workstations.filter(w => w.project === projectId);
+        }
+        return this.workstations;
+    });
 
     // Computed filtered qualifications - reactively updates when signals change
     filteredQualifications = computed(() => {
@@ -1204,6 +1258,10 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
                 if (q.formation_name?.toLowerCase().includes(termLower)) {
                     return true;
                 }
+                // Search by poste/workstation name
+                if (q.poste_name?.toLowerCase().includes(termLower)) {
+                    return true;
+                }
                 // Search by badge
                 if (q.employee_badge?.toLowerCase().includes(termLower)) {
                     return true;
@@ -1220,6 +1278,12 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         const projectId = this.selectedProject();
         if (projectId) {
             result = result.filter(q => q.project === projectId);
+        }
+
+        // Filter by poste/workstation
+        const posteId = this.selectedPoste();
+        if (posteId) {
+            result = result.filter(q => q.poste === posteId);
         }
 
         // Filter by result
@@ -1314,6 +1378,15 @@ export class QualificationsListComponent implements OnInit, OnDestroy {
         } else {
             this.selectedResult.set(result);
         }
+    }
+
+    /**
+     * Handle project filter change - resets poste when project changes
+     */
+    onFilterProjectChange(projectId: number | null): void {
+        this.selectedProject.set(projectId);
+        // Réinitialiser le poste si le projet change
+        this.selectedPoste.set(null);
     }
 
     /**

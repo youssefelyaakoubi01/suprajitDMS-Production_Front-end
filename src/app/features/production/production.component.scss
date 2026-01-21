@@ -1780,3 +1780,59 @@
         }
     }
 }
+
+// ==================== EXPLICIT ASSIGNMENT DIALOG ====================
+
+.explicit-assignment-content {
+    padding: 0.5rem 0;
+}
+
+.employee-header-dialog {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--surface-50);
+    border-radius: 8px;
+}
+
+.employee-info-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.employee-name-dialog {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.employee-badge-dialog {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+    font-family: 'Courier New', monospace;
+}
+
+.explicit-selection-form {
+    .form-field {
+        margin-bottom: 1.5rem;
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-color);
+
+            i {
+                color: var(--primary-color);
+            }
+        }
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+}

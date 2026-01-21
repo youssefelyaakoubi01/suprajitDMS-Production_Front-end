@@ -17,6 +17,9 @@ export interface HRDashboardStats {
     employeesRequiringRecyclage: number;
     qualificationCompletionRate: number;
     averageVersatility: number;
+    // Non-qualified assignments tracking
+    nonQualifiedAssignmentsActive: number;
+    nonQualifiedAssignmentsTotal: number;
 }
 
 // ==================== HR KPI ====================

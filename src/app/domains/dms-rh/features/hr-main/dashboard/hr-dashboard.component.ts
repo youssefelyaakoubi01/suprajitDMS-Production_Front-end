@@ -91,6 +91,10 @@ export class HrDashboardComponent implements OnInit {
     // Top performers
     topPerformers: any[] = [];
 
+    // Non-qualified assignments
+    nonQualifiedActive = 0;
+    nonQualifiedTotal = 0;
+
     constructor(private hrService: HRService) {}
 
     ngOnInit(): void {
@@ -165,8 +169,14 @@ export class HrDashboardComponent implements OnInit {
                     recentHires: [],
                     employeesRequiringRecyclage: stats.employees_requiring_recyclage,
                     qualificationCompletionRate: stats.qualification_rate,
-                    averageVersatility: 2.4
+                    averageVersatility: 2.4,
+                    nonQualifiedAssignmentsActive: stats.non_qualified_assignments_active || 0,
+                    nonQualifiedAssignmentsTotal: stats.non_qualified_assignments_total || 0
                 };
+
+                // Update non-qualified assignments
+                this.nonQualifiedActive = stats.non_qualified_assignments_active || 0;
+                this.nonQualifiedTotal = stats.non_qualified_assignments_total || 0;
 
                 this.formationStats = {
                     totalFormations: stats.total_formations,
@@ -252,6 +262,14 @@ export class HrDashboardComponent implements OnInit {
                 color: '#F59E0B',
                 trend: -2,
                 subtitle: 'Employees to retrain'
+            },
+            {
+                title: 'Non Qualifiés',
+                value: this.nonQualifiedActive,
+                icon: 'pi pi-exclamation-triangle',
+                color: this.nonQualifiedActive > 0 ? '#EF4444' : '#10B981',
+                trend: this.nonQualifiedActive > 0 ? this.nonQualifiedActive : 0,
+                subtitle: 'Affectations actives'
             }
         ];
     }

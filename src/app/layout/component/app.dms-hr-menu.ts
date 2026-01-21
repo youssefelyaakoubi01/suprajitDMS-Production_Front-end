@@ -64,6 +64,11 @@ export class AppDmsHrMenu {
                         routerLink: ['/dms-hr/recyclage']
                     },
                     {
+                        label: 'Affectations Non Qualifiées',
+                        icon: 'pi pi-fw pi-exclamation-triangle',
+                        routerLink: ['/dms-hr/non-qualified-assignments']
+                    },
+                    {
                         label: 'Teams',
                         icon: 'pi pi-fw pi-sitemap',
                         routerLink: ['/dms-hr/teams']

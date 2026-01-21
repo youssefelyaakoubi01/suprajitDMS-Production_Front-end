@@ -6,7 +6,7 @@
  */
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -268,6 +268,49 @@ interface KpiCard {
                 </div>
             </div>
 
+            <!-- Non-Qualified Assignments Alert -->
+            <div class="grid mt-3" *ngIf="!loading && stats && stats.nonQualifiedAssignmentsActive > 0">
+                <div class="col-12">
+                    <div class="hr-section-card non-qualified-alert">
+                        <div class="section-header">
+                            <span class="section-title">
+                                <i class="pi pi-exclamation-triangle" style="color: #EF4444;"></i>
+                                Affectations Non Qualifiées
+                            </span>
+                            <span class="section-badge danger">
+                                {{ stats.nonQualifiedAssignmentsActive }}
+                            </span>
+                        </div>
+                        <div class="section-body">
+                            <div class="non-qualified-display">
+                                <div class="nq-stats-row">
+                                    <div class="nq-stat">
+                                        <div class="nq-value danger">{{ stats.nonQualifiedAssignmentsActive }}</div>
+                                        <span class="nq-label">Actives</span>
+                                    </div>
+                                    <div class="nq-divider"></div>
+                                    <div class="nq-stat">
+                                        <div class="nq-value muted">{{ stats.nonQualifiedAssignmentsTotal }}</div>
+                                        <span class="nq-label">Total</span>
+                                    </div>
+                                </div>
+                                <p class="nq-description">
+                                    Des opérateurs ont été affectés à des postes sans qualification valide.
+                                    Ces affectations nécessitent une action (formation ou acquittement).
+                                </p>
+                                <button pButton pRipple
+                                        label="Voir les détails"
+                                        icon="pi pi-arrow-right"
+                                        iconPos="right"
+                                        class="p-button-danger p-button-sm"
+                                        (click)="onViewNonQualifiedAssignments()">
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Recent Hires -->
             <div class="hr-section-card mt-3" *ngIf="!loading && stats?.recentHires?.length">
                 <div class="section-header">
@@ -440,12 +483,81 @@ interface KpiCard {
                 color: var(--text-color-secondary);
             }
         }
+
+        /* Non-Qualified Assignments Alert */
+        .non-qualified-alert {
+            border-left: 4px solid #EF4444;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, var(--surface-card) 100%);
+        }
+
+        .section-badge.danger {
+            background: #EF4444;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+        }
+
+        .non-qualified-display {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .nq-stats-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .nq-stat {
+            text-align: center;
+        }
+
+        .nq-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+
+            &.danger {
+                color: #EF4444;
+            }
+
+            &.muted {
+                color: var(--text-color-secondary);
+            }
+        }
+
+        .nq-label {
+            display: block;
+            font-size: 0.8125rem;
+            color: var(--text-color-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .nq-divider {
+            width: 1px;
+            height: 48px;
+            background: var(--surface-border);
+        }
+
+        .nq-description {
+            font-size: 0.875rem;
+            color: var(--text-color-secondary);
+            margin: 1rem 0;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
     `]
 })
 export class RhDashboardComponent implements OnInit, OnDestroy {
     @Input() stats: HRDashboardStats | null = null;
     @Output() kpiClicked = new EventEmitter<KpiCard>();
     @Output() viewRecyclage = new EventEmitter<void>();
+    @Output() viewNonQualifiedAssignments = new EventEmitter<void>();
 
     private destroy$ = new Subject<void>();
 
@@ -506,7 +618,10 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
         maintainAspectRatio: false
     };
 
-    constructor(private dashboardService: DmsRhDashboardService) {}
+    constructor(
+        private dashboardService: DmsRhDashboardService,
+        private router: Router
+    ) {}
 
     ngOnInit(): void {
         if (!this.stats) {
@@ -549,7 +664,9 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
             recentHires: data.recent_hires ?? data.recentHires ?? [],
             employeesRequiringRecyclage: data.employees_requiring_recyclage ?? data.employeesRequiringRecyclage ?? 0,
             qualificationCompletionRate: data.qualification_rate ?? data.qualificationCompletionRate ?? 0,
-            averageVersatility: data.average_versatility ?? data.averageVersatility ?? 0
+            averageVersatility: data.average_versatility ?? data.averageVersatility ?? 0,
+            nonQualifiedAssignmentsActive: data.non_qualified_assignments_active ?? data.nonQualifiedAssignmentsActive ?? 0,
+            nonQualifiedAssignmentsTotal: data.non_qualified_assignments_total ?? data.nonQualifiedAssignmentsTotal ?? 0
         };
     }
 
@@ -557,6 +674,8 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
         if (!this.stats) return;
 
         const totalEmployees = this.stats.totalEmployees || 1;
+
+        const nonQualifiedActive = this.stats.nonQualifiedAssignmentsActive || 0;
 
         this.kpiCards = [
             {
@@ -587,13 +706,13 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
                 subtitle: 'Need retraining'
             },
             {
-                label: 'Qualification Rate',
-                value: Math.round(this.stats.qualificationCompletionRate || 0),
-                icon: 'pi pi-chart-line',
-                color: 'info',
-                trend: 8,
-                progress: this.stats.qualificationCompletionRate || 0,
-                subtitle: '% fully qualified'
+                label: 'Non Qualifiés',
+                value: nonQualifiedActive,
+                icon: 'pi pi-exclamation-triangle',
+                color: nonQualifiedActive > 0 ? 'danger' : 'success',
+                trend: nonQualifiedActive > 0 ? nonQualifiedActive : 0,
+                progress: nonQualifiedActive > 0 ? Math.min((nonQualifiedActive / 10) * 100, 100) : 0,
+                subtitle: 'Affectations sans qualification'
             }
         ];
     }
@@ -664,5 +783,11 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
 
     onViewRecyclage(): void {
         this.viewRecyclage.emit();
+        this.router.navigate(['/dms-rh', 'recyclage']);
+    }
+
+    onViewNonQualifiedAssignments(): void {
+        this.viewNonQualifiedAssignments.emit();
+        this.router.navigate(['/dms-rh', 'non-qualified-assignments']);
     }
 }

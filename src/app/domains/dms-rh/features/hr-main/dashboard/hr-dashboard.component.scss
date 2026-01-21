@@ -474,6 +474,57 @@
     }
 }
 
+// Alert Section
+.alert-section {
+    margin-bottom: 1.5rem;
+}
+
+.alert-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+
+    &.danger {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .alert-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(239, 68, 68, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+
+        i {
+            font-size: 1.5rem;
+            color: #EF4444;
+        }
+    }
+
+    .alert-content {
+        flex: 1;
+
+        h4 {
+            margin: 0 0 0.25rem 0;
+            color: #EF4444;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0;
+            color: var(--text-color-secondary);
+            font-size: 0.9rem;
+        }
+    }
+}
+
 // Responsive
 @media (max-width: 768px) {
     .hr-dashboard {
@@ -496,5 +547,16 @@
 
     .charts-row {
         grid-template-columns: 1fr;
+    }
+
+    .alert-card {
+        flex-direction: column;
+        text-align: center;
+
+        .alert-content {
+            h4, p {
+                text-align: center;
+            }
+        }
     }
 }
