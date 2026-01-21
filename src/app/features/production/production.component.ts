@@ -2769,6 +2769,76 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 }
             },
             error: (error) => {
+                // If 404 on update, the record no longer exists (stale ID from localStorage) - create new instead
+                if (error.status === 404 && isUpdate) {
+                    console.warn('Record not found (404), creating new record instead');
+                    // Clear the stale ID
+                    hour.hourlyProductionId = null;
+                    // Retry as POST (create)
+                    this.productionService.saveHourlyProduction(productionData).subscribe({
+                        next: (response: any) => {
+                            // Same success handling as above
+                            console.log('Production created after 404 retry, full response:', response);
+
+                            // Try different possible ID fields
+                            let extractedId = response?.id ||
+                                             response?.Id_HourlyProd ||
+                                             response?.ID_HOURLYPROD ||
+                                             response?.hourly_production_id ||
+                                             response?.production_id;
+
+                            if (!extractedId && response?.date && response?.shift && response?.hour) {
+                                extractedId = `${response.date}_${response.shift}_${response.hour}`;
+                                console.warn('Using composite ID:', extractedId);
+                            }
+
+                            hour.hourlyProductionId = extractedId || response;
+                            hour.output = this.hourProductionInput.output;
+                            hour.scrap = this.hourProductionInput.scrap || 0;
+                            hour.efficiency = Math.round((hour.output! / hour.target) * 100);
+                            hour.scrapRate = hour.scrapTarget > 0 ?
+                                Math.round((hour.scrap! / hour.scrapTarget) * 10000) / 100 : 0;
+                            hour.status = 'completed';
+
+                            // Capture team for saving
+                            const teamToSaveForHour: EmployeeWithAssignment[] = this.currentHourTeam.length > 0
+                                ? [...this.currentHourTeam]
+                                : [...this.teamState.team()];
+
+                            hour.team = [...teamToSaveForHour];
+                            this.saveSessionToStorage();
+
+                            // Save team assignments
+                            if (teamToSaveForHour.length > 0) {
+                                this.fetchProductionIdThenSaveTeam(hour, teamToSaveForHour);
+                            }
+
+                            // Save downtimes
+                            if (this.hourProductionInput.downtimes && this.hourProductionInput.downtimes.length > 0) {
+                                this.saveAllDowntimesForHour(this.selectedHourIndex!, hour.hourlyProductionId as number);
+                            } else {
+                                this.closeHourDialog();
+                                this.messageService.add({
+                                    severity: 'success',
+                                    summary: 'Saved',
+                                    detail: `Hour ${hour.hour} production saved successfully`
+                                });
+                            }
+                        },
+                        error: (retryError) => {
+                            hour.status = 'not_started';
+                            console.error('Error creating hourly production after 404 retry:', retryError);
+                            this.messageService.add({
+                                severity: 'error',
+                                summary: 'Error',
+                                detail: 'Failed to save production'
+                            });
+                        }
+                    });
+                    return;
+                }
+
+                // Original error handling for other errors
                 hour.status = 'not_started';
                 console.error('Error saving hourly production:', error);
                 // Extract detailed error message from DRF response
