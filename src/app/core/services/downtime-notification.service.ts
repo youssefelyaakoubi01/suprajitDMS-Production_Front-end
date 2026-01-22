@@ -524,7 +524,7 @@ export class DowntimeNotificationService implements OnDestroy {
         this.saveToLocalStorage();
 
         // Send to backend for distribution to maintenance (optional - may not be implemented)
-        return this.api.post<any>(`${this.endpoint}/declarations/send-alert/`, {
+        return this.api.post<any>(`${this.endpoint}/declarations/send_alert/`, {
             declaration_id: declaration.id,
             alert_type: alert.type,
             priority: alert.priority
