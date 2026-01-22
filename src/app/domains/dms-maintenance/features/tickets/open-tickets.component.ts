@@ -26,6 +26,8 @@ import { TextareaModule } from 'primeng/textarea';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { ToastModule } from 'primeng/toast';
+import { BadgeModule } from 'primeng/badge';
+import { AvatarModule } from 'primeng/avatar';
 import { MessageService } from 'primeng/api';
 
 // Domain imports
@@ -56,6 +58,8 @@ import { MaintenanceService } from '@core/services/maintenance.service';
         IconFieldModule,
         InputIconModule,
         ToastModule,
+        BadgeModule,
+        AvatarModule,
         AlertPanelComponent
     ],
     providers: [MessageService],
@@ -82,15 +86,20 @@ import { MaintenanceService } from '@core/services/maintenance.service';
                     <div class="header-section mb-3">
                         <div class="flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="flex align-items-center gap-2">
-                                <button pButton
-                                        [icon]="showAlertPanel ? 'pi pi-chevron-up' : 'pi pi-bell'"
-                                        class="p-button-rounded p-button-text toggle-alerts-btn"
-                                        [class.has-alerts]="unreadAlertCount > 0"
-                                        [pTooltip]="showAlertPanel ? 'Masquer les alertes' : 'Afficher les alertes'"
-                                        (click)="toggleAlertPanel()">
-                                    <span *ngIf="!showAlertPanel && unreadAlertCount > 0"
-                                          class="alert-badge">{{ unreadAlertCount }}</span>
-                                </button>
+                                <span class="p-overlay-badge">
+                                    <button pButton
+                                            [icon]="showAlertPanel ? 'pi pi-chevron-up' : 'pi pi-bell'"
+                                            class="p-button-rounded p-button-text toggle-alerts-btn"
+                                            [class.p-button-danger]="unreadAlertCount > 0 && !showAlertPanel"
+                                            [class.p-button-secondary]="!(unreadAlertCount > 0 && !showAlertPanel)"
+                                            [pTooltip]="showAlertPanel ? 'Masquer les alertes' : 'Afficher les alertes'"
+                                            (click)="toggleAlertPanel()">
+                                    </button>
+                                    <p-badge *ngIf="!showAlertPanel && unreadAlertCount > 0"
+                                             [value]="unreadAlertCount.toString()"
+                                             severity="danger">
+                                    </p-badge>
+                                </span>
                                 <p-select [options]="ticketOptions"
                                           [(ngModel)]="selectedTicketId"
                                           optionLabel="label"
@@ -119,22 +128,62 @@ import { MaintenanceService } from '@core/services/maintenance.service';
                     </div>
 
                     <!-- Quick Stats -->
-                    <div class="stats-row mb-3" *ngIf="tickets.length > 0">
-                        <div class="stat-item stat-open">
-                            <span class="stat-value">{{ getOpenCount() }}</span>
-                            <span class="stat-label">Open</span>
+                    <div class="grid mb-3" *ngIf="tickets.length > 0">
+                        <div class="col-6 md:col-3">
+                            <p-card styleClass="stat-card stat-open">
+                                <div class="flex align-items-center gap-3">
+                                    <p-avatar icon="pi pi-clock"
+                                              size="large"
+                                              [style]="{'background-color': 'var(--orange-100)', 'color': 'var(--orange-600)'}">
+                                    </p-avatar>
+                                    <div>
+                                        <div class="text-2xl font-bold text-orange-600">{{ getOpenCount() }}</div>
+                                        <div class="text-color-secondary text-sm">Open</div>
+                                    </div>
+                                </div>
+                            </p-card>
                         </div>
-                        <div class="stat-item stat-progress">
-                            <span class="stat-value">{{ getInProgressCount() }}</span>
-                            <span class="stat-label">In Progress</span>
+                        <div class="col-6 md:col-3">
+                            <p-card styleClass="stat-card stat-progress">
+                                <div class="flex align-items-center gap-3">
+                                    <p-avatar icon="pi pi-spinner"
+                                              size="large"
+                                              [style]="{'background-color': 'var(--blue-100)', 'color': 'var(--blue-600)'}">
+                                    </p-avatar>
+                                    <div>
+                                        <div class="text-2xl font-bold text-blue-600">{{ getInProgressCount() }}</div>
+                                        <div class="text-color-secondary text-sm">In Progress</div>
+                                    </div>
+                                </div>
+                            </p-card>
                         </div>
-                        <div class="stat-item stat-assigned">
-                            <span class="stat-value">{{ getAssignedCount() }}</span>
-                            <span class="stat-label">Assigned</span>
+                        <div class="col-6 md:col-3">
+                            <p-card styleClass="stat-card stat-assigned">
+                                <div class="flex align-items-center gap-3">
+                                    <p-avatar icon="pi pi-user-plus"
+                                              size="large"
+                                              [style]="{'background-color': 'var(--green-100)', 'color': 'var(--green-600)'}">
+                                    </p-avatar>
+                                    <div>
+                                        <div class="text-2xl font-bold text-green-600">{{ getAssignedCount() }}</div>
+                                        <div class="text-color-secondary text-sm">Assigned</div>
+                                    </div>
+                                </div>
+                            </p-card>
                         </div>
-                        <div class="stat-item stat-critical">
-                            <span class="stat-value">{{ getCriticalCount() }}</span>
-                            <span class="stat-label">Critical</span>
+                        <div class="col-6 md:col-3">
+                            <p-card styleClass="stat-card stat-critical">
+                                <div class="flex align-items-center gap-3">
+                                    <p-avatar icon="pi pi-exclamation-triangle"
+                                              size="large"
+                                              [style]="{'background-color': 'var(--red-100)', 'color': 'var(--red-600)'}">
+                                    </p-avatar>
+                                    <div>
+                                        <div class="text-2xl font-bold text-red-600">{{ getCriticalCount() }}</div>
+                                        <div class="text-color-secondary text-sm">Critical</div>
+                                    </div>
+                                </div>
+                            </p-card>
                         </div>
                     </div>
 
@@ -409,13 +458,7 @@ import { MaintenanceService } from '@core/services/maintenance.service';
         }
 
         .toggle-alerts-btn {
-            position: relative;
             transition: all 0.3s ease;
-        }
-
-        .toggle-alerts-btn.has-alerts {
-            background: var(--red-50);
-            color: var(--red-500);
         }
 
         .ticket-select {
@@ -519,81 +562,36 @@ import { MaintenanceService } from '@core/services/maintenance.service';
             border-top: 1px solid var(--surface-border);
         }
 
-        /* Alert badge */
-        .alert-badge {
+        /* Overlay badge positioning */
+        .p-overlay-badge {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .p-overlay-badge > .p-badge {
             position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--red-500);
-            color: white;
-            font-size: 0.7rem;
-            font-weight: bold;
-            padding: 2px 6px;
-            border-radius: 10px;
-            min-width: 18px;
-            text-align: center;
+            top: 0;
+            right: 0;
+            transform: translate(50%, -50%);
         }
 
-        /* Stats row */
-        .stats-row {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            min-width: 100px;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: var(--text-color-secondary);
-        }
-
-        .stat-open {
-            background: var(--orange-50);
-            border: 1px solid var(--orange-200);
-        }
-        .stat-open .stat-value { color: var(--orange-600); }
-
-        .stat-progress {
-            background: var(--blue-50);
-            border: 1px solid var(--blue-200);
-        }
-        .stat-progress .stat-value { color: var(--blue-600); }
-
-        .stat-assigned {
-            background: var(--green-50);
-            border: 1px solid var(--green-200);
-        }
-        .stat-assigned .stat-value { color: var(--green-600); }
-
-        .stat-critical {
-            background: var(--red-50);
-            border: 1px solid var(--red-200);
-        }
-        .stat-critical .stat-value { color: var(--red-600); }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .stats-row {
-                justify-content: center;
+        /* Stats cards */
+        ::ng-deep .stat-card {
+            .p-card-body {
+                padding: 1rem;
             }
-            .stat-item {
-                min-width: 80px;
-                padding: 0.5rem 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             }
         }
+
+        .stat-open { border-left: 3px solid var(--orange-500); }
+        .stat-progress { border-left: 3px solid var(--blue-500); }
+        .stat-assigned { border-left: 3px solid var(--green-500); }
+        .stat-critical { border-left: 3px solid var(--red-500); }
     `]
 })
 export class OpenTicketsComponent implements OnInit, OnDestroy {

@@ -5,21 +5,26 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MenuItem } from 'primeng/api';
 import { BadgeModule } from 'primeng/badge';
+import { MessageModule } from 'primeng/message';
 import { AppMenuitem } from './app.menuitem';
 import { DowntimeNotificationService } from '../../core/services/downtime-notification.service';
 
 @Component({
     selector: 'app-dms-maintenance-menu',
     standalone: true,
-    imports: [CommonModule, AppMenuitem, RouterModule, BadgeModule],
+    imports: [CommonModule, AppMenuitem, RouterModule, BadgeModule, MessageModule],
     template: `
         <ul class="layout-menu">
             <!-- Alert Banner -->
-            <li *ngIf="unreadCount > 0" class="alert-banner">
-                <div class="alert-banner-content">
-                    <i class="pi pi-bell animate-pulse"></i>
-                    <span>{{ unreadCount }} new alert(s)</span>
-                </div>
+            <li *ngIf="unreadCount > 0" class="menu-alert-item">
+                <p-message severity="error" styleClass="w-full menu-alert-message">
+                    <ng-template pTemplate="content">
+                        <div class="flex align-items-center gap-2">
+                            <i class="pi pi-bell animate-pulse"></i>
+                            <span class="font-semibold">{{ unreadCount }} new alert(s)</span>
+                        </div>
+                    </ng-template>
+                </p-message>
             </li>
 
             <ng-container *ngFor="let item of model; let i = index">
@@ -29,27 +34,20 @@ import { DowntimeNotificationService } from '../../core/services/downtime-notifi
         </ul>
     `,
     styles: [`
-        .alert-banner {
+        .menu-alert-item {
             margin: 0.5rem 1rem;
-            padding: 0.5rem;
-            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-            border-radius: 8px;
-            border-left: 3px solid #ef4444;
         }
-        .alert-banner-content {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #dc2626;
-            font-size: 0.85rem;
-            font-weight: 600;
+
+        ::ng-deep .menu-alert-message {
+            .p-message-content {
+                padding: 0.5rem 0.75rem;
+            }
         }
-        .alert-banner i {
-            font-size: 1rem;
-        }
+
         .animate-pulse {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
