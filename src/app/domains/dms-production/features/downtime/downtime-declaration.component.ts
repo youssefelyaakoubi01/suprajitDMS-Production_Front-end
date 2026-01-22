@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { interval, Subscription } from 'rxjs';
+import { interval, Subscription, timeout, finalize } from 'rxjs';
 import { CardModule } from 'primeng/card';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -554,9 +554,15 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             declarationData.machine = formValue.machine.id;
         }
 
-        this.maintenanceService.createDeclaration(declarationData).subscribe({
+        this.maintenanceService.createDeclaration(declarationData).pipe(
+            timeout(30000), // 30 seconds timeout for mobile networks
+            finalize(() => {
+                // Guarantees isSaving is reset regardless of success, error, or timeout
+                this.isSaving = false;
+            })
+        ).subscribe({
             next: (declaration) => {
-                // Send alert notification to maintenance team if enabled
+                // Send alert notification to maintenance team if enabled (fire-and-forget)
                 if (this.notifyMaintenance) {
                     this.notificationService.createDowntimeAlert({
                         id: declaration.id,
@@ -572,13 +578,11 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
                         impactLevel: declarationData.impact_level as AlertPriority,
                         declarationType: declarationData.declaration_type,
                         declaredBy: declaration.declared_by_name
-                    }).subscribe({
-                        next: () => {
-                            console.log('Alert sent to maintenance team');
-                        },
-                        error: (alertErr) => {
-                            console.warn('Could not send alert notification:', alertErr);
-                        }
+                    }).pipe(
+                        timeout(10000) // 10 seconds for alert notification
+                    ).subscribe({
+                        next: () => console.log('Alert sent to maintenance team'),
+                        error: (alertErr) => console.warn('Could not send alert notification:', alertErr)
                     });
                 }
 
@@ -588,17 +592,22 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
                     detail: `Déclaration ${declaration.ticket_number} créée - Équipe maintenance notifiée`,
                     life: 5000
                 });
-                this.isSaving = false;
                 this.showDeclarationDialog = false;
                 this.loadDeclarations();
             },
             error: (err) => {
                 console.error('Error creating declaration:', err);
-                this.isSaving = false;
+
+                // Appropriate error message based on error type
+                let errorMessage = 'Failed to create declaration';
+                if (err.name === 'TimeoutError') {
+                    errorMessage = 'La connexion a expiré. Veuillez vérifier votre réseau et réessayer.';
+                }
+
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Error',
-                    detail: 'Failed to create declaration'
+                    detail: errorMessage
                 });
             }
         });

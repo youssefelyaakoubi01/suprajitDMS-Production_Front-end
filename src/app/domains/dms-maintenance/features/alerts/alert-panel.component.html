@@ -363,6 +363,20 @@
 
             <!-- Location & Problem Info -->
             <div class="grid mb-4">
+                <!-- Project -->
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-briefcase mr-2"></i>Projet</label>
+                        <span class="info-value">{{ selectedDeclaration.project_name || '-' }}</span>
+                    </div>
+                </div>
+                <!-- Zone -->
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-map mr-2"></i>Zone</label>
+                        <span class="info-value">{{ selectedDeclaration.zone_name || '-' }}</span>
+                    </div>
+                </div>
                 <div class="col-6">
                     <div class="info-group">
                         <label class="info-label"><i class="pi pi-sitemap mr-2"></i>Production Line</label>
@@ -389,12 +403,27 @@
                         </p-tag>
                     </div>
                 </div>
+                <!-- Declaration Type -->
+                <div class="col-6">
+                    <div class="info-group">
+                        <label class="info-label"><i class="pi pi-tag mr-2"></i>Type</label>
+                        <p-tag [value]="selectedDeclaration.declaration_type_display || (selectedDeclaration.declaration_type | titlecase)"
+                               [severity]="getDeclarationTypeSeverity(selectedDeclaration.declaration_type)">
+                        </p-tag>
+                    </div>
+                </div>
             </div>
 
             <!-- Reason -->
             <div class="info-group mb-4">
                 <label class="info-label"><i class="pi pi-file-edit mr-2"></i>Reason</label>
                 <p class="info-value m-0 surface-ground p-3 border-round">{{ selectedDeclaration.reason }}</p>
+            </div>
+
+            <!-- Description (if different from reason) -->
+            <div class="info-group mb-4" *ngIf="selectedDeclaration.description">
+                <label class="info-label"><i class="pi pi-align-left mr-2"></i>Description</label>
+                <p class="info-value m-0 surface-ground p-3 border-round">{{ selectedDeclaration.description }}</p>
             </div>
 
             <p-divider></p-divider>

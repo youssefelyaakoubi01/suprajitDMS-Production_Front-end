@@ -26,5 +26,20 @@
 
     <body>
         <app-root></app-root>
+
+        <!-- Service Worker Registration for Push Notifications -->
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/custom-sw.js', { scope: '/' })
+                        .then(function(registration) {
+                            console.log('[SW] Service Worker registered with scope:', registration.scope);
+                        })
+                        .catch(function(error) {
+                            console.warn('[SW] Service Worker registration failed:', error);
+                        });
+                });
+            }
+        </script>
     </body>
 </html>

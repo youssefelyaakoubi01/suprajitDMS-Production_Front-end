@@ -95,6 +95,10 @@ export interface DowntimeDeclaration {
     waiting_time?: number;
     created_at: string;
     updated_at: string;
+    // New fields for Declaration Details dialog
+    project_name?: string;
+    zone_name?: string;
+    declaration_type_display?: string;
 }
 
 @Injectable({

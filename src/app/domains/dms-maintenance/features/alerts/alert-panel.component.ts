@@ -628,4 +628,13 @@ export class AlertPanelComponent implements OnInit, OnDestroy {
         };
         return map[status] || 'info';
     }
+
+    getDeclarationTypeSeverity(type: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+        const map: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary'> = {
+            'planned': 'info',
+            'unplanned': 'warn',
+            'emergency': 'danger'
+        };
+        return map[type] || 'secondary';
+    }
 }

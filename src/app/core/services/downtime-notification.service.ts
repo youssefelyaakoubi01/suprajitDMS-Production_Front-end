@@ -12,6 +12,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, interval, Subscription, of } from 'rxjs';
 import { takeUntil, filter, map, catchError } from 'rxjs/operators';
 import { ApiService } from './api.service';
+import { PushNotificationService, PushSubscriptionState } from './push-notification.service';
 
 // Alert types
 export type AlertType = 'new_downtime' | 'acknowledged' | 'technician_assigned' | 'work_started' | 'resolved' | 'escalated' | 'critical';
@@ -43,6 +44,7 @@ export interface DowntimeAlert {
 export interface NotificationPreferences {
     enableSound: boolean;
     enableDesktop: boolean;
+    enablePush: boolean; // Web Push notifications (works when browser is closed)
     autoRefreshInterval: number; // seconds
     showCriticalOnly: boolean;
     filterByZone?: string[];
@@ -92,6 +94,7 @@ export class DowntimeNotificationService implements OnDestroy {
     private preferences: NotificationPreferences = {
         enableSound: true,
         enableDesktop: true,
+        enablePush: false,
         autoRefreshInterval: 10,
         showCriticalOnly: false
     };
@@ -100,9 +103,17 @@ export class DowntimeNotificationService implements OnDestroy {
     private alertSound?: HTMLAudioElement;
     private soundsAvailable = false;
 
-    constructor(private api: ApiService) {
+    // Push notification state
+    private pushStateSubject = new BehaviorSubject<PushSubscriptionState | null>(null);
+    public pushState$ = this.pushStateSubject.asObservable();
+
+    constructor(
+        private api: ApiService,
+        private pushService: PushNotificationService
+    ) {
         this.initializeSounds();
         this.requestNotificationPermission();
+        this.initializePushNotifications();
     }
 
     ngOnDestroy(): void {
@@ -143,6 +154,98 @@ export class DowntimeNotificationService implements OnDestroy {
         if ('Notification' in window && Notification.permission === 'default') {
             Notification.requestPermission();
         }
+    }
+
+    private initializePushNotifications(): void {
+        // Subscribe to push state changes
+        this.pushService.getState()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(state => {
+                this.pushStateSubject.next(state);
+                // Update preferences based on actual subscription state
+                if (state.isSubscribed !== this.preferences.enablePush) {
+                    this.preferences.enablePush = state.isSubscribed;
+                    this.saveToLocalStorage();
+                }
+            });
+
+        // Initialize push service
+        this.pushService.init().then(success => {
+            if (success) {
+                console.log('[Downtime Notifications] Push service initialized');
+            }
+        });
+    }
+
+    // ==================== PUSH NOTIFICATION METHODS ====================
+
+    /**
+     * Enable push notifications for the current user
+     * @param employeeId Optional employee ID to associate with the subscription
+     */
+    async enablePushNotifications(employeeId?: number): Promise<boolean> {
+        try {
+            const subscription = await this.pushService.subscribe(employeeId);
+            if (subscription) {
+                this.preferences.enablePush = true;
+                this.saveToLocalStorage();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('[Downtime Notifications] Failed to enable push:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Disable push notifications
+     */
+    async disablePushNotifications(): Promise<boolean> {
+        try {
+            const success = await this.pushService.unsubscribe();
+            if (success) {
+                this.preferences.enablePush = false;
+                this.saveToLocalStorage();
+            }
+            return success;
+        } catch (error) {
+            console.error('[Downtime Notifications] Failed to disable push:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Toggle push notifications on/off
+     * @param employeeId Optional employee ID for subscription
+     */
+    async togglePushNotifications(employeeId?: number): Promise<boolean> {
+        if (this.pushService.isSubscribed()) {
+            return this.disablePushNotifications();
+        } else {
+            return this.enablePushNotifications(employeeId);
+        }
+    }
+
+    /**
+     * Check if push notifications are enabled
+     */
+    isPushEnabled(): boolean {
+        return this.pushService.isSubscribed();
+    }
+
+    /**
+     * Get the current push notification state
+     */
+    getPushState(): PushSubscriptionState | null {
+        return this.pushStateSubject.value;
+    }
+
+    /**
+     * Send a test push notification
+     */
+    async sendTestPushNotification(): Promise<boolean> {
+        return this.pushService.sendTestNotification();
     }
 
     // ==================== POLLING ====================
