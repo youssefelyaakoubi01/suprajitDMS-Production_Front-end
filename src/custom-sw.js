@@ -3,8 +3,17 @@
  * Handles Web Push Notifications for downtime alerts
  */
 
-// Cache name for offline assets (optional)
-const CACHE_NAME = 'dms-push-v1';
+// Cache name for offline assets
+const CACHE_NAME = 'dms-push-v2';
+
+// Assets to cache for offline support
+const ASSETS_TO_CACHE = [
+    '/',
+    '/index.html',
+    '/manifest.json',
+    '/assets/icons/icon-192x192.png',
+    '/assets/icons/badge-72x72.png'
+];
 
 // Listen for push messages from the server
 self.addEventListener('push', (event) => {
@@ -108,9 +117,19 @@ self.addEventListener('notificationclose', (event) => {
     }
 });
 
-// Service Worker installation
+// Service Worker installation - cache assets for offline support
 self.addEventListener('install', (event) => {
     console.log('[Service Worker] Installing...');
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('[Service Worker] Caching assets for offline support');
+            return cache.addAll(ASSETS_TO_CACHE).catch((error) => {
+                console.warn('[Service Worker] Some assets could not be cached:', error);
+                // Continue even if some assets fail to cache
+                return Promise.resolve();
+            });
+        })
+    );
     // Skip waiting to activate immediately
     self.skipWaiting();
 });
@@ -132,6 +151,51 @@ self.addEventListener('activate', (event) => {
                 );
             })
         ])
+    );
+});
+
+// Handle fetch events - serve cached assets when offline
+self.addEventListener('fetch', (event) => {
+    // Only handle GET requests
+    if (event.request.method !== 'GET') {
+        return;
+    }
+
+    // Skip API requests - let them go to network
+    if (event.request.url.includes('/api/')) {
+        return;
+    }
+
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+            // Return cached response if available
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            // Otherwise fetch from network
+            return fetch(event.request).then((response) => {
+                // Don't cache non-successful responses
+                if (!response || response.status !== 200 || response.type !== 'basic') {
+                    return response;
+                }
+
+                // Clone the response for caching
+                const responseToCache = response.clone();
+
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, responseToCache);
+                });
+
+                return response;
+            }).catch(() => {
+                // Return a fallback for navigation requests when offline
+                if (event.request.mode === 'navigate') {
+                    return caches.match('/index.html');
+                }
+                return null;
+            });
+        })
     );
 });
 

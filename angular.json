@@ -39,6 +39,11 @@
                                 "glob": "custom-sw.js",
                                 "input": "src",
                                 "output": "/"
+                            },
+                            {
+                                "glob": "manifest.json",
+                                "input": "src",
+                                "output": "/"
                             }
                         ],
                         "styles": [
