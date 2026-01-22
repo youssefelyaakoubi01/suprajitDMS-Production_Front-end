@@ -139,8 +139,8 @@ export class ProductionService {
         );
     }
 
-    getWorkstations(lineId?: number): Observable<Workstation[]> {
-        return this.coreService.getWorkstations(lineId).pipe(
+    getWorkstations(lineId?: number, projectId?: number): Observable<Workstation[]> {
+        return this.coreService.getWorkstations(lineId, projectId).pipe(
             map((response: any) => {
                 const workstations = response.results || response;
                 return workstations.map((w: any) => ({
@@ -148,6 +148,7 @@ export class ProductionService {
                     Name_Workstation: w.name,
                     Code_Workstation: w.code,
                     Id_ProdLine: w.production_line,
+                    project: w.project,
                     machines_count: w.machines_count || 0
                 }));
             })

@@ -356,6 +356,8 @@ export interface EmployeeWithAssignment extends Employee {
     machineId?: number;
     qualification?: string;
     qualificationLevel?: number;
+    qualificationEndDate?: Date | null; // End date of qualification
+    qualificationValid?: boolean; // Whether qualification is currently valid
     role?: ProductionRole;
     team?: Team;
     category?: EmployeeCategory;

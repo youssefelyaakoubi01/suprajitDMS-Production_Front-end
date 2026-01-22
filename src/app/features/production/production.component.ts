@@ -183,6 +183,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
         employee: any;
         qualificationCheck: QualificationCheckResult | null;
         isManualSelection: boolean;
+        workstation: Workstation | null;
+        machine: Machine | null;
     } | null = null;
 
     // Manual Workstation Selection (when no default assignment exists)
@@ -194,6 +196,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
     selectedWorkstationForAssignment: Workstation | null = null;
     selectedMachineForExplicitAssignment: Machine | null = null;
     filteredMachinesForExplicitAssignment: Machine[] = [];
+
+    // Employee Image Viewer Dialog
+    showImageViewerDialog = false;
+    selectedEmployeeForImage: EmployeeWithAssignment | null = null;
 
     // Hour Production Dialog
     showHourDialog = false;
@@ -644,7 +650,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
                 // Load related data
                 this.loadParts(project.Id_Project);
-                this.loadWorkstations(line.id);
+                this.loadWorkstationsByProject(project.Id_Project);
                 this.loadMachines(line.id);
                 this.loadShiftsForProductionLine(line.id);
 
@@ -711,8 +717,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         partNumber: part
                     });
 
-                    // Load workstations for this line
-                    this.loadWorkstations(line.id);
+                    // Load workstations for this project
+                    this.loadWorkstationsByProject(project.Id_Project);
 
                     // Auto-complete the setup
                     this.session.shift = shift;
@@ -1380,12 +1386,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     { productionLine: null, partNumber: null },
                     { emitEvent: false }
                 );
-                // Clear dependent arrays
-                this.workstations = [];
+                // Clear machines (line-specific)
                 this.machines = [];
-                // Then load new data
+                // Load data for this project
                 this.loadProductionLines(project.Id_Project);
                 this.loadParts(project.Id_Project);
+                // Load workstations for all production lines of this project
+                this.loadWorkstationsByProject(project.Id_Project);
             } else {
                 // Clear all dependent data
                 this.productionLines = [];
@@ -1398,7 +1405,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Watch for production line changes
         this.shiftSetupForm.get('productionLine')?.valueChanges.subscribe((line: ProductionLine) => {
             if (line) {
-                this.loadWorkstations(line.id);
+                // Note: Workstations are already loaded by project (loadWorkstationsByProject)
+                // No need to reload them by line - this would overwrite the project filter
                 this.loadMachines(line.id);
                 this.loadShiftsForProductionLine(line.id);
             }
@@ -1475,6 +1483,12 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     loadWorkstations(lineId: number): void {
         this.productionService.getWorkstations(lineId).subscribe(workstations => {
+            this.workstations = workstations;
+        });
+    }
+
+    loadWorkstationsByProject(projectId: number): void {
+        this.productionService.getWorkstations(undefined, projectId).subscribe(workstations => {
             this.workstations = workstations;
         });
     }
@@ -1694,39 +1708,17 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     return;
                 }
 
-                // Step 2: For operators - Get primary assignment from HR module, then show explicit dialog
-                this.hrService.getPrimaryAssignment(employee.id).subscribe({
-                    next: (primaryAssignment: EmployeePrimaryAssignment) => {
-                        if (existingInTeam) {
-                            // Inform user they can reassign
-                            this.messageService.add({
-                                severity: 'info',
-                                summary: 'Employé déjà assigné',
-                                detail: 'Vous pouvez le réaffecter à un autre poste'
-                            });
-                        }
-                        // Show explicit assignment dialog with primary assignment info
-                        this.showExplicitAssignmentForEmployee(employee, primaryAssignment, cleanBadgeId);
-                    },
-                    error: (error) => {
-                        if (error.status === 404) {
-                            // No default assignment found
-                            if (existingInTeam) {
-                                this.messageService.add({
-                                    severity: 'info',
-                                    summary: 'Employé déjà assigné',
-                                    detail: 'Vous pouvez le réaffecter à un autre poste'
-                                });
-                            }
-                            // Show explicit assignment dialog without primary assignment
-                            this.showExplicitAssignmentForEmployee(employee, null, cleanBadgeId);
-                        } else {
-                            console.error('Error fetching primary assignment:', error);
-                            // Fallback to explicit assignment dialog
-                            this.showExplicitAssignmentForEmployee(employee, null, cleanBadgeId);
-                        }
-                    }
-                });
+                // Step 2: For operators - Show explicit assignment dialog to select workstation
+                if (existingInTeam) {
+                    // Inform user they can reassign
+                    this.messageService.add({
+                        severity: 'info',
+                        summary: 'Employé déjà assigné',
+                        detail: 'Vous pouvez le réaffecter à un autre poste'
+                    });
+                }
+                // Show explicit assignment dialog (user selects workstation manually)
+                this.showExplicitAssignmentForEmployee(employee, null, cleanBadgeId);
             },
             error: (error) => {
                 this.messageService.add({
@@ -1796,7 +1788,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
             this.proceedWithExplicitAssignment(
                 this.pendingManualAssignmentData.employee,
                 this.pendingManualAssignmentData.qualificationCheck,
-                true // isNonQualified
+                true, // isNonQualified
+                this.pendingManualAssignmentData.workstation,
+                this.pendingManualAssignmentData.machine
             );
             this.resetQualificationWarningState();
         } else if (this.pendingEmployeeAssignment && this.pendingEmployeeData) {
@@ -1943,6 +1937,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             machineId: primaryAssignment.machine_id || undefined,
             qualification: primaryAssignment.qualification_name || employee.current_qualification || 'Not Qualified',
             qualificationLevel: primaryAssignment.is_qualified ? (primaryAssignment.qualification_valid ? 3 : 2) : 0,
+            qualificationEndDate: primaryAssignment.qualification_end_date ? new Date(primaryAssignment.qualification_end_date) : null,
+            qualificationValid: primaryAssignment.qualification_valid,
             role: 'operator'
         };
 
@@ -2039,11 +2035,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
             this.qualificationWarningMessage = `La qualification de ${fullName} pour le poste "${workstationName}" est expirée (fin: ${endDateStr}). Êtes-vous sûr(e) de vouloir l'ajouter ?`;
         }
 
-        // Store info for assignment after confirmation
+        // Store info for assignment after confirmation (including workstation/machine since dialog will be hidden)
         this.pendingManualAssignmentData = {
             employee,
             qualificationCheck,
-            isManualSelection: true
+            isManualSelection: true,
+            workstation: this.selectedWorkstationForAssignment,
+            machine: this.selectedMachineForExplicitAssignment
         };
         this.showExplicitAssignmentDialog = false;
         this.showQualificationWarningDialog = true;
@@ -2052,7 +2050,26 @@ export class ProductionComponent implements OnInit, OnDestroy {
     /**
      * Proceed with explicit assignment after qualification check
      */
-    private proceedWithExplicitAssignment(employee: any, qualificationCheck: QualificationCheckResult | null, isNonQualified: boolean): void {
+    private proceedWithExplicitAssignment(
+        employee: any,
+        qualificationCheck: QualificationCheckResult | null,
+        isNonQualified: boolean,
+        workstation?: Workstation | null,
+        machine?: Machine | null
+    ): void {
+        // Use provided workstation/machine or fall back to selected ones
+        const wsToUse = workstation ?? this.selectedWorkstationForAssignment;
+        const machineToUse = machine ?? this.selectedMachineForExplicitAssignment;
+
+        if (!wsToUse) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Erreur',
+                detail: 'Aucun poste de travail sélectionné'
+            });
+            return;
+        }
+
         const badgeId = this.employeeIdScan.trim();
 
         const newAssignment: EmployeeWithAssignment = {
@@ -2068,14 +2085,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
             EmpStatus: employee.status,
             BadgeNumber: employee.badge_number || employee.BadgeNumber,
             badgeId: badgeId,
-            workstation: this.selectedWorkstationForAssignment!.Name_Workstation,
-            workstationId: this.selectedWorkstationForAssignment!.Id_Workstation,
-            machine: this.selectedMachineForExplicitAssignment?.name,
-            machineId: this.selectedMachineForExplicitAssignment?.id,
+            workstation: wsToUse.Name_Workstation,
+            workstationId: wsToUse.Id_Workstation,
+            machine: machineToUse?.name,
+            machineId: machineToUse?.id,
             qualification: qualificationCheck?.qualification_name || 'Non Qualifié',
             qualificationLevel: qualificationCheck?.is_qualified
                 ? (qualificationCheck.qualification_valid ? 3 : 2)
                 : 0,
+            qualificationEndDate: qualificationCheck?.qualification_end_date ? new Date(qualificationCheck.qualification_end_date) : null,
+            qualificationValid: qualificationCheck?.qualification_valid ?? false,
             role: 'operator',
             isNonQualified: isNonQualified
         };
@@ -2107,7 +2126,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Record non-qualified assignment for traceability if applicable
         if (isNonQualified) {
-            this.recordNonQualifiedAssignment(employee, this.selectedWorkstationForAssignment!);
+            this.recordNonQualifiedAssignment(employee, wsToUse);
         }
 
         this.cancelExplicitAssignment();
@@ -2160,6 +2179,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
             this.filteredMachinesForExplicitAssignment = [];
         }
         this.selectedMachineForExplicitAssignment = null;
+    }
+
+    /**
+     * Show employee image in a dialog
+     */
+    showEmployeeImage(employee: EmployeeWithAssignment): void {
+        this.selectedEmployeeForImage = employee;
+        this.showImageViewerDialog = true;
     }
 
     getRoleLabel(role: ProductionRole): string {
@@ -2769,72 +2796,35 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         this.employeeService.getEmployeeByBadge(badgeId).subscribe({
             next: (employee: any) => {
-                // Get primary assignment for workstation info
-                this.hrService.getPrimaryAssignment(employee.id).subscribe({
-                    next: (assignment: EmployeePrimaryAssignment) => {
-                        const newMember: EmployeeWithAssignment = {
-                            Id_Emp: employee.id,
-                            Nom_Emp: employee.last_name,
-                            Prenom_Emp: employee.first_name,
-                            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
-                            Genre_Emp: employee.gender,
-                            Categorie_Emp: employee.category,
-                            DateEmbauche_Emp: new Date(employee.hire_date),
-                            Departement_Emp: employee.department,
-                            Picture: this.getEmployeePictureUrl(employee.picture),
-                            EmpStatus: employee.status,
-                            BadgeNumber: employee.badge_number || employee.BadgeNumber,
-                            badgeId: badgeId, // Save the scanned badge ID
-                            workstation: assignment.workstation_name,
-                            workstationId: assignment.workstation_id,
-                            machine: assignment.machine_name || undefined,
-                            machineId: assignment.machine_id || undefined,
-                            qualification: assignment.qualification_name || 'Not Qualified',
-                            qualificationLevel: assignment.is_qualified ? (assignment.qualification_valid ? 3 : 2) : 0,
-                            role: 'operator'
-                        };
+                // Add employee with minimal info (workstation will be selected manually)
+                const newMember: EmployeeWithAssignment = {
+                    Id_Emp: employee.id,
+                    Nom_Emp: employee.last_name,
+                    Prenom_Emp: employee.first_name,
+                    DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
+                    Genre_Emp: employee.gender,
+                    Categorie_Emp: employee.category,
+                    DateEmbauche_Emp: new Date(employee.hire_date),
+                    Departement_Emp: employee.department,
+                    Picture: this.getEmployeePictureUrl(employee.picture),
+                    EmpStatus: employee.status,
+                    BadgeNumber: employee.badge_number || employee.BadgeNumber,
+                    badgeId: badgeId,
+                    workstation: 'Not Assigned',
+                    qualification: 'Not Qualified',
+                    qualificationLevel: 0,
+                    qualificationValid: false,
+                    role: 'operator'
+                };
 
-                        this.currentHourTeam.push(newMember);
-                        this.employeeScanForHour = '';
+                this.currentHourTeam.push(newMember);
+                this.employeeScanForHour = '';
 
-                        this.messageService.add({
-                            severity: 'success',
-                            summary: 'Added',
-                            detail: `${employee.first_name} ${employee.last_name} added to hour team`,
-                            life: 2000
-                        });
-                    },
-                    error: () => {
-                        // No primary assignment, add with minimal info
-                        const newMember: EmployeeWithAssignment = {
-                            Id_Emp: employee.id,
-                            Nom_Emp: employee.last_name,
-                            Prenom_Emp: employee.first_name,
-                            DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
-                            Genre_Emp: employee.gender,
-                            Categorie_Emp: employee.category,
-                            DateEmbauche_Emp: new Date(employee.hire_date),
-                            Departement_Emp: employee.department,
-                            Picture: this.getEmployeePictureUrl(employee.picture),
-                            EmpStatus: employee.status,
-                            BadgeNumber: employee.badge_number || employee.BadgeNumber,
-                            badgeId: badgeId, // Save the scanned badge ID
-                            workstation: 'Not Assigned',
-                            qualification: 'Not Qualified',
-                            qualificationLevel: 0,
-                            role: 'operator'
-                        };
-
-                        this.currentHourTeam.push(newMember);
-                        this.employeeScanForHour = '';
-
-                        this.messageService.add({
-                            severity: 'success',
-                            summary: 'Added',
-                            detail: `${employee.first_name} ${employee.last_name} added (no default workstation)`,
-                            life: 2000
-                        });
-                    }
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Added',
+                    detail: `${employee.first_name} ${employee.last_name} added to hour team`,
+                    life: 2000
                 });
             },
             error: () => {
@@ -3754,6 +3744,48 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     /**
+     * Get qualification status label based on validity and end date
+     */
+    getQualificationStatusLabel(emp: EmployeeWithAssignment): string {
+        if (emp.isNonQualified || !emp.qualificationValid) {
+            return 'Expired';
+        }
+
+        // Check if expiring soon (within 30 days)
+        if (emp.qualificationEndDate) {
+            const thirtyDaysFromNow = new Date();
+            thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+            const endDate = new Date(emp.qualificationEndDate);
+            if (endDate <= thirtyDaysFromNow) {
+                return 'Expiring';
+            }
+        }
+
+        return 'Valid';
+    }
+
+    /**
+     * Get qualification status severity for tag color
+     */
+    getQualificationStatusSeverity(emp: EmployeeWithAssignment): 'success' | 'warn' | 'danger' {
+        if (emp.isNonQualified || !emp.qualificationValid) {
+            return 'danger';
+        }
+
+        // Check if expiring soon (within 30 days)
+        if (emp.qualificationEndDate) {
+            const thirtyDaysFromNow = new Date();
+            thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+            const endDate = new Date(emp.qualificationEndDate);
+            if (endDate <= thirtyDaysFromNow) {
+                return 'warn';
+            }
+        }
+
+        return 'success';
+    }
+
+    /**
      * Create a new production - clears current session and starts fresh
      */
     createNewProduction(): void {
@@ -4010,8 +4042,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                                 partNumber: part
                             });
 
-                            if (line) {
-                                this.loadWorkstations(line.id);
+                            if (project) {
+                                this.loadWorkstationsByProject(project.Id_Project);
                             }
 
                             // Regenerate hours with fresh shift data from backend

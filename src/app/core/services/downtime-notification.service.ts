@@ -96,9 +96,8 @@ export class DowntimeNotificationService implements OnDestroy {
         showCriticalOnly: false
     };
 
-    // Audio for alerts
+    // Audio support
     private alertSound?: HTMLAudioElement;
-    private criticalSound?: HTMLAudioElement;
     private soundsAvailable = false;
 
     constructor(private api: ApiService) {
@@ -116,40 +115,24 @@ export class DowntimeNotificationService implements OnDestroy {
 
     private initializeSounds(): void {
         try {
-            // Create audio elements
+            // Create audio element for alert sound
             this.alertSound = new Audio();
-            this.alertSound.volume = 0.5;
-            this.criticalSound = new Audio();
-            this.criticalSound.volume = 0.8;
+            this.alertSound.volume = 0.6;
 
-            // Track successful loads
-            let loadedCount = 0;
-            const onLoad = () => {
-                loadedCount++;
-                if (loadedCount === 2) {
-                    this.soundsAvailable = true;
-                }
-            };
+            // Handle load success
+            this.alertSound.addEventListener('canplaythrough', () => {
+                this.soundsAvailable = true;
+            }, { once: true });
 
-            // Handle load errors gracefully
-            const onError = (e: Event) => {
+            // Handle load error gracefully
+            this.alertSound.addEventListener('error', () => {
                 console.warn('Alert sound file not available, audio notifications disabled');
                 this.soundsAvailable = false;
-            };
+            }, { once: true });
 
-            // Set up event listeners before setting src
-            this.alertSound.addEventListener('canplaythrough', onLoad, { once: true });
-            this.alertSound.addEventListener('error', onError, { once: true });
-            this.criticalSound.addEventListener('canplaythrough', onLoad, { once: true });
-            this.criticalSound.addEventListener('error', onError, { once: true });
-
-            // Set source (this triggers the load)
+            // Load alert.mp3
             this.alertSound.src = 'assets/sounds/alert.mp3';
-            this.criticalSound.src = 'assets/sounds/critical.mp3';
-
-            // Preload
             this.alertSound.load();
-            this.criticalSound.load();
         } catch (e) {
             console.warn('Could not initialize alert sounds:', e);
             this.soundsAvailable = false;
@@ -297,16 +280,16 @@ export class DowntimeNotificationService implements OnDestroy {
 
     private playAlertSound(alert: DowntimeAlert): void {
         if (!this.preferences.enableSound) return;
-        if (!this.soundsAvailable) return;
+        if (!this.soundsAvailable || !this.alertSound) return;
 
-        const sound = alert.priority === 'critical' ? this.criticalSound : this.alertSound;
-        if (!sound) return;
+        // Set volume based on priority
+        this.alertSound.volume = alert.priority === 'critical' ? 1.0 : 0.6;
 
         // Reset to start if already playing
-        sound.currentTime = 0;
+        this.alertSound.currentTime = 0;
 
-        // Play returns a promise - catch rejection silently
-        sound.play().catch(() => {
+        // Play - catch rejection silently (autoplay policy)
+        this.alertSound.play().catch(() => {
             // Ignore play errors (user interaction required, autoplay blocked, etc.)
         });
     }

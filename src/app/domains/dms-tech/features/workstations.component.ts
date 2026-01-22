@@ -61,6 +61,21 @@ interface Workstation {
                         <i class="pi pi-desktop mr-2"></i>Workstations Management
                     </h2>
                 </ng-template>
+                <ng-template pTemplate="center">
+                    <div class="flex align-items-center gap-2">
+                        <label class="font-medium text-sm">Filter by Project:</label>
+                        <p-select
+                            [(ngModel)]="selectedProjectFilter"
+                            [options]="projects"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="All Projects"
+                            [showClear]="true"
+                            (onChange)="applyProjectFilter()"
+                            styleClass="w-15rem">
+                        </p-select>
+                    </div>
+                </ng-template>
                 <ng-template pTemplate="right">
                     <p-button
                         label="New Workstation"
@@ -78,7 +93,7 @@ interface Workstation {
             </p-toolbar>
 
             <p-table
-                [value]="workstations"
+                [value]="filteredWorkstations"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
@@ -211,8 +226,10 @@ interface Workstation {
 })
 export class WorkstationsComponent implements OnInit {
     workstations: Workstation[] = [];
+    filteredWorkstations: Workstation[] = [];
     projects: any[] = [];
     workstation: Partial<Workstation> = {};
+    selectedProjectFilter: number | null = null;
 
     wsDialog = false;
     editMode = false;
@@ -244,6 +261,7 @@ export class WorkstationsComponent implements OnInit {
         this.productionService.getWorkstations().subscribe({
             next: (data: any) => {
                 this.workstations = data.results || data;
+                this.applyProjectFilter();
                 this.loading = false;
             },
             error: () => {
@@ -253,6 +271,16 @@ export class WorkstationsComponent implements OnInit {
         });
     }
 
+    applyProjectFilter(): void {
+        if (this.selectedProjectFilter) {
+            this.filteredWorkstations = this.workstations.filter(
+                ws => ws.project === this.selectedProjectFilter
+            );
+        } else {
+            this.filteredWorkstations = [...this.workstations];
+        }
+    }
+
     getProjectName(projectId: number): string {
         return this.projects.find(p => p.id === projectId)?.name || 'Unknown';
     }
@@ -260,7 +288,7 @@ export class WorkstationsComponent implements OnInit {
     openNew(): void {
         this.workstation = {
             name: '',
-            project: undefined,
+            project: this.selectedProjectFilter || undefined,
             description: '',
             is_active: true
         };

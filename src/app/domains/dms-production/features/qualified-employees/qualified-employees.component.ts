@@ -30,6 +30,7 @@ import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { RippleModule } from 'primeng/ripple';
 import { SkeletonModule } from 'primeng/skeleton';
+import { DialogModule } from 'primeng/dialog';
 import { MessageService } from 'primeng/api';
 
 import { HRService } from '@core/services/hr.service';
@@ -77,7 +78,8 @@ interface QualifiedEmployee {
         IconFieldModule,
         InputIconModule,
         RippleModule,
-        SkeletonModule
+        SkeletonModule,
+        DialogModule
     ],
     providers: [MessageService],
     template: `
@@ -286,7 +288,10 @@ interface QualifiedEmployee {
                                     <p-avatar [image]="getEmployeePicture(emp.employee_picture)"
                                               [label]="!emp.employee_picture ? getInitials(emp.employee_name) : undefined"
                                               shape="circle" size="normal"
-                                              [style]="{'background': getAvatarColor(emp.employee_name), 'color': 'white'}">
+                                              [style]="{'background': getAvatarColor(emp.employee_name), 'color': 'white'}"
+                                              class="cursor-pointer"
+                                              (click)="showEmployeeImage(emp)"
+                                              pTooltip="Click to view photo">
                                     </p-avatar>
                                     <div class="employee-info">
                                         <span class="employee-name">{{ emp.employee_name }}</span>
@@ -334,6 +339,24 @@ interface QualifiedEmployee {
                 </p-table>
             </div>
         </div>
+
+        <!-- Employee Image Viewer Dialog -->
+        <p-dialog
+            [(visible)]="showImageViewerDialog"
+            [header]="selectedEmployeeForImage?.employee_name || 'Employee Photo'"
+            [modal]="true"
+            [style]="{width: 'auto', maxWidth: '90vw'}"
+            [closable]="true"
+            styleClass="image-viewer-dialog">
+            <div class="flex justify-content-center align-items-center p-3">
+                <img
+                    *ngIf="selectedEmployeeForImage"
+                    [src]="getEmployeePicture(selectedEmployeeForImage.employee_picture)"
+                    [alt]="selectedEmployeeForImage.employee_name"
+                    class="employee-full-image"
+                    style="max-width: 400px; max-height: 500px; border-radius: 8px; object-fit: cover;">
+            </div>
+        </p-dialog>
 
         <p-toast position="bottom-right"></p-toast>
     `,
@@ -783,6 +806,10 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
     workstations: Workstation[] = [];
     loading = false;
 
+    // Image Viewer
+    showImageViewerDialog = false;
+    selectedEmployeeForImage: QualifiedEmployee | null = null;
+
     // Filters
     badgeScan = '';
     badgeFilter = signal<string | null>(null);
@@ -1070,5 +1097,13 @@ export class QualifiedEmployeesComponent implements OnInit, OnDestroy {
             return (parts[0][0] + parts[1][0]).toUpperCase();
         }
         return name.substring(0, 2).toUpperCase();
+    }
+
+    /**
+     * Show employee image in dialog
+     */
+    showEmployeeImage(emp: QualifiedEmployee): void {
+        this.selectedEmployeeForImage = emp;
+        this.showImageViewerDialog = true;
     }
 }

@@ -61,9 +61,11 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
 
     // Reference data
     zones: Zone[] = [];
+    projects: any[] = [];
     productionLines: ProductionLine[] = [];
     allProductionLines: ProductionLine[] = [];
     workstations: Workstation[] = [];
+    allWorkstations: Workstation[] = [];
     machines: Machine[] = [];
     technicians: any[] = [];
     downtimeProblems: any[] = [];
@@ -138,14 +140,16 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
 
     initForms(): void {
         this.declarationForm = this.fb.group({
-            zone: [null, Validators.required],
-            production_line: [{ value: null, disabled: true }, Validators.required],
-            workstation: [{ value: null, disabled: true }, Validators.required],
-            machine: [{ value: null, disabled: true }],
+            // Classification
             declaration_type: ['unplanned', Validators.required],
             impact_level: ['medium', Validators.required],
-            problem_type: [null, Validators.required],
-            duration: [15, [Validators.required, Validators.min(1), Validators.max(480)]],
+            // Location
+            project: [null, Validators.required],
+            zone: [null],
+            production_line: [null],
+            workstation: [{ value: null, disabled: true }, Validators.required],
+            machine: [{ value: null, disabled: true }],
+            // Description
             reason: ['', [Validators.required, Validators.minLength(10)]]
         });
 
@@ -155,34 +159,52 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             cancel_reason: ['']
         });
 
+        // Watch project changes to filter production lines and workstations
+        this.declarationForm.get('project')?.valueChanges.subscribe((project: any) => {
+            if (project) {
+                const projectId = project.Id_Project || project.id;
+                // Filter production lines by project (uses projectId field)
+                this.productionLines = this.allProductionLines.filter(line =>
+                    line.projectId === projectId || (line as any).project === projectId
+                );
+                // Load workstations by project from API (server-side filtering)
+                this.loadWorkstationsByProject(projectId);
+            } else {
+                this.productionLines = [];
+                this.workstations = [];
+            }
+            // Reset dependent fields
+            this.declarationForm.get('production_line')?.reset();
+            this.declarationForm.get('workstation')?.reset();
+            this.machines = [];
+            this.declarationForm.get('machine')?.reset();
+        });
+
         // Watch zone changes to enable production line selection
         this.declarationForm.get('zone')?.valueChanges.subscribe((zone: Zone) => {
             if (zone) {
-                // Show all production lines (ProductionLine model doesn't have zone field)
-                this.productionLines = [...this.allProductionLines];
+                // Production lines are already filtered by project, just enable the field
                 this.declarationForm.get('production_line')?.enable();
                 this.declarationForm.get('production_line')?.reset();
                 // Reset dependent fields
-                this.workstations = [];
                 this.machines = [];
                 this.declarationForm.get('workstation')?.disable();
                 this.declarationForm.get('workstation')?.reset();
                 this.declarationForm.get('machine')?.disable();
                 this.declarationForm.get('machine')?.reset();
             } else {
-                this.productionLines = [];
                 this.declarationForm.get('production_line')?.disable();
                 this.declarationForm.get('production_line')?.reset();
             }
         });
 
-        // Watch production line changes to load workstations
+        // Watch production line changes - workstations are already filtered by project
+        // Don't reload workstations here to preserve project-based filtering
         this.declarationForm.get('production_line')?.valueChanges.subscribe((line: ProductionLine) => {
             if (line) {
-                this.loadWorkstations(line.id);
+                // Workstations are already loaded by project, just enable the field
                 this.declarationForm.get('workstation')?.enable();
             } else {
-                this.workstations = [];
                 this.machines = [];
                 this.declarationForm.get('workstation')?.disable();
                 this.declarationForm.get('workstation')?.reset();
@@ -206,6 +228,16 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
     }
 
     loadReferenceData(): void {
+        // Load projects
+        this.productionService.getProjects().subscribe({
+            next: (projects) => {
+                this.projects = Array.isArray(projects) ? projects : (projects as any).results || [];
+            },
+            error: (err) => {
+                console.error('Error loading projects:', err);
+            }
+        });
+
         // Load zones
         this.productionService.getActiveZones().subscribe({
             next: (zones) => {
@@ -226,6 +258,16 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             },
             error: (err) => {
                 console.error('Error loading production lines:', err);
+            }
+        });
+
+        // Load all workstations (for filtering by project)
+        this.productionService.getWorkstations().subscribe({
+            next: (workstations) => {
+                this.allWorkstations = Array.isArray(workstations) ? workstations : (workstations as any).results || [];
+            },
+            error: (err) => {
+                console.error('Error loading workstations:', err);
             }
         });
 
@@ -333,6 +375,18 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             },
             error: (err) => {
                 console.error('Error loading workstations:', err);
+            }
+        });
+    }
+
+    loadWorkstationsByProject(projectId: number): void {
+        this.productionService.getWorkstations(undefined, projectId).subscribe({
+            next: (response: any) => {
+                // Handle paginated response or direct array
+                this.workstations = Array.isArray(response) ? response : response.results || [];
+            },
+            error: (err) => {
+                console.error('Error loading workstations by project:', err);
             }
         });
     }
@@ -491,9 +545,8 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
             declaration_type: formValue.declaration_type,
             impact_level: formValue.impact_level,
             reason: formValue.reason,
-            description: '',
-            problem_type: formValue.problem_type?.Id_DowntimeProblems,
-            duration: formValue.duration
+            description: ''
+            // Note: problem_type and duration will be added later by maintenance team
         };
 
         // Add machine if selected
@@ -531,10 +584,8 @@ export class DowntimeDeclarationComponent implements OnInit, OnDestroy {
 
                 this.messageService.add({
                     severity: 'success',
-                    summary: 'Declaration Created',
-                    detail: this.notifyMaintenance
-                        ? `Declaration ${declaration.ticket_number} created and maintenance team notified`
-                        : `Declaration ${declaration.ticket_number} created successfully`,
+                    summary: 'Déclaration créée',
+                    detail: `Déclaration ${declaration.ticket_number} créée - Équipe maintenance notifiée`,
                     life: 5000
                 });
                 this.isSaving = false;

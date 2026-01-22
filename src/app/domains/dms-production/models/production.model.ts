@@ -70,6 +70,7 @@ export interface Workstation {
     Name_Workstation: string;
     Code_Workstation: string;
     Id_ProdLine: number;
+    project?: number;
     machines_count?: number;
 }
 

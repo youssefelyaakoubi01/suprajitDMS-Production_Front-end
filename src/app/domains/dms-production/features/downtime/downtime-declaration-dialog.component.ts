@@ -25,12 +25,13 @@ import { MessageService } from 'primeng/api';
 
 // Domain imports
 import { DmsProductionService } from '../../services/production.service';
-import { Workstation, Machine, ProductionLine } from '../../models/production.model';
+import { Workstation, Machine, ProductionLine, Project } from '../../models/production.model';
 import { DowntimeProblem } from '../../models/downtime.model';
 import { MaintenanceService } from '@core/services/maintenance.service';
 
 export interface DowntimeDeclarationData {
     // Core fields
+    project: number | null;
     workstation: number | null;
     machine: number | null;
     problemType: number | null;
@@ -132,6 +133,24 @@ interface DeclarationTypeOption {
 
                 <p-divider></p-divider>
 
+                <!-- Project Selection -->
+                <div class="mb-3">
+                    <label class="block mb-2 font-medium">
+                        <i class="pi pi-briefcase mr-1"></i>Project <span class="text-red-500">*</span>
+                    </label>
+                    <p-select [options]="projects"
+                              formControlName="project"
+                              optionLabel="Name_Project"
+                              optionValue="Id_Project"
+                              placeholder="Select Project"
+                              [filter]="true"
+                              filterBy="Name_Project"
+                              appendTo="body"
+                              styleClass="w-full"
+                              (onChange)="onProjectChange()">
+                    </p-select>
+                </div>
+
                 <!-- Location Selection -->
                 <div class="grid mb-3">
                     <div class="col-12 md:col-6">
@@ -147,6 +166,7 @@ interface DeclarationTypeOption {
                                   filterBy="Name_Workstation"
                                   appendTo="body"
                                   styleClass="w-full"
+                                  [disabled]="!form.get('project')?.value"
                                   (onChange)="onWorkstationChange()">
                         </p-select>
                     </div>
@@ -454,6 +474,7 @@ interface DeclarationTypeOption {
 })
 export class DowntimeDeclarationDialogComponent implements OnInit, OnDestroy {
     @Input() visible = false;
+    @Input() projectId: number | null = null;
     @Input() productionLineId: number | null = null;
     @Input() hourlyProductionId: number | null = null;
     @Input() editData: DowntimeDeclarationData | null = null;
@@ -467,7 +488,9 @@ export class DowntimeDeclarationDialogComponent implements OnInit, OnDestroy {
     form!: FormGroup;
     submitting = false;
 
+    projects: Project[] = [];
     workstations: Workstation[] = [];
+    allWorkstations: Workstation[] = [];
     machines: Machine[] = [];
     downtimeProblems: DowntimeProblem[] = [];
 
@@ -503,6 +526,7 @@ export class DowntimeDeclarationDialogComponent implements OnInit, OnDestroy {
 
     private initForm(): void {
         this.form = this.fb.group({
+            project: [this.projectId, Validators.required],
             workstation: [null, Validators.required],
             machine: [null],
             problemType: [null, Validators.required],
@@ -522,22 +546,51 @@ export class DowntimeDeclarationDialogComponent implements OnInit, OnDestroy {
     }
 
     private loadData(): void {
-        // Load workstations for the production line
-        if (this.productionLineId) {
-            this.productionService.getWorkstations(this.productionLineId)
-                .pipe(takeUntil(this.destroy$))
-                .subscribe(ws => this.workstations = ws);
+        // Load projects
+        this.productionService.getProjects()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(projects => {
+                this.projects = projects;
+            });
+
+        // Load workstations - use API filter if projectId is set
+        if (this.projectId) {
+            this.loadWorkstationsByProject(this.projectId);
         } else {
-            // Load all workstations if no line specified
             this.productionService.getWorkstations()
                 .pipe(takeUntil(this.destroy$))
-                .subscribe(ws => this.workstations = ws);
+                .subscribe(ws => {
+                    this.allWorkstations = ws;
+                    this.workstations = ws;
+                });
         }
 
         // Load downtime problems
         this.productionService.getDowntimeProblems()
             .pipe(takeUntil(this.destroy$))
             .subscribe(problems => this.downtimeProblems = problems);
+    }
+
+    onProjectChange(): void {
+        const projectId = this.form.get('project')?.value;
+        // Reset workstation and machine when project changes
+        this.form.patchValue({ workstation: null, machine: null });
+        this.machines = [];
+
+        if (projectId) {
+            this.loadWorkstationsByProject(projectId);
+        } else {
+            this.workstations = [...this.allWorkstations];
+        }
+    }
+
+    private loadWorkstationsByProject(projectId: number): void {
+        // Use API filter to get workstations by project (includes direct project OR via production_line)
+        this.productionService.getWorkstations(undefined, projectId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(ws => {
+                this.workstations = ws;
+            });
     }
 
     onWorkstationChange(): void {
@@ -608,6 +661,7 @@ export class DowntimeDeclarationDialogComponent implements OnInit, OnDestroy {
         const formValue = this.form.value;
 
         const declarationData: DowntimeDeclarationData = {
+            project: formValue.project,
             workstation: formValue.workstation,
             machine: formValue.machine,
             problemType: formValue.problemType,
@@ -694,10 +748,18 @@ export class DowntimeDeclarationDialogComponent implements OnInit, OnDestroy {
         this.visible = false;
         this.visibleChange.emit(false);
         this.form.reset({
+            project: this.projectId,
             impactLevel: 'medium',
             declarationType: 'unplanned',
             duration: 15,
             notifyMaintenance: false
         });
+        // Reset workstations filter if projectId is set
+        if (this.projectId) {
+            this.loadWorkstationsByProject(this.projectId);
+        } else {
+            this.workstations = [...this.allWorkstations];
+        }
+        this.machines = [];
     }
 }

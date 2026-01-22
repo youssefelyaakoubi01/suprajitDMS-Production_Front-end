@@ -71,9 +71,15 @@ export class ProductionService {
     }
 
     // Workstations
-    getWorkstations(lineId?: number): Observable<Workstation[]> {
-        const params = lineId ? { production_line: lineId } : undefined;
-        return this.api.get<Workstation[]>(`${this.endpoint}/workstations`, params);
+    getWorkstations(lineId?: number, projectId?: number): Observable<Workstation[]> {
+        const params: any = {};
+        if (lineId) {
+            params.production_line = lineId;
+        }
+        if (projectId) {
+            params.project = projectId;
+        }
+        return this.api.get<Workstation[]>(`${this.endpoint}/workstations`, Object.keys(params).length ? params : undefined);
     }
 
     getWorkstation(id: number): Observable<Workstation> {

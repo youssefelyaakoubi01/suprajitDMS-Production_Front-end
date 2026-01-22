@@ -792,6 +792,24 @@
     }
 }
 
+// Notification Info (always active)
+.notification-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--orange-50) 0%, var(--yellow-50) 100%);
+    border-radius: 8px;
+    border: 2px solid var(--orange-300);
+    color: var(--orange-700);
+    font-weight: 500;
+
+    i {
+        font-size: 1.25rem;
+        color: var(--orange-500);
+    }
+}
+
 // Dialog Footer
 .dialog-footer {
     display: flex;
