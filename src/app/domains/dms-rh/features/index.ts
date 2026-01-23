@@ -17,6 +17,9 @@ export * from './categories';
 // Formations
 export * from './formations';
 
+// Processes
+export * from './processes';
+
 // Versatility
 export * from './versatility';
 

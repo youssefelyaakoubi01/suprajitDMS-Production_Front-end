@@ -31,6 +31,13 @@ export const DMS_ADMIN_ROUTES: Routes = [
                 .then(m => m.ActivityLogsComponent),
         title: 'Logs d\'activité'
     },
+    {
+        path: 'positions',
+        loadComponent: () =>
+            import('./features/positions/positions-list.component')
+                .then(m => m.PositionsListComponent),
+        title: 'Gestion des Positions'
+    },
     // ==================== DATA IMPORT ====================
     {
         path: 'data-import',

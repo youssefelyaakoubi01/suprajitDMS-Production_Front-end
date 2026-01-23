@@ -10,7 +10,8 @@ import {
     FormationPlan,
     Formateur,
     TrainerSpecialization,
-    FormationStats
+    FormationStats,
+    Process
 } from '../models';
 
 @Injectable({
@@ -116,6 +117,27 @@ export class DmsFormationService {
 
     deleteTrainerSpecialization(id: number): Observable<void> {
         return this.api.delete<void>(`${this.endpoint}/specializations/${id}`);
+    }
+
+    // ==================== PROCESSES ====================
+    getProcesses(params?: { is_active?: boolean }): Observable<Process[]> {
+        return this.api.get<Process[]>(`${this.endpoint}/processes`, params);
+    }
+
+    getProcess(id: number): Observable<Process> {
+        return this.api.get<Process>(`${this.endpoint}/processes/${id}`);
+    }
+
+    createProcess(process: Partial<Process>): Observable<Process> {
+        return this.api.post<Process>(`${this.endpoint}/processes`, process);
+    }
+
+    updateProcess(id: number, process: Partial<Process>): Observable<Process> {
+        return this.api.put<Process>(`${this.endpoint}/processes/${id}`, process);
+    }
+
+    deleteProcess(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/processes/${id}`);
     }
 
     // ==================== STATS ====================

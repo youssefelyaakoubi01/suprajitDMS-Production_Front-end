@@ -44,6 +44,11 @@ export class AppDmsHrMenu {
                         routerLink: ['/dms-hr/formations']
                     },
                     {
+                        label: 'Processus',
+                        icon: 'pi pi-fw pi-cog',
+                        routerLink: ['/dms-hr/processes']
+                    },
+                    {
                         label: 'Formateurs',
                         icon: 'pi pi-fw pi-user-edit',
                         routerLink: ['/dms-hr/formateurs']

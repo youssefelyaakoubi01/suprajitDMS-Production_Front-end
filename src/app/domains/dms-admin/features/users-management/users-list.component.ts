@@ -33,7 +33,8 @@ import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { AdminService } from '../../services/admin.service';
-import { DMSUser, DMSUserCreate, DMS_MODULE_PERMISSIONS, DmsModulePermission } from '../../models';
+import { DMSUser, DMSUserCreate, DMS_MODULE_PERMISSIONS, DmsModulePermission, Position } from '../../models';
+import { forkJoin } from 'rxjs';
 import { EmployeeAutocompleteComponent } from '@shared/components/employee-autocomplete/employee-autocomplete.component';
 
 interface StatusOption {
@@ -676,14 +677,9 @@ export class UsersListComponent implements OnInit, OnDestroy {
         { label: 'Suspendu', value: 'suspended', severity: 'danger', icon: 'pi pi-ban' }
     ];
 
-    positionOptions: PositionOption[] = [
-        { label: 'Administrateur', value: 'admin', icon: 'pi pi-shield' },
-        { label: 'Manager RH', value: 'rh_manager', icon: 'pi pi-users' },
-        { label: 'Team Leader', value: 'team_leader', icon: 'pi pi-star' },
-        { label: 'Superviseur', value: 'supervisor', icon: 'pi pi-eye' },
-        { label: 'Opérateur', value: 'operator', icon: 'pi pi-user' },
-        { label: 'Formateur', value: 'formateur', icon: 'pi pi-book' }
-    ];
+    // Dynamic positions from API
+    positions: Position[] = [];
+    positionOptions: PositionOption[] = [];
 
     get hasActiveFilters(): boolean {
         return !!(this.searchTerm || this.selectedStatus || this.selectedPosition);
@@ -696,7 +692,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
     ) {}
 
     ngOnInit(): void {
-        this.loadUsers();
+        this.loadData();
         this.setupSearch();
     }
 
@@ -715,15 +711,46 @@ export class UsersListComponent implements OnInit, OnDestroy {
         });
     }
 
-    private loadUsers(): void {
+    private loadData(): void {
         this.loading = true;
+        forkJoin({
+            users: this.adminService.getUsers(),
+            positions: this.adminService.getPositions()
+        })
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+            next: ({ users, positions }) => {
+                this.users = users;
+                this.positions = positions;
+                // Map positions to positionOptions format
+                this.positionOptions = positions
+                    .filter(p => p.is_active)
+                    .map(p => ({
+                        label: p.name,
+                        value: p.code,
+                        icon: p.icon
+                    }));
+                this.filterUsers();
+                this.loading = false;
+            },
+            error: () => {
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Erreur',
+                    detail: 'Impossible de charger les donnees'
+                });
+                this.loading = false;
+            }
+        });
+    }
+
+    private loadUsers(): void {
         this.adminService.getUsers()
             .pipe(takeUntil(this.destroy$))
             .subscribe({
                 next: (users) => {
                     this.users = users;
                     this.filterUsers();
-                    this.loading = false;
                 },
                 error: () => {
                     this.messageService.add({
@@ -731,7 +758,6 @@ export class UsersListComponent implements OnInit, OnDestroy {
                         summary: 'Erreur',
                         detail: 'Impossible de charger les utilisateurs'
                     });
-                    this.loading = false;
                 }
             });
     }
@@ -1087,6 +1113,20 @@ export class UsersListComponent implements OnInit, OnDestroy {
     }
 
     getPositionSeverity(position: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
+        // Try to find position in dynamic positions
+        const found = this.positions.find(p => p.code === position);
+        if (found?.color) {
+            const colorMap: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'> = {
+                'success': 'success',
+                'info': 'info',
+                'warn': 'warn',
+                'warning': 'warn',
+                'danger': 'danger',
+                'secondary': 'secondary'
+            };
+            return colorMap[found.color] || 'secondary';
+        }
+        // Fallback for legacy positions
         const severities: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'> = {
             'admin': 'danger',
             'rh_manager': 'warn',

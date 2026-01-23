@@ -34,6 +34,11 @@ export class AppDmsAdminMenu {
                         routerLink: ['/dms-admin/users']
                     },
                     {
+                        label: 'Positions',
+                        icon: 'pi pi-fw pi-id-card',
+                        routerLink: ['/dms-admin/positions']
+                    },
+                    {
                         label: 'Activity Logs',
                         icon: 'pi pi-fw pi-history',
                         routerLink: ['/dms-admin/activity-logs']

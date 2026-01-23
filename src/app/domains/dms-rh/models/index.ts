@@ -11,6 +11,7 @@ export * from './transport.model';
 // Qualification & Formation
 export * from './qualification.model';
 export * from './formation.model';
+export * from './process.model';
 export * from './workstation.model';
 
 // Administration

@@ -15,7 +15,9 @@ import {
     AdminDashboardStats,
     ActivityLog,
     BulkStatusUpdate,
-    DMS_MODULE_PERMISSIONS
+    DMS_MODULE_PERMISSIONS,
+    Position,
+    PositionCreate
 } from '../models';
 
 @Injectable({
@@ -24,6 +26,7 @@ import {
 export class AdminService {
     private readonly endpoint = 'employees/users';
     private readonly logsEndpoint = 'employees/activity-logs';
+    private readonly positionsEndpoint = 'employees/positions';
 
     constructor(private api: ApiService) {}
 
@@ -240,5 +243,29 @@ export class AdminService {
             }))),
             catchError(() => of([]))
         );
+    }
+
+    // ==================== POSITIONS CRUD ====================
+
+    getPositions(): Observable<Position[]> {
+        return this.api.get<Position[]>(this.positionsEndpoint).pipe(
+            map((data: any) => Array.isArray(data) ? data : (data.results || []))
+        );
+    }
+
+    getPosition(id: number): Observable<Position> {
+        return this.api.get<Position>(`${this.positionsEndpoint}/${id}`);
+    }
+
+    createPosition(position: PositionCreate): Observable<Position> {
+        return this.api.post<Position>(this.positionsEndpoint, position);
+    }
+
+    updatePosition(id: number, position: Partial<Position>): Observable<Position> {
+        return this.api.put<Position>(`${this.positionsEndpoint}/${id}`, position);
+    }
+
+    deletePosition(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.positionsEndpoint}/${id}`);
     }
 }

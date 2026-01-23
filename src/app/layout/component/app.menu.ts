@@ -90,6 +90,11 @@ export class AppMenu {
                         routerLink: ['/dms-hr/formations']
                     },
                     {
+                        label: 'Processus',
+                        icon: 'pi pi-fw pi-cog',
+                        routerLink: ['/dms-hr/processes']
+                    },
+                    {
                         label: 'Qualifications',
                         icon: 'pi pi-fw pi-verified',
                         routerLink: ['/dms-hr/qualifications']

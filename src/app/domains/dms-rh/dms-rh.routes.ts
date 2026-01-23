@@ -38,6 +38,12 @@ export const DMS_RH_ROUTES: Routes = [
         title: 'Formations'
     },
     {
+        path: 'processes',
+        loadComponent: () =>
+            import('./features/processes/processes-list.component').then(m => m.ProcessesListComponent),
+        title: 'Processus'
+    },
+    {
         path: 'qualifications',
         loadComponent: () =>
             import('./features/qualifications/qualifications-list.component').then(m => m.QualificationsListComponent),
