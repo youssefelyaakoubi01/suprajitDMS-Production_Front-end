@@ -292,7 +292,7 @@
 
                     <!-- Production Line - Shown for finished_good or when no type selected -->
                     <div class="form-field"
-                         *ngIf="!shiftSetupForm.get('productType')?.value || shiftSetupForm.get('productType')?.value === 'finished_good'">
+                         *ngIf="shouldShowProductionLine()">
                         <p-floatLabel variant="on">
                             <p-select
                                 id="productionLine"
@@ -313,7 +313,7 @@
 
                     <!-- Process - Shown for semi_finished or when no type selected -->
                     <div class="form-field"
-                         *ngIf="!shiftSetupForm.get('productType')?.value || shiftSetupForm.get('productType')?.value === 'semi_finished'">
+                         *ngIf="shouldShowProcess()">
                         <p-floatLabel variant="on">
                             <p-select
                                 id="process"

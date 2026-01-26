@@ -1572,6 +1572,23 @@ export class ProductionComponent implements OnInit, OnDestroy {
         }
     }
 
+    // Helper methods for template visibility - handles both string and object values from p-select
+    shouldShowProcess(): boolean {
+        const productType = this.shiftSetupForm.get('productType')?.value;
+        if (!productType) return true;  // Show if no type selected
+        // Handle case where productType is an object or a string
+        const typeValue = typeof productType === 'object' ? productType?.value : productType;
+        return typeValue === 'semi_finished';
+    }
+
+    shouldShowProductionLine(): boolean {
+        const productType = this.shiftSetupForm.get('productType')?.value;
+        if (!productType) return true;  // Show if no type selected
+        // Handle case where productType is an object or a string
+        const typeValue = typeof productType === 'object' ? productType?.value : productType;
+        return typeValue === 'finished_good';
+    }
+
     loadProcesses(projectId: number): void {
         this.productionService.getProcessesByProject(projectId).subscribe({
             next: (processes) => {
