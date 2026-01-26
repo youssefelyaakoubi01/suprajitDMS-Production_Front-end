@@ -270,7 +270,29 @@
                         </p-message>
                     </div>
 
+                    <!-- Product Type Selection - Controls which fields are shown -->
                     <div class="form-field">
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="productType"
+                                formControlName="productType"
+                                [options]="PRODUCT_TYPE_OPTIONS"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="All Types"
+                                appendTo="body"
+                                styleClass="w-full"
+                                [showClear]="true"
+                                (onChange)="onProductTypeChange()">
+                            </p-select>
+                            <label for="productType">Product Type</label>
+                        </p-floatLabel>
+                        <small class="text-color-secondary text-xs mt-1">Select product type to filter options</small>
+                    </div>
+
+                    <!-- Production Line - Shown for finished_good or when no type selected -->
+                    <div class="form-field"
+                         *ngIf="!shiftSetupForm.get('productType')?.value || shiftSetupForm.get('productType')?.value === 'finished_good'">
                         <p-floatLabel variant="on">
                             <p-select
                                 id="productionLine"
@@ -282,10 +304,31 @@
                                 styleClass="w-full"
                                 [class.ng-invalid]="shiftSetupForm.get('productionLine')?.invalid && shiftSetupForm.get('productionLine')?.touched">
                             </p-select>
-                            <label for="productionLine">Production Line *</label>
+                            <label for="productionLine">Production Line {{ shiftSetupForm.get('productType')?.value === 'finished_good' ? '*' : '' }}</label>
                         </p-floatLabel>
                         <p-message *ngIf="shiftSetupForm.get('productionLine')?.invalid && shiftSetupForm.get('productionLine')?.touched"
                             severity="error" text="Production Line is required" styleClass="mt-1 validation-message">
+                        </p-message>
+                    </div>
+
+                    <!-- Process - Shown for semi_finished or when no type selected -->
+                    <div class="form-field"
+                         *ngIf="!shiftSetupForm.get('productType')?.value || shiftSetupForm.get('productType')?.value === 'semi_finished'">
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="process"
+                                formControlName="process"
+                                [options]="processes"
+                                optionLabel="name"
+                                placeholder="Select Process"
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('process')?.invalid && shiftSetupForm.get('process')?.touched">
+                            </p-select>
+                            <label for="process">Process {{ shiftSetupForm.get('productType')?.value === 'semi_finished' ? '*' : '' }}</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('process')?.invalid && shiftSetupForm.get('process')?.touched"
+                            severity="error" text="Process is required" styleClass="mt-1 validation-message">
                         </p-message>
                     </div>
 
@@ -369,13 +412,24 @@
                 <span class="summary-label">Project:</span>
                 <span class="summary-value">{{ session.project?.Name_Project }}</span>
             </div>
-            <div class="summary-item">
+            <div class="summary-item" *ngIf="session.productionLine">
                 <span class="summary-label">Line:</span>
-                <span class="summary-value">{{ session.productionLine?.name }}</span>
+                <span class="summary-value">{{ session.productionLine.name }}</span>
+            </div>
+            <div class="summary-item" *ngIf="session.process">
+                <span class="summary-label">Process:</span>
+                <span class="summary-value">{{ session.process.name }}</span>
             </div>
             <div class="summary-item">
                 <span class="summary-label">Part:</span>
                 <span class="summary-value">{{ session.part?.PN_Part }}</span>
+            </div>
+            <div class="summary-item" *ngIf="session.part?.product_type">
+                <span class="summary-label">Type de produit:</span>
+                <p-tag
+                    [value]="getProductTypeLabel(session.part?.product_type)"
+                    [severity]="getProductTypeSeverity(session.part?.product_type)">
+                </p-tag>
             </div>
             <div class="summary-item" *ngIf="session.machine">
                 <span class="summary-label">Machine:</span>

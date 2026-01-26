@@ -16,7 +16,9 @@ import {
     DowntimeProblem,
     TeamAssignment,
     PartLineAssignment,
-    HeadcountRequirement
+    HeadcountRequirement,
+    Process,
+    PartProcessAssignment
 } from '../models/production.model';
 
 @Injectable({
@@ -129,9 +131,11 @@ export class ProductionService {
     }
 
     // Parts
-    getParts(projectId?: number): Observable<Part[]> {
-        const params = projectId ? { project: projectId } : undefined;
-        return this.api.get<Part[]>(`${this.endpoint}/parts`, params);
+    getParts(projectId?: number, productType?: string): Observable<Part[]> {
+        let params: any = {};
+        if (projectId) params.project = projectId;
+        if (productType) params.product_type = productType;
+        return this.api.get<Part[]>(`${this.endpoint}/parts`, Object.keys(params).length ? params : undefined);
     }
 
     getPart(id: number): Observable<Part> {
@@ -407,5 +411,96 @@ export class ProductionService {
 
     saveOrUpdateHeadcountRequirement(requirement: Partial<HeadcountRequirement>): Observable<HeadcountRequirement> {
         return this.api.post<HeadcountRequirement>(`${this.endpoint}/headcount-requirements/save_or_update`, requirement);
+    }
+
+    // Processes
+    getProcesses(projectId?: number): Observable<Process[]> {
+        const params = projectId ? { project: projectId } : undefined;
+        return this.api.get<Process[]>(`${this.endpoint}/processes`, params);
+    }
+
+    getActiveProcesses(): Observable<Process[]> {
+        return this.api.get<Process[]>(`${this.endpoint}/processes/active`);
+    }
+
+    getProcess(id: number): Observable<Process> {
+        return this.api.get<Process>(`${this.endpoint}/processes/${id}`);
+    }
+
+    getProcessesByProject(projectId: number): Observable<Process[]> {
+        return this.api.get<Process[]>(`${this.endpoint}/processes/by_project`, { project_id: projectId });
+    }
+
+    createProcess(process: Partial<Process>): Observable<Process> {
+        return this.api.post<Process>(`${this.endpoint}/processes`, process);
+    }
+
+    updateProcess(id: number, process: Partial<Process>): Observable<Process> {
+        return this.api.put<Process>(`${this.endpoint}/processes/${id}`, process);
+    }
+
+    deleteProcess(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/processes/${id}`);
+    }
+
+    // Parts by Product Type
+    getSemiFinishedParts(): Observable<Part[]> {
+        return this.api.get<Part[]>(`${this.endpoint}/parts/semi_finished`);
+    }
+
+    getFinishedGoodsParts(): Observable<Part[]> {
+        return this.api.get<Part[]>(`${this.endpoint}/parts/finished_goods`);
+    }
+
+    getPartsByProcess(processId: number): Observable<Part[]> {
+        return this.api.get<Part[]>(`${this.endpoint}/parts/by_process`, { process_id: processId });
+    }
+
+    getPartsByZone(zoneId: number): Observable<Part[]> {
+        return this.api.get<Part[]>(`${this.endpoint}/parts/by_zone`, { zone_id: zoneId });
+    }
+
+    // Part-Process Assignments
+    getPartProcessAssignments(params?: { part?: number; process?: number }): Observable<PartProcessAssignment[]> {
+        return this.api.get<PartProcessAssignment[]>(`${this.endpoint}/part-process-assignments`, params);
+    }
+
+    getPartProcessAssignment(id: number): Observable<PartProcessAssignment> {
+        return this.api.get<PartProcessAssignment>(`${this.endpoint}/part-process-assignments/${id}`);
+    }
+
+    getPartProcessAssignmentsByProcess(processId: number): Observable<PartProcessAssignment[]> {
+        return this.api.get<PartProcessAssignment[]>(`${this.endpoint}/part-process-assignments/by_process`, { process_id: processId });
+    }
+
+    getPartProcessAssignmentsByPart(partId: number): Observable<PartProcessAssignment[]> {
+        return this.api.get<PartProcessAssignment[]>(`${this.endpoint}/part-process-assignments/by_part`, { part_id: partId });
+    }
+
+    getPartProcessAssignmentsByProject(projectId: number): Observable<PartProcessAssignment[]> {
+        return this.api.get<PartProcessAssignment[]>(`${this.endpoint}/part-process-assignments/by_project`, { project_id: projectId });
+    }
+
+    createPartProcessAssignment(assignment: Partial<PartProcessAssignment>): Observable<PartProcessAssignment> {
+        return this.api.post<PartProcessAssignment>(`${this.endpoint}/part-process-assignments`, assignment);
+    }
+
+    updatePartProcessAssignment(id: number, assignment: Partial<PartProcessAssignment>): Observable<PartProcessAssignment> {
+        return this.api.patch<PartProcessAssignment>(`${this.endpoint}/part-process-assignments/${id}`, assignment);
+    }
+
+    deletePartProcessAssignment(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/part-process-assignments/${id}`);
+    }
+
+    bulkAssignPartsToProcess(processId: number, partIds: number[]): Observable<PartProcessAssignment[]> {
+        return this.api.post<PartProcessAssignment[]>(`${this.endpoint}/part-process-assignments/bulk_assign`, {
+            process: processId,
+            parts: partIds
+        });
+    }
+
+    setPrimaryProcessForPart(assignmentId: number): Observable<PartProcessAssignment> {
+        return this.api.post<PartProcessAssignment>(`${this.endpoint}/part-process-assignments/${assignmentId}/set_primary`, {});
     }
 }

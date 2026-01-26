@@ -95,6 +95,19 @@
                     [style]="{ width: '200px' }"></p-select>
             </div>
 
+            <div class="filter-field">
+                <p-select
+                    [(ngModel)]="filterProductType"
+                    [options]="productTypeFilterOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="All product types"
+                    [showClear]="true"
+                    (onChange)="onProductTypeFilterChange()"
+                    [style]="{ width: '180px' }">
+                </p-select>
+            </div>
+
             <p-button
                 label="Clear"
                 icon="pi pi-filter-slash"
@@ -132,6 +145,7 @@
                     <th>Project</th>
                     <th>Production Line</th>
                     <th>Part Number</th>
+                    <th>Type de produit</th>
                     <th>Result</th>
                     <th>Target</th>
                     <th>Efficiency</th>
@@ -160,6 +174,14 @@
                     </td>
                     <td>
                         <span class="part-number">{{ production.partNumber || '-' }}</span>
+                    </td>
+                    <td>
+                        <p-tag
+                            *ngIf="production.productType"
+                            [value]="getProductTypeLabel(production.productType)"
+                            [severity]="getProductTypeSeverity(production.productType)">
+                        </p-tag>
+                        <span *ngIf="!production.productType" class="text-color-secondary">-</span>
                     </td>
                     <td>
                         <span class="result-value">{{ production.Result_HourlyProdPN }}</span>
@@ -216,7 +238,7 @@
 
             <ng-template pTemplate="emptymessage">
                 <tr>
-                    <td colspan="11">
+                    <td colspan="12">
                         <div class="empty-state">
                             <i class="pi pi-inbox empty-icon"></i>
                             <p>No production records found</p>
@@ -276,6 +298,15 @@
                 <div class="col-6">
                     <span class="text-sm text-color-secondary">Hour</span>
                     <p class="m-0 font-medium">H{{ selectedProduction.Hour_HourlyProd }}</p>
+                </div>
+                <div class="col-6" *ngIf="selectedProduction?.productType">
+                    <span class="text-sm text-color-secondary">Type de produit</span>
+                    <p class="m-0">
+                        <p-tag
+                            [value]="getProductTypeLabel(selectedProduction.productType)"
+                            [severity]="getProductTypeSeverity(selectedProduction.productType)">
+                        </p-tag>
+                    </p>
                 </div>
             </div>
         </div>

@@ -47,7 +47,9 @@ import {
     ShiftType,
     DowntimeProblem,
     Downtime,
-    Zone
+    Zone,
+    Process,
+    PRODUCT_TYPE_OPTIONS
 } from '../../core/models';
 import {
     ShiftProductionSession,
@@ -123,6 +125,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         date: new Date(),
         project: null,
         productionLine: null,
+        process: null,  // For semi-finished products
         part: null,
         machine: null,
         zone: null,
@@ -148,6 +151,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
     shifts: Shift[] = [];
     projects: Project[] = [];
     productionLines: ProductionLine[] = [];
+    processes: Process[] = [];  // For semi-finished products
     parts: Part[] = [];
     workstations: Workstation[] = [];
     machines: Machine[] = [];
@@ -157,6 +161,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     // Hour Type Options - loaded from database
     hourTypeOptions: { label: string; value: string }[] = [];
+
+    // Product Type Options
+    PRODUCT_TYPE_OPTIONS = PRODUCT_TYPE_OPTIONS;
 
     // Team Assignment
     employeeIdScan = '';
@@ -1373,7 +1380,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
             shift: [null, Validators.required],
             date: [new Date(), Validators.required],
             project: [null, Validators.required],
-            productionLine: [null, Validators.required],
+            productionLine: [null],  // Required only for finished_good
+            process: [null],         // Required only for semi_finished
+            productType: [null],     // Optional filter for parts by Semi-Finished or Finished Good
             partNumber: [null, Validators.required],
             zone: [null]
         });
@@ -1383,23 +1392,30 @@ export class ProductionComponent implements OnInit, OnDestroy {
             if (project) {
                 // Reset child controls first WITHOUT triggering their valueChanges
                 this.shiftSetupForm.patchValue(
-                    { productionLine: null, partNumber: null },
+                    { productionLine: null, process: null, productType: null, partNumber: null },
                     { emitEvent: false }
                 );
                 // Clear machines (line-specific)
                 this.machines = [];
-                // Load data for this project
+                // Load data for this project (both production lines and processes initially)
                 this.loadProductionLines(project.Id_Project);
+                this.loadProcesses(project.Id_Project);
                 this.loadParts(project.Id_Project);
                 // Load workstations for all production lines of this project
                 this.loadWorkstationsByProject(project.Id_Project);
             } else {
                 // Clear all dependent data
                 this.productionLines = [];
+                this.processes = [];
                 this.parts = [];
                 this.workstations = [];
                 this.machines = [];
             }
+        });
+
+        // Watch for productType changes to update validation dynamically
+        this.shiftSetupForm.get('productType')?.valueChanges.subscribe((type: string | null) => {
+            this.updateValidationByProductType(type);
         });
 
         // Watch for production line changes
@@ -1412,6 +1428,23 @@ export class ProductionComponent implements OnInit, OnDestroy {
             }
         });
 
+        // Watch for process changes - load parts by process for semi-finished
+        this.shiftSetupForm.get('process')?.valueChanges.subscribe((process: Process) => {
+            if (process) {
+                this.onProcessChange();
+            }
+        });
+
+        // Watch for partNumber changes - auto-set productType from part's product_type
+        this.shiftSetupForm.get('partNumber')?.valueChanges.subscribe((part: Part) => {
+            if (part?.product_type) {
+                // Auto-populate productType from the selected part
+                this.shiftSetupForm.get('productType')?.setValue(part.product_type, { emitEvent: true });
+                // Note: The productType valueChanges subscription will trigger
+                // updateValidationByProductType() automatically, making process required for semi-finished
+            }
+        });
+
         // Watch for date changes - keep session.date in sync with form
         this.shiftSetupForm.get('date')?.valueChanges.subscribe((date: Date) => {
             if (date) {
@@ -1419,6 +1452,32 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 console.log('Session date updated to:', date);
             }
         });
+    }
+
+    /**
+     * Update validation rules based on product type selection
+     * - semi_finished: requires process, not production line
+     * - finished_good: requires production line, not process
+     * - null/undefined: both optional
+     */
+    updateValidationByProductType(productType: string | null): void {
+        const lineControl = this.shiftSetupForm.get('productionLine');
+        const processControl = this.shiftSetupForm.get('process');
+
+        if (productType === 'semi_finished') {
+            lineControl?.clearValidators();
+            processControl?.setValidators([Validators.required]);
+        } else if (productType === 'finished_good') {
+            lineControl?.setValidators([Validators.required]);
+            processControl?.clearValidators();
+        } else {
+            // No product type selected - both optional
+            lineControl?.clearValidators();
+            processControl?.clearValidators();
+        }
+
+        lineControl?.updateValueAndValidity();
+        processControl?.updateValueAndValidity();
     }
 
     loadReferenceData(): void {
@@ -1474,11 +1533,75 @@ export class ProductionComponent implements OnInit, OnDestroy {
         });
     }
 
-    loadParts(projectId: number): void {
-        this.productionService.getParts(projectId).subscribe(parts => {
+    loadParts(projectId: number, productType?: string): void {
+        this.productionService.getParts(projectId, productType).subscribe(parts => {
             this.parts = parts;
             // patchValue removed - now handled in project valueChanges with emitEvent: false
         });
+    }
+
+    onProductTypeChange(): void {
+        const project = this.shiftSetupForm.get('project')?.value;
+        const productType = this.shiftSetupForm.get('productType')?.value;
+
+        // Reset dependent fields when product type changes
+        this.shiftSetupForm.patchValue({
+            productionLine: null,
+            process: null,
+            partNumber: null
+        });
+        this.parts = [];
+
+        if (project) {
+            if (productType === 'semi_finished') {
+                // Semi-finished: load processes, clear production lines
+                this.loadProcesses(project.Id_Project);
+                this.productionLines = [];
+            } else if (productType === 'finished_good') {
+                // Finished good: load production lines, clear processes
+                this.loadProductionLines(project.Id_Project);
+                this.processes = [];
+                // Also load parts filtered by product type
+                this.loadParts(project.Id_Project, productType);
+            } else {
+                // No type selected: load all
+                this.loadProductionLines(project.Id_Project);
+                this.loadProcesses(project.Id_Project);
+                this.loadParts(project.Id_Project);
+            }
+        }
+    }
+
+    loadProcesses(projectId: number): void {
+        this.productionService.getProcessesByProject(projectId).subscribe({
+            next: (processes) => {
+                this.processes = processes;
+            },
+            error: (err) => {
+                console.error('Error loading processes:', err);
+                this.processes = [];
+            }
+        });
+    }
+
+    onProcessChange(): void {
+        const process = this.shiftSetupForm.get('process')?.value;
+
+        // Reset part selection when process changes
+        this.shiftSetupForm.patchValue({ partNumber: null });
+
+        if (process) {
+            // Load parts associated with this process
+            this.productionService.getPartsByProcess(process.id).subscribe({
+                next: (parts) => {
+                    this.parts = parts;
+                },
+                error: (err) => {
+                    console.error('Error loading parts by process:', err);
+                    this.parts = [];
+                }
+            });
+        }
     }
 
     loadWorkstations(lineId: number): void {
@@ -1551,6 +1674,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.session.date = formValue.date;
         this.session.project = formValue.project;
         this.session.productionLine = formValue.productionLine;
+        this.session.process = formValue.process;  // For semi-finished products
         this.session.part = formValue.partNumber;
         this.session.zone = formValue.zone;
         this.session.isSetupComplete = true;
@@ -1587,9 +1711,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
             shiftDuration += 24; // Overnight shift
         }
 
-        // Calculate hourly target based on actual shift duration
-        const hourlyTarget = Math.round(part.ShiftTarget_Part / shiftDuration);
-        const hourlyScrapTarget = Math.round((part.ScrapTarget_Part || shiftDuration) / shiftDuration);
+        // ShiftTarget_Part already represents the hourly target (no division needed)
+        const hourlyTarget = part.ShiftTarget_Part;
+        const hourlyScrapTarget = part.ScrapTarget_Part || 0;
 
         // Generate hours based on actual shift duration
         for (let i = 0; i < shiftDuration; i++) {
@@ -2482,7 +2606,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             shiftDuration += 24;
         }
 
-        return Math.round(this.session.part.ShiftTarget_Part / shiftDuration);
+        return this.session.part.ShiftTarget_Part;
     }
 
     getHourTypeLabel(type: HourType): string {
@@ -2890,17 +3014,26 @@ export class ProductionComponent implements OnInit, OnDestroy {
         }
 
         // Validate session data before saving
-        if (!this.session.date || !this.session.shift || !this.session.part || !this.session.productionLine) {
+        const isSemiFinished = this.session.part?.product_type === 'semi_finished';
+        const hasRequiredLocation = isSemiFinished
+            ? !!this.session.process
+            : !!this.session.productionLine;
+
+        if (!this.session.date || !this.session.shift || !this.session.part || !hasRequiredLocation) {
             console.error('Missing session data:', {
                 date: this.session.date,
                 shift: this.session.shift,
                 part: this.session.part,
-                productionLine: this.session.productionLine
+                productionLine: this.session.productionLine,
+                process: this.session.process,
+                productType: this.session.part?.product_type
             });
             this.messageService.add({
                 severity: 'error',
                 summary: 'Session Error',
-                detail: 'Please complete the session setup (Date, Shift, Part, Production Line)'
+                detail: isSemiFinished
+                    ? 'Please complete the session setup (Date, Shift, Part, Process)'
+                    : 'Please complete the session setup (Date, Shift, Part, Production Line)'
             });
             return;
         }
@@ -2947,7 +3080,6 @@ export class ProductionComponent implements OnInit, OnDestroy {
             result: this.hourProductionInput.output,
             target: hour.target,
             headcount: this.currentHourTeam.length,
-            production_line: this.session.productionLine.id,
             // Machine
             machine: this.session.machine?.id || null,
             // Order Number
@@ -2958,6 +3090,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
             maintenance_tech: this.session.actors.maintenanceTech.badgeId || '',
             pqc: this.session.actors.pqc.badgeId || ''
         };
+
+        // Add location field based on product type
+        if (isSemiFinished) {
+            productionData.process = this.session.process?.id;
+        } else {
+            productionData.production_line = this.session.productionLine?.id;
+        }
 
         console.log('Sending production data:', productionData);
 
@@ -3735,6 +3874,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
         return 'danger';
     }
 
+    getProductTypeLabel(type: string | undefined): string {
+        if (!type) return 'N/A';
+        return type === 'semi_finished' ? 'Semi-Finished' : 'Finished Good';
+    }
+
+    getProductTypeSeverity(type: string | undefined): 'warn' | 'success' | 'secondary' {
+        if (!type) return 'secondary';
+        return type === 'semi_finished' ? 'warn' : 'success';
+    }
+
     getQualificationSeverity(level: number | undefined): 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' {
         if (!level) return 'secondary';
         if (level >= 4) return 'success';
@@ -3848,6 +3997,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             date: new Date(),
             project: null,
             productionLine: null,
+            process: null,
             part: null,
             machine: null,
             zone: null,

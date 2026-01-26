@@ -29,7 +29,8 @@ import {
     Project,
     ProductionLine,
     Part,
-    Shift
+    Shift,
+    PRODUCT_TYPE_OPTIONS
 } from '../../core/models';
 
 interface ProductionListItem extends HourlyProduction {
@@ -39,6 +40,8 @@ interface ProductionListItem extends HourlyProduction {
     shiftName?: string;
     efficiency?: number;
     orderNo?: string;
+    productType?: string;
+    productTypeDisplay?: string;
 }
 
 @Component({
@@ -90,6 +93,10 @@ export class ProductionListComponent implements OnInit {
     allProductionLines: ProductionLine[] = []; // Store all lines for independent filtering
     parts: Part[] = [];
     allParts: Part[] = []; // Store all parts for independent filtering
+
+    // Product Type Filter
+    filterProductType: string | null = null;
+    productTypeFilterOptions = PRODUCT_TYPE_OPTIONS;
 
     isLoading = false;
 
@@ -269,15 +276,8 @@ export class ProductionListComponent implements OnInit {
     }
 
     applyGlobalFilter(event: Event): void {
-        const filterValue = (event.target as HTMLInputElement).value.toLowerCase();
-        this.filteredProductions = this.productions.filter(p => {
-            return (
-                p.projectName?.toLowerCase().includes(filterValue) ||
-                p.lineName?.toLowerCase().includes(filterValue) ||
-                p.partNumber?.toLowerCase().includes(filterValue) ||
-                p.shiftName?.toLowerCase().includes(filterValue)
-            );
-        });
+        this.globalFilterValue = (event.target as HTMLInputElement).value;
+        this.applyFilters();
     }
 
     clearFilters(): void {
@@ -286,6 +286,7 @@ export class ProductionListComponent implements OnInit {
         this.filterProject = null;
         this.filterLine = null;
         this.filterPart = null;
+        this.filterProductType = null;
         this.globalFilterValue = '';
         // Reset to show all lines and parts
         this.productionLines = this.allProductionLines;
@@ -298,6 +299,45 @@ export class ProductionListComponent implements OnInit {
         if (efficiency >= 90) return 'info';
         if (efficiency >= 80) return 'warn';
         return 'danger';
+    }
+
+    getProductTypeLabel(type: string | undefined): string {
+        if (!type) return '-';
+        return type === 'semi_finished' ? 'Semi-Finished' : 'Finished Good';
+    }
+
+    getProductTypeSeverity(type: string | undefined): 'warn' | 'success' | 'secondary' {
+        if (!type) return 'secondary';
+        return type === 'semi_finished' ? 'warn' : 'success';
+    }
+
+    onProductTypeFilterChange(): void {
+        this.applyFilters();
+    }
+
+    applyFilters(): void {
+        let filtered = [...this.productions];
+
+        // Apply product type filter
+        if (this.filterProductType) {
+            filtered = filtered.filter(p => p.productType === this.filterProductType);
+        }
+
+        // Apply global search filter
+        if (this.globalFilterValue) {
+            const filterValue = this.globalFilterValue.toLowerCase();
+            filtered = filtered.filter(p => {
+                return (
+                    p.projectName?.toLowerCase().includes(filterValue) ||
+                    p.lineName?.toLowerCase().includes(filterValue) ||
+                    p.partNumber?.toLowerCase().includes(filterValue) ||
+                    p.shiftName?.toLowerCase().includes(filterValue) ||
+                    p.productTypeDisplay?.toLowerCase().includes(filterValue)
+                );
+            });
+        }
+
+        this.filteredProductions = filtered;
     }
 
     viewDetails(production: ProductionListItem): void {
@@ -614,6 +654,8 @@ export class ProductionListComponent implements OnInit {
                 const part = parts.find(p => p.Id_Part === production.Id_Part);
                 if (part) {
                     production.partNumber = part.PN_Part;
+                    production.productType = part.product_type;
+                    production.productTypeDisplay = part.product_type_display;
                 }
             });
         }

@@ -18,7 +18,7 @@ import { BadgeModule } from 'primeng/badge';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
-import { PartLineAssignment } from '../../../core/models/production.model';
+import { PartProcessAssignment } from '../../../core/models/production.model';
 import { forkJoin } from 'rxjs';
 
 interface Part {
@@ -28,9 +28,10 @@ interface Part {
     project: number;
     project_name?: string;
     shift_target: number;
+    product_type: string;
 }
 
-interface ProductionLine {
+interface Process {
     id: number;
     name: string;
     code: string;
@@ -45,7 +46,7 @@ interface Project {
 }
 
 @Component({
-    selector: 'app-part-line-assignments',
+    selector: 'app-part-process-assignments',
     standalone: true,
     imports: [
         CommonModule,
@@ -75,7 +76,7 @@ interface Project {
             <p-toolbar styleClass="mb-4">
                 <ng-template pTemplate="left">
                     <h2 class="m-0">
-                        <i class="pi pi-link mr-2"></i>Part-Line Assignments
+                        <i class="pi pi-link mr-2"></i>Part-Process Assignments
                     </h2>
                 </ng-template>
                 <ng-template pTemplate="center">
@@ -121,8 +122,7 @@ interface Project {
             <div class="mb-3">
                 <p class="text-gray-600 m-0">
                     <i class="pi pi-info-circle mr-2"></i>
-                    Configure which finished goods can be produced on which production lines. Set specific targets per line if different from part defaults.
-                    <br><small class="text-gray-400">Finished Goods hierarchy: Zone → Project → Production Line → Part Number</small>
+                    Configure which semi-finished parts can be produced on which processes. Set specific targets per process if different from part defaults.
                 </p>
             </div>
 
@@ -140,10 +140,10 @@ interface Project {
                     <tr>
                         <th pSortableColumn="part_number">Part Number <p-sortIcon field="part_number"></p-sortIcon></th>
                         <th>Part Name</th>
-                        <th pSortableColumn="line_name">Production Line <p-sortIcon field="line_name"></p-sortIcon></th>
+                        <th pSortableColumn="process_name">Process <p-sortIcon field="process_name"></p-sortIcon></th>
                         <th>Project</th>
                         <th class="text-center" style="width: 120px">Default Target</th>
-                        <th class="text-center" style="width: 120px">Line Target</th>
+                        <th class="text-center" style="width: 120px">Process Target</th>
                         <th class="text-center" style="width: 100px">Effective</th>
                         <th class="text-center" style="width: 80px">Primary</th>
                         <th class="text-center" style="width: 80px">Active</th>
@@ -156,8 +156,8 @@ interface Project {
                         <td><strong class="text-primary">{{ assignment.part_number }}</strong></td>
                         <td>{{ assignment.part_name }}</td>
                         <td>
-                            <span class="font-medium">{{ assignment.line_name }}</span>
-                            <span class="text-gray-500 text-sm ml-1">({{ assignment.line_code }})</span>
+                            <span class="font-medium">{{ assignment.process_name }}</span>
+                            <span class="text-gray-500 text-sm ml-1">({{ assignment.process_code }})</span>
                         </td>
                         <td>
                             <p-tag [value]="assignment.project_name" severity="info"></p-tag>
@@ -173,7 +173,7 @@ interface Project {
                             <span class="font-bold text-lg">{{ assignment.effective_target }}</span>
                         </td>
                         <td class="text-center">
-                            <i *ngIf="assignment.is_primary" class="pi pi-star-fill text-yellow-500" pTooltip="Primary Line"></i>
+                            <i *ngIf="assignment.is_primary" class="pi pi-star-fill text-yellow-500" pTooltip="Primary Process"></i>
                             <i *ngIf="!assignment.is_primary" class="pi pi-star text-gray-300" pTooltip="Set as Primary" style="cursor: pointer" (click)="setPrimary(assignment)"></i>
                         </td>
                         <td class="text-center">
@@ -204,9 +204,9 @@ interface Project {
                     <tr>
                         <td colspan="10" class="text-center p-4">
                             <i class="pi pi-link text-4xl text-gray-400 mb-3 block"></i>
-                            <span class="text-gray-500">No part-line assignments found.</span>
+                            <span class="text-gray-500">No part-process assignments found.</span>
                             <br>
-                            <small class="text-gray-400">Create assignments to define which parts can be produced on which lines.</small>
+                            <small class="text-gray-400">Create assignments to define which semi-finished parts can be produced on which processes.</small>
                         </td>
                     </tr>
                 </ng-template>
@@ -217,13 +217,13 @@ interface Project {
         <p-dialog
             [(visible)]="assignmentDialog"
             [style]="{width: '550px'}"
-            [header]="editMode ? 'Edit Assignment' : 'New Part-Line Assignment'"
+            [header]="editMode ? 'Edit Assignment' : 'New Part-Process Assignment'"
             [modal]="true"
             styleClass="p-fluid form-dialog">
 
                 <div class="form-grid">
                     <div class="form-field">
-                        <label for="part">Part <span class="required">*</span></label>
+                        <label for="part">Part (Semi-Finished) <span class="required">*</span></label>
                         <p-select
                             id="part"
                             [(ngModel)]="assignment.part"
@@ -246,26 +246,26 @@ interface Project {
                     </div>
 
                     <div class="form-field">
-                        <label for="productionLine">Production Line <span class="required">*</span></label>
+                        <label for="process">Process <span class="required">*</span></label>
                         <p-select
-                            id="productionLine"
-                            [(ngModel)]="assignment.production_line"
-                            [options]="filteredLines"
+                            id="process"
+                            [(ngModel)]="assignment.process"
+                            [options]="filteredProcesses"
                             optionLabel="name"
                             optionValue="id"
-                            placeholder="Select Production Line"
+                            placeholder="Select Process"
                             [filter]="true"
-                            filterPlaceholder="Search lines..."
+                            filterPlaceholder="Search processes..."
                             [disabled]="editMode"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !assignment.production_line}">
-                            <ng-template let-line pTemplate="item">
+                            [ngClass]="{'ng-invalid ng-dirty': submitted && !assignment.process}">
+                            <ng-template let-process pTemplate="item">
                                 <div class="flex align-items-center gap-2">
-                                    <strong>{{ line.code }}</strong>
-                                    <span class="text-gray-500">- {{ line.name }}</span>
+                                    <strong>{{ process.code }}</strong>
+                                    <span class="text-gray-500">- {{ process.name }}</span>
                                 </div>
                             </ng-template>
                         </p-select>
-                        <small class="error-message" *ngIf="submitted && !assignment.production_line">Production Line is required.</small>
+                        <small class="error-message" *ngIf="submitted && !assignment.process">Process is required.</small>
                     </div>
 
                     <div class="form-field">
@@ -276,7 +276,7 @@ interface Project {
                             [min]="0"
                             placeholder="Leave empty to use part default">
                         </p-inputNumber>
-                        <small class="help-text">Override the part's default hourly target for this line</small>
+                        <small class="help-text">Override the part's default hourly target for this process</small>
                     </div>
 
                     <div class="form-field">
@@ -298,7 +298,7 @@ interface Project {
                             [(ngModel)]="assignment.specific_cycle_time"
                             [min]="0"
                             [maxFractionDigits]="2"
-                            placeholder="Cycle time for this part on this line">
+                            placeholder="Cycle time for this part on this process">
                         </p-inputNumber>
                     </div>
 
@@ -308,7 +308,7 @@ interface Project {
                             [binary]="true"
                             inputId="isPrimary">
                         </p-checkbox>
-                        <label for="isPrimary" class="mb-0">Primary production line for this part</label>
+                        <label for="isPrimary" class="mb-0">Primary process for this part</label>
                     </div>
 
                     <div class="form-field flex align-items-center gap-3">
@@ -331,24 +331,24 @@ interface Project {
         <p-dialog
             [(visible)]="bulkDialog"
             [style]="{width: '600px'}"
-            header="Bulk Assign Parts to Line"
+            header="Bulk Assign Parts to Process"
             [modal]="true"
             styleClass="p-fluid form-dialog">
 
                 <div class="form-field">
-                    <label for="bulkLine">Production Line <span class="required">*</span></label>
+                    <label for="bulkProcess">Process <span class="required">*</span></label>
                     <p-select
-                        id="bulkLine"
-                        [(ngModel)]="bulkLineId"
-                        [options]="filteredLines"
+                        id="bulkProcess"
+                        [(ngModel)]="bulkProcessId"
+                        [options]="filteredProcesses"
                         optionLabel="name"
                         optionValue="id"
-                        placeholder="Select Production Line"
+                        placeholder="Select Process"
                         [filter]="true">
-                        <ng-template let-line pTemplate="item">
+                        <ng-template let-process pTemplate="item">
                             <div class="flex align-items-center gap-2">
-                                <strong>{{ line.code }}</strong>
-                                <span class="text-gray-500">- {{ line.name }}</span>
+                                <strong>{{ process.code }}</strong>
+                                <span class="text-gray-500">- {{ process.name }}</span>
                             </div>
                         </ng-template>
                     </p-select>
@@ -379,12 +379,12 @@ interface Project {
 
                 <div class="info-message mt-3" *ngIf="bulkPartIds.length > 0">
                     <i class="pi pi-info-circle mr-2"></i>
-                    {{ bulkPartIds.length }} part(s) will be assigned to the selected production line.
+                    {{ bulkPartIds.length }} part(s) will be assigned to the selected process.
                 </div>
 
             <ng-template pTemplate="footer">
                 <p-button label="Cancel" icon="pi pi-times" styleClass="p-button-text" (onClick)="bulkDialog = false"></p-button>
-                <p-button label="Assign All" icon="pi pi-check" (onClick)="executeBulkAssign()" [disabled]="!bulkLineId || bulkPartIds.length === 0"></p-button>
+                <p-button label="Assign All" icon="pi pi-check" (onClick)="executeBulkAssign()" [disabled]="!bulkProcessId || bulkPartIds.length === 0"></p-button>
             </ng-template>
         </p-dialog>
     `,
@@ -409,17 +409,17 @@ interface Project {
         }
     `]
 })
-export class PartLineAssignmentsComponent implements OnInit {
-    assignments: PartLineAssignment[] = [];
+export class PartProcessAssignmentsComponent implements OnInit {
+    assignments: PartProcessAssignment[] = [];
     parts: Part[] = [];
-    lines: ProductionLine[] = [];
+    processes: Process[] = [];
     projects: Project[] = [];
 
     filteredParts: Part[] = [];
-    filteredLines: ProductionLine[] = [];
+    filteredProcesses: Process[] = [];
 
     selectedProjectId: number | null = null;
-    assignment: Partial<PartLineAssignment> = {};
+    assignment: Partial<PartProcessAssignment> = {};
 
     assignmentDialog = false;
     bulkDialog = false;
@@ -427,7 +427,7 @@ export class PartLineAssignmentsComponent implements OnInit {
     submitted = false;
     loading = false;
 
-    bulkLineId: number | null = null;
+    bulkProcessId: number | null = null;
     bulkPartIds: number[] = [];
 
     constructor(
@@ -444,9 +444,9 @@ export class PartLineAssignmentsComponent implements OnInit {
         this.loading = true;
 
         forkJoin({
-            assignments: this.productionService.getPartLineAssignments(),
-            parts: this.productionService.getFinishedGoodsParts(),
-            lines: this.productionService.getProductionLines(),
+            assignments: this.productionService.getPartProcessAssignments(),
+            parts: this.productionService.getSemiFinishedParts(),
+            processes: this.productionService.getProcesses(),
             projects: this.productionService.getProjects()
         }).subscribe({
             next: (data: any) => {
@@ -454,17 +454,18 @@ export class PartLineAssignmentsComponent implements OnInit {
                 this.parts = (data.parts.results || data.parts).map((p: any) => ({
                     id: p.id,
                     part_number: p.part_number,
-                    name: p.name,
+                    name: p.description || p.name,
                     project: p.project,
                     project_name: p.project_name,
-                    shift_target: p.shift_target
+                    shift_target: p.shift_target,
+                    product_type: p.product_type
                 }));
-                this.lines = (data.lines.results || data.lines).map((l: any) => ({
-                    id: l.id,
-                    name: l.name,
-                    code: l.code,
-                    project: l.project,
-                    project_name: l.project_name
+                this.processes = (data.processes.results || data.processes).map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    code: p.code,
+                    project: p.project,
+                    project_name: p.project_name
                 }));
                 this.projects = (data.projects.results || data.projects).map((p: any) => ({
                     id: p.id,
@@ -489,17 +490,17 @@ export class PartLineAssignmentsComponent implements OnInit {
     applyFilters(): void {
         if (this.selectedProjectId) {
             this.filteredParts = this.parts.filter(p => p.project === this.selectedProjectId);
-            this.filteredLines = this.lines.filter(l => l.project === this.selectedProjectId);
+            this.filteredProcesses = this.processes.filter(p => p.project === this.selectedProjectId);
         } else {
             this.filteredParts = [...this.parts];
-            this.filteredLines = [...this.lines];
+            this.filteredProcesses = [...this.processes];
         }
     }
 
     openNew(): void {
         this.assignment = {
             part: undefined,
-            production_line: undefined,
+            process: undefined,
             specific_target: undefined,
             specific_efficiency: undefined,
             specific_cycle_time: undefined,
@@ -511,7 +512,7 @@ export class PartLineAssignmentsComponent implements OnInit {
         this.assignmentDialog = true;
     }
 
-    editAssignment(assignment: PartLineAssignment): void {
+    editAssignment(assignment: PartProcessAssignment): void {
         this.assignment = { ...assignment };
         this.editMode = true;
         this.submitted = false;
@@ -526,13 +527,13 @@ export class PartLineAssignmentsComponent implements OnInit {
     saveAssignment(): void {
         this.submitted = true;
 
-        if (!this.assignment.part || !this.assignment.production_line) {
-            this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Please select both part and production line' });
+        if (!this.assignment.part || !this.assignment.process) {
+            this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Please select both part and process' });
             return;
         }
 
         if (this.editMode && this.assignment.id) {
-            this.productionService.updatePartLineAssignment(this.assignment.id, this.assignment).subscribe({
+            this.productionService.updatePartProcessAssignment(this.assignment.id, this.assignment).subscribe({
                 next: () => {
                     this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Assignment updated successfully' });
                     this.loadData();
@@ -543,7 +544,7 @@ export class PartLineAssignmentsComponent implements OnInit {
                 }
             });
         } else {
-            this.productionService.createPartLineAssignment(this.assignment).subscribe({
+            this.productionService.createPartProcessAssignment(this.assignment).subscribe({
                 next: () => {
                     this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Assignment created successfully' });
                     this.loadData();
@@ -569,9 +570,9 @@ export class PartLineAssignmentsComponent implements OnInit {
         }
     }
 
-    confirmDelete(assignment: PartLineAssignment): void {
+    confirmDelete(assignment: PartProcessAssignment): void {
         this.confirmationService.confirm({
-            message: `Remove "${assignment.part_number}" from "${assignment.line_name}"?`,
+            message: `Remove "${assignment.part_number}" from "${assignment.process_name}"?`,
             header: 'Confirm Delete',
             icon: 'pi pi-exclamation-triangle',
             acceptButtonStyleClass: 'p-button-danger',
@@ -579,9 +580,9 @@ export class PartLineAssignmentsComponent implements OnInit {
         });
     }
 
-    deleteAssignment(assignment: PartLineAssignment): void {
+    deleteAssignment(assignment: PartProcessAssignment): void {
         if (!assignment.id) return;
-        this.productionService.deletePartLineAssignment(assignment.id).subscribe({
+        this.productionService.deletePartProcessAssignment(assignment.id).subscribe({
             next: () => {
                 this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Assignment removed successfully' });
                 this.loadData();
@@ -592,11 +593,11 @@ export class PartLineAssignmentsComponent implements OnInit {
         });
     }
 
-    setPrimary(assignment: PartLineAssignment): void {
+    setPrimary(assignment: PartProcessAssignment): void {
         if (!assignment.id) return;
-        this.productionService.setPrimaryLineForPart(assignment.id).subscribe({
+        this.productionService.setPrimaryProcessForPart(assignment.id).subscribe({
             next: () => {
-                this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Primary line set successfully' });
+                this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Primary process set successfully' });
                 this.loadData();
             },
             error: (error) => {
@@ -606,15 +607,15 @@ export class PartLineAssignmentsComponent implements OnInit {
     }
 
     openBulkAssign(): void {
-        this.bulkLineId = null;
+        this.bulkProcessId = null;
         this.bulkPartIds = [];
         this.bulkDialog = true;
     }
 
     executeBulkAssign(): void {
-        if (!this.bulkLineId || this.bulkPartIds.length === 0) return;
+        if (!this.bulkProcessId || this.bulkPartIds.length === 0) return;
 
-        this.productionService.bulkAssignPartsToLine(this.bulkLineId, this.bulkPartIds).subscribe({
+        this.productionService.bulkAssignPartsToProcess(this.bulkProcessId, this.bulkPartIds).subscribe({
             next: (result) => {
                 this.messageService.add({
                     severity: 'success',

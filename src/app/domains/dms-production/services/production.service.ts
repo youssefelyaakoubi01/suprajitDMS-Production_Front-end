@@ -289,9 +289,15 @@ export class DmsProductionService {
     /**
      * Get parts assigned to a specific production line via PartLineAssignment
      * Falls back to project-based filtering if no assignments exist
+     * @param lineId - The production line ID
+     * @param productType - Optional filter by product type ('semi_finished' | 'finished_good')
      */
-    getPartsByProductionLine(lineId: number): Observable<Part[]> {
-        return this.api.get<Part[]>(`${this.endpoint}/parts/by_production_line`, { line_id: lineId });
+    getPartsByProductionLine(lineId: number, productType?: string): Observable<Part[]> {
+        const params: any = { line_id: lineId };
+        if (productType) {
+            params.product_type = productType;
+        }
+        return this.api.get<Part[]>(`${this.endpoint}/parts/by_production_line`, params);
     }
 
     // ==================== PART-LINE ASSIGNMENTS ====================

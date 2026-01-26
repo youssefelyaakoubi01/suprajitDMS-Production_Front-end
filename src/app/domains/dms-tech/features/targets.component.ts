@@ -84,7 +84,7 @@ interface LineHeadcount {
             <p-tabs value="0">
                 <!-- Part Targets Tab -->
                 <p-tablist>
-                    <p-tab value="0">Part Shift Targets</p-tab>
+                    <p-tab value="0">Part Hourly Targets</p-tab>
                     <p-tab value="1">Line Headcount Targets</p-tab>
                 </p-tablist>
                 <p-tabpanels>
@@ -92,7 +92,7 @@ interface LineHeadcount {
                     <div class="mb-3">
                         <p class="text-gray-600 m-0">
                             <i class="pi pi-info-circle mr-2"></i>
-                            Configure shift production targets for each part number
+                            Configure hourly production targets for each part number
                         </p>
                     </div>
 
@@ -109,7 +109,7 @@ interface LineHeadcount {
                                 <th>Part Number</th>
                                 <th>Name</th>
                                 <th>Project</th>
-                                <th style="width: 150px">Shift Target</th>
+                                <th style="width: 150px">Hourly Target</th>
                                 <th style="width: 120px">Scrap %</th>
                                 <th style="width: 120px">Efficiency %</th>
                                 <th style="width: 100px">Actions</th>
@@ -223,7 +223,7 @@ interface LineHeadcount {
                     </div>
 
                     <div class="form-field">
-                        <label for="shiftTarget">Shift Target (units/shift)</label>
+                        <label for="shiftTarget">Hourly Target (units/hour)</label>
                         <p-inputNumber
                             id="shiftTarget"
                             [(ngModel)]="selectedPart.shift_target"
@@ -236,7 +236,7 @@ interface LineHeadcount {
                             incrementButtonIcon="pi pi-plus"
                             decrementButtonIcon="pi pi-minus">
                         </p-inputNumber>
-                        <small class="help-text">Target production quantity per shift</small>
+                        <small class="help-text">Target production quantity per hour</small>
                     </div>
 
                     <div class="form-field">

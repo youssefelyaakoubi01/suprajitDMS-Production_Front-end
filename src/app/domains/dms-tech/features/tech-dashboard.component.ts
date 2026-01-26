@@ -305,7 +305,7 @@ export class TechDashboardComponent implements OnInit {
             icon: 'pi pi-chart-bar',
             route: '/dms-tech/targets',
             count: 0,
-            description: 'Set shift targets and headcount requirements',
+            description: 'Set hourly targets and headcount requirements',
             color: '#EF4444'
         }
     ];

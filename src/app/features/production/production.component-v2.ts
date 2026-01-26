@@ -282,8 +282,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     generateShiftHours(shift: Shift, part: Part): HourlyProductionState[] {
         const hours: HourlyProductionState[] = [];
-        const hourlyTarget = Math.round(part.ShiftTarget_Part / 8);
-        const hourlyScrapTarget = Math.round((part.ScrapTarget_Part || 8) / 8);
+        const hourlyTarget = part.ShiftTarget_Part;
+        const hourlyScrapTarget = part.ScrapTarget_Part || 0;
 
         // Get shift start time
         const shiftStart = this.getShiftStartHour(shift.id);

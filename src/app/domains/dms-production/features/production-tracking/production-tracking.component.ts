@@ -34,6 +34,7 @@ import {
     PartLineAssignment,
     HeadcountRequirement
 } from '@domains/dms-production';
+import { PRODUCT_TYPE_OPTIONS } from '@core/models/production.model';
 import { DowntimeDeclarationDialogComponent, DowntimeDeclarationData } from '../downtime/downtime-declaration-dialog.component';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
@@ -110,6 +111,18 @@ interface HourOption {
                                   optionLabel="name" optionValue="id"
                                   placeholder="Select Line" styleClass="w-full"
                                   (onChange)="onLineChange()">
+                        </p-select>
+                    </div>
+                    <div class="col-12 md:col-4 lg:col-2">
+                        <label class="block mb-2 font-medium">Product Type</label>
+                        <p-select [options]="PRODUCT_TYPE_OPTIONS"
+                                  formControlName="productType"
+                                  optionLabel="label"
+                                  optionValue="value"
+                                  placeholder="All Types"
+                                  styleClass="w-full"
+                                  [showClear]="true"
+                                  (onChange)="onProductTypeChange()">
                         </p-select>
                     </div>
                     <div class="col-12 md:col-4 lg:col-2">
@@ -620,6 +633,9 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
     @Input() productionLines: ProductionLine[] = [];
     @Input() parts: Part[] = [];
 
+    // Product Type filter options
+    PRODUCT_TYPE_OPTIONS = PRODUCT_TYPE_OPTIONS;
+
     @Output() outputSaved = new EventEmitter<HourlyProduction>();
     @Output() downtimeSaved = new EventEmitter<any>();
 
@@ -686,6 +702,7 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
             date: [new Date(), Validators.required],
             projectId: [null, Validators.required],
             productionLineId: [null, Validators.required],
+            productType: [null],
             partId: [null, Validators.required],
             hour: [null, Validators.required]
         });
@@ -728,16 +745,16 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
 
     onLineChange(): void {
         const lineId = this.shiftForm.get('productionLineId')?.value;
+        const productType = this.shiftForm.get('productType')?.value;
+
+        this.shiftForm.patchValue({ partId: null });
+        this.parts = [];
+        this.currentTarget = 0;
+        this.currentLineAssignment = null;
+        this.recommendedHeadcount = 0;
+
         if (lineId) {
-            // Use getPartsByProductionLine to get only parts assigned to this line
-            this.productionService.getPartsByProductionLine(lineId)
-                .pipe(takeUntil(this.destroy$))
-                .subscribe(parts => {
-                    this.parts = parts;
-                    this.shiftForm.patchValue({ partId: null });
-                    this.currentLineAssignment = null;
-                    this.recommendedHeadcount = 0;
-                });
+            this.loadPartsForLine(lineId, productType);
 
             // Load headcount requirements for this line
             this.productionService.getHeadcountRequirements({ production_line: lineId })
@@ -747,6 +764,37 @@ export class ProductionTrackingComponent implements OnInit, OnDestroy {
                 });
         }
         this.loadHourlyData();
+    }
+
+    onProductTypeChange(): void {
+        const lineId = this.shiftForm.get('productionLineId')?.value;
+        const productType = this.shiftForm.get('productType')?.value;
+
+        this.shiftForm.patchValue({ partId: null });
+        this.parts = [];
+        this.currentTarget = 0;
+
+        if (lineId) {
+            this.loadPartsForLine(lineId, productType);
+        }
+    }
+
+    private loadPartsForLine(lineId: number, productType?: string): void {
+        this.productionService.getPartsByProductionLine(lineId, productType)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+                next: (parts) => {
+                    this.parts = parts;
+                },
+                error: (error) => {
+                    console.error('Error loading parts:', error);
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Error',
+                        detail: 'Failed to load parts'
+                    });
+                }
+            });
     }
 
     onPartChange(): void {

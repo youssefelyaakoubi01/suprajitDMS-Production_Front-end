@@ -8,7 +8,7 @@
  * - Part Numbers
  * - Machines
  * - Zones
- * - Shift Targets & Headcount
+ * - Hourly Targets & Headcount
  */
 import { Routes } from '@angular/router';
 
@@ -71,6 +71,18 @@ export const DMS_TECH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/part-line-assignments.component').then(m => m.PartLineAssignmentsComponent),
         title: 'Part-Line Assignments'
+    },
+    {
+        path: 'processes',
+        loadComponent: () =>
+            import('./features/processes.component').then(m => m.ProcessesComponent),
+        title: 'Processes Management'
+    },
+    {
+        path: 'part-process-assignments',
+        loadComponent: () =>
+            import('./features/part-process-assignments.component').then(m => m.PartProcessAssignmentsComponent),
+        title: 'Part-Process Assignments'
     },
     {
         path: 'headcount-config',

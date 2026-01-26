@@ -23,6 +23,13 @@ export interface HourlyProduction {
     order_no?: string;
 }
 
+export type ProductType = 'semi_finished' | 'finished_good';
+
+export const PRODUCT_TYPE_OPTIONS = [
+    { label: 'Semi-Finished', value: 'semi_finished' },
+    { label: 'Finished Good', value: 'finished_good' }
+];
+
 export interface Part {
     Id_Part: number;
     PN_Part: string;
@@ -32,6 +39,13 @@ export interface Part {
     Price_Part: number;
     Efficiency: number;
     MATSTATUS: string;
+    // New fields for product type hierarchy
+    product_type?: ProductType;
+    product_type_display?: string;
+    zone?: number;
+    zone_name?: string;
+    process?: number;
+    process_name?: string;
 }
 
 export interface Project {
@@ -201,6 +215,43 @@ export interface HeadcountRequirement {
     quality_agents_required: number;
     total_required?: number;
     notes?: string;
+    is_active: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Process {
+    id?: number;
+    name: string;
+    code: string;
+    description?: string;
+    project: number;
+    project_name?: string;
+    project_code?: string;
+    sequence_order?: number;
+    cycle_time_seconds?: number;
+    is_active: boolean;
+    parts_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface PartProcessAssignment {
+    id?: number;
+    part: number;
+    part_number?: string;
+    part_name?: string;
+    part_default_target?: number;
+    process: number;
+    process_name?: string;
+    process_code?: string;
+    project_name?: string;
+    specific_target?: number;
+    specific_efficiency?: number;
+    specific_cycle_time?: number;
+    effective_target?: number;
+    effective_efficiency?: number;
+    is_primary: boolean;
     is_active: boolean;
     created_at?: string;
     updated_at?: string;

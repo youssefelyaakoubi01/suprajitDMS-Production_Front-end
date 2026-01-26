@@ -12,7 +12,8 @@ import {
     DowntimeProblem,
     HourlyProduction,
     Downtime,
-    Zone
+    Zone,
+    Process
 } from '../../core/models';
 import { EmployeeWithAssignment } from '../../core/models/employee.model';
 import { ProductionService as CoreProductionService } from '../../core/services/production.service';
@@ -121,8 +122,8 @@ export class ProductionService {
         );
     }
 
-    getParts(projectId?: number): Observable<Part[]> {
-        return this.coreService.getParts(projectId).pipe(
+    getParts(projectId?: number, productType?: string): Observable<Part[]> {
+        return this.coreService.getParts(projectId, productType).pipe(
             map((response: any) => {
                 const parts = response.results || response;
                 return parts.map((p: any) => ({
@@ -133,7 +134,9 @@ export class ProductionService {
                     ScrapTarget_Part: 0, // TODO: Add to Django model
                     Price_Part: parseFloat(p.price) || 0,
                     Efficiency: p.efficiency || 0,
-                    MATSTATUS: p.material_status || 'active'
+                    MATSTATUS: p.material_status || 'active',
+                    product_type: p.product_type,
+                    product_type_display: p.product_type_display
                 }));
             })
         );
@@ -292,7 +295,6 @@ export class ProductionService {
             hour_type: data.hour_type || 'normal',
             shift_type: data.shift_type || null,
             part: data.part || data.Id_Part,
-            production_line: data.production_line || data.Id_ProdLine,
             machine: data.machine || null,
             result: data.result ?? data.Result_HourlyProdPN ?? 0,
             target: data.target ?? data.Target_HourlyProdPN ?? 0,
@@ -305,6 +307,15 @@ export class ProductionService {
             maintenance_tech: data.maintenance_tech || '',
             pqc: data.pqc || ''
         };
+
+        // Conditionally add production_line OR process (not both)
+        // Finished goods require production_line, semi-finished products require process
+        if (data.production_line || data.Id_ProdLine) {
+            apiData.production_line = data.production_line || data.Id_ProdLine;
+        }
+        if (data.process) {
+            apiData.process = data.process;
+        }
 
         console.log('saveHourlyProduction - Input data:', data);
         console.log('saveHourlyProduction - API data being sent:', apiData);
@@ -329,7 +340,6 @@ export class ProductionService {
             hour_type: data.hour_type || 'normal',
             shift_type: data.shift_type || null,
             part: data.part || data.Id_Part,
-            production_line: data.production_line || data.Id_ProdLine,
             machine: data.machine || null,
             result: data.result ?? data.Result_HourlyProdPN ?? 0,
             scrap: data.scrap ?? data.Scrap_HourlyProdPN ?? 0,
@@ -341,6 +351,15 @@ export class ProductionService {
             maintenance_tech: data.maintenance_tech || '',
             pqc: data.pqc || ''
         };
+
+        // Conditionally add production_line OR process (not both)
+        // Finished goods require production_line, semi-finished products require process
+        if (data.production_line || data.Id_ProdLine) {
+            apiData.production_line = data.production_line || data.Id_ProdLine;
+        }
+        if (data.process) {
+            apiData.process = data.process;
+        }
 
         // Only include target and headcount if they are provided (to avoid overwriting with 0)
         if (data.target !== undefined || data.Target_HourlyProdPN !== undefined) {
@@ -512,5 +531,47 @@ export class ProductionService {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    }
+
+    // ==================== PROCESS METHODS ====================
+
+    getProcessesByProject(projectId: number): Observable<Process[]> {
+        return this.coreService.getProcessesByProject(projectId).pipe(
+            map((response: any) => {
+                const processes = response.results || response;
+                return processes.map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    code: p.code,
+                    description: p.description,
+                    project: p.project,
+                    project_name: p.project_name,
+                    project_code: p.project_code,
+                    sequence_order: p.sequence_order,
+                    cycle_time_seconds: p.cycle_time_seconds,
+                    is_active: p.is_active
+                }));
+            })
+        );
+    }
+
+    getPartsByProcess(processId: number): Observable<Part[]> {
+        return this.coreService.getPartsByProcess(processId).pipe(
+            map((response: any) => {
+                const parts = response.results || response;
+                return parts.map((p: any) => ({
+                    Id_Part: p.id,
+                    PN_Part: p.part_number,
+                    Id_Project: p.project,
+                    ShiftTarget_Part: p.shift_target || 0,
+                    ScrapTarget_Part: 0,
+                    Price_Part: parseFloat(p.price) || 0,
+                    Efficiency: p.efficiency || 0,
+                    MATSTATUS: p.material_status || 'active',
+                    product_type: p.product_type,
+                    product_type_display: p.product_type_display
+                }));
+            })
+        );
     }
 }

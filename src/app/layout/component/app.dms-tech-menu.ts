@@ -63,6 +63,11 @@ export class AppDmsTechMenu {
                         label: 'Zones',
                         icon: 'pi pi-fw pi-map',
                         routerLink: ['/dms-tech/zones']
+                    },
+                    {
+                        label: 'Processes',
+                        icon: 'pi pi-fw pi-sitemap',
+                        routerLink: ['/dms-tech/processes']
                     }
                 ]
             },
@@ -73,7 +78,14 @@ export class AppDmsTechMenu {
                     {
                         label: 'Part-Line Assignments',
                         icon: 'pi pi-fw pi-link',
-                        routerLink: ['/dms-tech/part-line-assignments']
+                        routerLink: ['/dms-tech/part-line-assignments'],
+                        tooltip: 'For Finished Goods'
+                    },
+                    {
+                        label: 'Part-Process Assignments',
+                        icon: 'pi pi-fw pi-share-alt',
+                        routerLink: ['/dms-tech/part-process-assignments'],
+                        tooltip: 'For Semi-Finished Products'
                     },
                     {
                         label: 'Headcount Config',
