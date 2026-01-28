@@ -22,8 +22,8 @@ import { AccordionModule } from 'primeng/accordion';
 import { AvatarModule } from 'primeng/avatar';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
-import { ProductionService } from './production.service';
-import { ExportService } from '../../core/services/export.service';
+import { ProductionService } from '../production-tracking/production.service';
+import { ExportService } from '../../../../core/services/export.service';
 import {
     HourlyProduction,
     Project,
@@ -31,7 +31,7 @@ import {
     Part,
     Shift,
     PRODUCT_TYPE_OPTIONS
-} from '../../core/models';
+} from '../../../../core/models';
 
 interface ProductionListItem extends HourlyProduction {
     projectName?: string;

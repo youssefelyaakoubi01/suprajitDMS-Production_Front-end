@@ -49,10 +49,21 @@ export interface Part {
 }
 
 export interface Project {
+    // New API format fields
+    id?: number;
+    name?: string;
+    capacity?: number;
+    image?: string;
+    description?: string;
+    zone?: number;
+    zone_name?: string;
+    is_active?: boolean;
+    created_at?: string;
+    updated_at?: string;
+    // Legacy fields for backward compatibility
     Id_Project: number;
     Name_Project: string;
-    Code_Project: string;
-    Status_Project: string;
+    Status_Project?: string;
 }
 
 export interface Downtime {
@@ -63,10 +74,8 @@ export interface Downtime {
     Id_DowntimeProblems: number;
     zone?: number;
     zone_name?: string;
-    zone_code?: string;
     machine?: number;
     machine_name?: string;
-    machine_code?: string;
     // Additional display fields
     production_line_name?: string;
     project_name?: string;
@@ -83,7 +92,6 @@ export interface Downtime {
 export interface DowntimeProblem {
     id?: number;
     name: string;
-    code: string;
     category: 'mechanical' | 'electrical' | 'quality' | 'material' | 'manpower' | 'other';
     description?: string;
     is_active: boolean;
@@ -96,7 +104,6 @@ export interface DowntimeProblem {
 export interface Workstation {
     id: number;
     name: string;
-    code: string;
     description?: string;
     production_line: number;
     production_line_name?: string;
@@ -113,17 +120,14 @@ export interface Workstation {
     // Legacy fields for backward compatibility
     Id_Workstation?: number;
     Name_Workstation?: string;
-    Code_Workstation?: string;
     Id_ProdLine?: number;
 }
 
 export interface Machine {
     id: number;
     name: string;
-    code: string;
     workstation: number;
     workstation_name?: string;
-    workstation_code?: string;
     production_line_name?: string;
     production_line_id?: number;
     description?: string;
@@ -142,7 +146,6 @@ export interface Machine {
 export interface Shift {
     id: number;
     name: string;
-    code: string;
     start_time: string;  // Format: "HH:MM:SS"
     end_time: string;    // Format: "HH:MM:SS"
     is_active: boolean;
@@ -154,7 +157,6 @@ export interface Shift {
 export interface ShiftType {
     id: number;
     name: string;
-    code: string;
     target_percentage: number;  // 0-100: percentage of base target
     description?: string;
     is_active: boolean;
@@ -167,10 +169,7 @@ export type ZoneType = 'production' | 'maintenance' | 'storage' | 'quality';
 export interface Zone {
     id: number;
     name: string;
-    code: string;
     description?: string;
-    project?: number;
-    project_name?: string;
     zone_type: ZoneType;
     is_active: boolean;
     created_at?: string;
@@ -185,7 +184,6 @@ export interface PartLineAssignment {
     part_default_target?: number;
     production_line: number;
     line_name?: string;
-    line_code?: string;
     project_name?: string;
     specific_target?: number;
     specific_efficiency?: number;
@@ -202,14 +200,12 @@ export interface HeadcountRequirement {
     id?: number;
     production_line: number;
     line_name?: string;
-    line_code?: string;
     project_name?: string;
     part?: number;
     part_number?: string;
     part_name?: string;
     shift_type?: number;
     shift_type_name?: string;
-    shift_type_code?: string;
     operators_required: number;
     technicians_required: number;
     quality_agents_required: number;
@@ -223,11 +219,9 @@ export interface HeadcountRequirement {
 export interface Process {
     id?: number;
     name: string;
-    code: string;
     description?: string;
     project: number;
     project_name?: string;
-    project_code?: string;
     sequence_order?: number;
     cycle_time_seconds?: number;
     is_active: boolean;
@@ -244,7 +238,6 @@ export interface PartProcessAssignment {
     part_default_target?: number;
     process: number;
     process_name?: string;
-    process_code?: string;
     project_name?: string;
     specific_target?: number;
     specific_efficiency?: number;

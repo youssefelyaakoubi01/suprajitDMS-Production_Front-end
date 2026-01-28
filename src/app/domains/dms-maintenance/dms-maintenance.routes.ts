@@ -52,6 +52,12 @@ export const DMS_MAINTENANCE_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/tickets/tickets-list.component').then(m => m.TicketsListComponent),
         title: 'Maintenance Tickets'
+    },
+    {
+        path: 'problem-types',
+        loadComponent: () =>
+            import('../dms-tech/features/problem-types.component').then(m => m.ProblemTypesComponent),
+        title: 'Problem Types Management'
     }
 ];
 

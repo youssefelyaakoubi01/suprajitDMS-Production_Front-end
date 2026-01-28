@@ -1,11 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
-import { InputNumberModule } from 'primeng/inputnumber';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { ToastModule } from 'primeng/toast';
@@ -15,16 +14,18 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 interface ProductionLine {
     id?: number;
     name: string;
-    code: string;
     project: number;
     project_name?: string;
-    capacity?: number;
     description?: string;
     is_active: boolean;
 }
@@ -45,7 +46,6 @@ interface Project {
         ButtonModule,
         DialogModule,
         InputTextModule,
-        InputNumberModule,
         TextareaModule,
         SelectModule,
         ToastModule,
@@ -54,7 +54,9 @@ interface Project {
         ToggleSwitchModule,
         CardModule,
         ToolbarModule,
-        TooltipModule
+        TooltipModule,
+        IconFieldModule,
+        InputIconModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -67,6 +69,35 @@ interface Project {
                     <h2 class="m-0">
                         <i class="pi pi-sitemap mr-2"></i>Production Lines Management
                     </h2>
+                </ng-template>
+                <ng-template pTemplate="center">
+                    <div class="flex align-items-center gap-2">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input
+                                pInputText
+                                type="text"
+                                [(ngModel)]="searchTerm"
+                                (ngModelChange)="onSearchChange($event)"
+                                placeholder="Search..."
+                                class="w-12rem" />
+                        </p-iconfield>
+                        <p-select
+                            [(ngModel)]="selectedProjectFilter"
+                            [options]="projectFilterOptions"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="All Projects"
+                            [showClear]="true"
+                            (onChange)="onFilterChange()"
+                            styleClass="w-12rem">
+                        </p-select>
+                        <p-button *ngIf="searchTerm || selectedProjectFilter"
+                            icon="pi pi-times"
+                            styleClass="p-button-text"
+                            (onClick)="clearFilters()">
+                        </p-button>
+                    </div>
                 </ng-template>
                 <ng-template pTemplate="right">
                     <p-button
@@ -85,7 +116,7 @@ interface Project {
             </p-toolbar>
 
             <p-table
-                [value]="productionLines"
+                [value]="filteredProductionLines"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
@@ -97,10 +128,8 @@ interface Project {
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
                         <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
                         <th>Project</th>
-                        <th style="width: 120px">Capacity</th>
                         <th style="width: 100px">Status</th>
                         <th style="width: 150px">Actions</th>
                     </tr>
@@ -109,12 +138,10 @@ interface Project {
                 <ng-template pTemplate="body" let-line>
                     <tr>
                         <td>{{ line.id }}</td>
-                        <td><strong class="text-primary">{{ line.code }}</strong></td>
                         <td>{{ line.name }}</td>
                         <td>
                             <p-tag [value]="line.project_name || getProjectName(line.project)" severity="info"></p-tag>
                         </td>
-                        <td class="text-center">{{ line.capacity || '-' }}</td>
                         <td>
                             <p-tag
                                 [value]="line.is_active ? 'Active' : 'Inactive'"
@@ -140,7 +167,7 @@ interface Project {
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="7" class="text-center p-4">
+                        <td colspan="5" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No production lines found.</span>
                         </td>
@@ -174,19 +201,6 @@ interface Project {
                     </div>
 
                     <div class="form-field">
-                        <label for="code">Code <span class="required">*</span></label>
-                        <input
-                            type="text"
-                            pInputText
-                            id="code"
-                            [(ngModel)]="line.code"
-                            required
-                            placeholder="e.g., LINE01"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !line.code}" />
-                        <small class="error-message" *ngIf="submitted && !line.code">Code is required.</small>
-                    </div>
-
-                    <div class="form-field">
                         <label for="name">Name <span class="required">*</span></label>
                         <input
                             type="text"
@@ -197,16 +211,6 @@ interface Project {
                             placeholder="Production Line Name"
                             [ngClass]="{'ng-invalid ng-dirty': submitted && !line.name}" />
                         <small class="error-message" *ngIf="submitted && !line.name">Name is required.</small>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="capacity">Capacity (units/hour)</label>
-                        <p-inputNumber
-                            id="capacity"
-                            [(ngModel)]="line.capacity"
-                            [min]="0"
-                            placeholder="Maximum capacity per hour">
-                        </p-inputNumber>
                     </div>
                 </div>
 
@@ -237,11 +241,14 @@ interface Project {
         :host ::ng-deep .p-datatable .p-datatable-thead > tr > th {
             background-color: var(--surface-50);
         }
-    `]
+    `],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ProductionLinesComponent implements OnInit {
+export class ProductionLinesComponent implements OnInit, OnDestroy {
     productionLines: ProductionLine[] = [];
+    filteredProductionLines: ProductionLine[] = [];
     projects: Project[] = [];
+    projectFilterOptions: { id: number; name: string }[] = [];
     line: Partial<ProductionLine> = {};
 
     lineDialog = false;
@@ -249,14 +256,79 @@ export class ProductionLinesComponent implements OnInit {
     submitted = false;
     loading = false;
 
+    // Filter properties
+    searchTerm = '';
+    selectedProjectFilter: number | null = null;
+    private searchSubject = new Subject<string>();
+    private filterSubject = new Subject<void>();
+    private destroy$ = new Subject<void>();
+
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
+        this.setupSearch();
         this.loadData();
+    }
+
+    ngOnDestroy(): void {
+        this.destroy$.next();
+        this.destroy$.complete();
+    }
+
+    private setupSearch(): void {
+        this.searchSubject.pipe(
+            debounceTime(300),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.applyFilters();
+        });
+
+        // Debounced dropdown filter changes
+        this.filterSubject.pipe(
+            debounceTime(100),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.applyFilters();
+        });
+    }
+
+    onSearchChange(value: string): void {
+        this.searchSubject.next(value);
+    }
+
+    onFilterChange(): void {
+        this.filterSubject.next();
+    }
+
+    applyFilters(): void {
+        let result = [...this.productionLines];
+
+        if (this.searchTerm) {
+            const search = this.searchTerm.toLowerCase();
+            result = result.filter(item =>
+                item.name?.toLowerCase().includes(search) ||
+                item.project_name?.toLowerCase().includes(search)
+            );
+        }
+
+        if (this.selectedProjectFilter) {
+            result = result.filter(item => item.project === this.selectedProjectFilter);
+        }
+
+        this.filteredProductionLines = result;
+        this.cdr.markForCheck();
+    }
+
+    clearFilters(): void {
+        this.searchTerm = '';
+        this.selectedProjectFilter = null;
+        this.applyFilters();
     }
 
     loadData(): void {
@@ -270,6 +342,7 @@ export class ProductionLinesComponent implements OnInit {
                     name: p.name,
                     code: p.code
                 }));
+                this.projectFilterOptions = this.projects.map(p => ({ id: p.id, name: p.name }));
             },
             error: (err) => console.error('Error loading projects:', err)
         });
@@ -278,7 +351,9 @@ export class ProductionLinesComponent implements OnInit {
         this.productionService.getProductionLines().subscribe({
             next: (data: any) => {
                 this.productionLines = data.results || data;
+                this.applyFilters();
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (error) => {
                 this.messageService.add({
@@ -287,6 +362,7 @@ export class ProductionLinesComponent implements OnInit {
                     detail: 'Failed to load production lines'
                 });
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -298,10 +374,8 @@ export class ProductionLinesComponent implements OnInit {
 
     openNew(): void {
         this.line = {
-            code: '',
             name: '',
             project: undefined,
-            capacity: 0,
             description: '',
             is_active: true
         };
@@ -325,7 +399,7 @@ export class ProductionLinesComponent implements OnInit {
     saveLine(): void {
         this.submitted = true;
 
-        if (!this.line.code || !this.line.name || !this.line.project) {
+        if (!this.line.name || !this.line.project) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Validation Error',

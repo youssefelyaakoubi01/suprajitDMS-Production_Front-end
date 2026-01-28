@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
@@ -14,9 +14,13 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
 import { DowntimeProblem } from '../../../core/models/production.model';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'manpower' | 'other';
 
@@ -38,7 +42,9 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
         ToggleSwitchModule,
         CardModule,
         ToolbarModule,
-        TooltipModule
+        TooltipModule,
+        IconFieldModule,
+        InputIconModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -51,6 +57,25 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
                     <h2 class="m-0">
                         <i class="pi pi-exclamation-triangle mr-2"></i>Problem Types Management
                     </h2>
+                </ng-template>
+                <ng-template pTemplate="center">
+                    <div class="flex align-items-center gap-2">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input
+                                pInputText
+                                type="text"
+                                [(ngModel)]="searchTerm"
+                                (ngModelChange)="onSearchChange($event)"
+                                placeholder="Search problem types..."
+                                class="w-20rem" />
+                        </p-iconfield>
+                        <p-button *ngIf="searchTerm"
+                            icon="pi pi-times"
+                            styleClass="p-button-text"
+                            (onClick)="clearFilters()">
+                        </p-button>
+                    </div>
                 </ng-template>
                 <ng-template pTemplate="right">
                     <p-button
@@ -69,20 +94,19 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
             </p-toolbar>
 
             <p-table
-                [value]="problemTypes"
+                [value]="filteredProblemTypes"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
                 [rows]="10"
                 [showCurrentPageReport]="true"
                 currentPageReportTemplate="Showing {first} to {last} of {totalRecords} problem types"
-                [globalFilterFields]="['name', 'code', 'category']"
+                [globalFilterFields]="['name', 'category']"
                 styleClass="p-datatable-sm">
 
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
                         <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
                         <th pSortableColumn="category">Category <p-sortIcon field="category"></p-sortIcon></th>
                         <th>Description</th>
@@ -94,8 +118,7 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
                 <ng-template pTemplate="body" let-problem>
                     <tr>
                         <td>{{ problem.id }}</td>
-                        <td><strong class="text-primary">{{ problem.code }}</strong></td>
-                        <td>{{ problem.name }}</td>
+                        <td><strong class="text-primary">{{ problem.name }}</strong></td>
                         <td>
                             <p-tag
                                 [value]="getCategoryLabel(problem.category)"
@@ -128,7 +151,7 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="7" class="text-center p-4">
+                        <td colspan="6" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No problem types found. Click "New Problem Type" to create one.</span>
                         </td>
@@ -147,20 +170,6 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
 
             <ng-template pTemplate="content">
                 <div class="form-grid">
-                    <div class="form-field">
-                        <label for="code">Code <span class="required">*</span></label>
-                        <input
-                            type="text"
-                            pInputText
-                            id="code"
-                            [(ngModel)]="problemType.code"
-                            required
-                            autofocus
-                            placeholder="e.g., MECH-001"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !problemType.code}" />
-                        <small class="error-message" *ngIf="submitted && !problemType.code">Code is required.</small>
-                    </div>
-
                     <div class="form-field">
                         <label for="name">Name <span class="required">*</span></label>
                         <input
@@ -248,10 +257,12 @@ type ProblemCategory = 'mechanical' | 'electrical' | 'quality' | 'material' | 'm
             align-items: center;
             gap: 1rem;
         }
-    `]
+    `],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ProblemTypesComponent implements OnInit {
+export class ProblemTypesComponent implements OnInit, OnDestroy {
     problemTypes: DowntimeProblem[] = [];
+    filteredProblemTypes: DowntimeProblem[] = [];
     problemType: Partial<DowntimeProblem> = {};
 
     categories = [
@@ -268,14 +279,60 @@ export class ProblemTypesComponent implements OnInit {
     submitted = false;
     loading = false;
 
+    // Filter properties
+    searchTerm = '';
+    private searchSubject = new Subject<string>();
+    private destroy$ = new Subject<void>();
+
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
+        this.setupSearch();
         this.loadProblemTypes();
+    }
+
+    ngOnDestroy(): void {
+        this.destroy$.next();
+        this.destroy$.complete();
+    }
+
+    private setupSearch(): void {
+        this.searchSubject.pipe(
+            debounceTime(300),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.applyFilters();
+        });
+    }
+
+    onSearchChange(value: string): void {
+        this.searchSubject.next(value);
+    }
+
+    applyFilters(): void {
+        let result = [...this.problemTypes];
+
+        if (this.searchTerm) {
+            const search = this.searchTerm.toLowerCase();
+            result = result.filter(item =>
+                item.name?.toLowerCase().includes(search) ||
+                item.description?.toLowerCase().includes(search)
+            );
+        }
+
+        this.filteredProblemTypes = result;
+        this.cdr.markForCheck();
+    }
+
+    clearFilters(): void {
+        this.searchTerm = '';
+        this.applyFilters();
     }
 
     loadProblemTypes(): void {
@@ -283,11 +340,14 @@ export class ProblemTypesComponent implements OnInit {
         this.productionService.getDowntimeProblems().subscribe({
             next: (data: any) => {
                 this.problemTypes = Array.isArray(data) ? data : data.results || [];
+                this.applyFilters();
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: () => {
                 this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load problem types' });
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -311,7 +371,6 @@ export class ProblemTypesComponent implements OnInit {
 
     openNew(): void {
         this.problemType = {
-            code: '',
             name: '',
             description: '',
             category: 'other',
@@ -337,7 +396,7 @@ export class ProblemTypesComponent implements OnInit {
     saveProblemType(): void {
         this.submitted = true;
 
-        if (!this.problemType.code || !this.problemType.name || !this.problemType.category) {
+        if (!this.problemType.name || !this.problemType.category) {
             this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Please fill all required fields' });
             return;
         }

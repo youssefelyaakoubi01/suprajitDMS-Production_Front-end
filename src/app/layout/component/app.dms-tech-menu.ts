@@ -35,9 +35,19 @@ export class AppDmsTechMenu {
                 label: 'Master Data',
                 items: [
                     {
+                        label: 'Zones',
+                        icon: 'pi pi-fw pi-map',
+                        routerLink: ['/dms-tech/zones']
+                    },
+                    {
                         label: 'Projects',
                         icon: 'pi pi-fw pi-briefcase',
                         routerLink: ['/dms-tech/projects']
+                    },
+                    {
+                        label: 'Processes',
+                        icon: 'pi pi-fw pi-sitemap',
+                        routerLink: ['/dms-tech/processes']
                     },
                     {
                         label: 'Production Lines',
@@ -58,16 +68,6 @@ export class AppDmsTechMenu {
                         label: 'Machines',
                         icon: 'pi pi-fw pi-cog',
                         routerLink: ['/dms-tech/machines']
-                    },
-                    {
-                        label: 'Zones',
-                        icon: 'pi pi-fw pi-map',
-                        routerLink: ['/dms-tech/zones']
-                    },
-                    {
-                        label: 'Processes',
-                        icon: 'pi pi-fw pi-sitemap',
-                        routerLink: ['/dms-tech/processes']
                     }
                 ]
             },
@@ -75,33 +75,6 @@ export class AppDmsTechMenu {
             {
                 label: 'Configuration',
                 items: [
-                    {
-                        label: 'Part-Line Assignments',
-                        icon: 'pi pi-fw pi-link',
-                        routerLink: ['/dms-tech/part-line-assignments'],
-                        tooltip: 'For Finished Goods'
-                    },
-                    {
-                        label: 'Part-Process Assignments',
-                        icon: 'pi pi-fw pi-share-alt',
-                        routerLink: ['/dms-tech/part-process-assignments'],
-                        tooltip: 'For Semi-Finished Products'
-                    },
-                    {
-                        label: 'Headcount Config',
-                        icon: 'pi pi-fw pi-users',
-                        routerLink: ['/dms-tech/headcount-config']
-                    },
-                    {
-                        label: 'Problem Types',
-                        icon: 'pi pi-fw pi-exclamation-triangle',
-                        routerLink: ['/dms-tech/problem-types']
-                    },
-                    {
-                        label: 'Targets',
-                        icon: 'pi pi-fw pi-chart-bar',
-                        routerLink: ['/dms-tech/targets']
-                    },
                     {
                         label: 'Shifts',
                         icon: 'pi pi-fw pi-calendar',

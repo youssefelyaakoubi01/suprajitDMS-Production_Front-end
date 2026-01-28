@@ -121,6 +121,11 @@ export class AppDmsMaintenanceMenu implements OnInit, OnDestroy {
                         label: 'Technicians',
                         icon: 'pi pi-fw pi-users',
                         routerLink: ['/dms-maintenance/technicians']
+                    },
+                    {
+                        label: 'Problem Types',
+                        icon: 'pi pi-fw pi-exclamation-triangle',
+                        routerLink: ['/dms-maintenance/problem-types']
                     }
                 ]
             },

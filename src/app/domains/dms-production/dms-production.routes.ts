@@ -22,7 +22,7 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
     {
         path: 'tracking',
         loadComponent: () =>
-            import('./features/production-tracking/production-tracking.component').then(m => m.ProductionTrackingComponent),
+            import('./features/production-tracking/production.component').then(m => m.ProductionComponent),
         title: 'Production Tracking'
     },
     {
@@ -40,13 +40,13 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
     {
         path: 'production',
         loadComponent: () =>
-            import('@features/production/production.component').then(m => m.ProductionComponent),
+            import('@/domains/dms-production/features/production-tracking/production.component').then(m => m.ProductionComponent),
         title: 'Production Entry'
     },
     {
         path: 'production-list',
         loadComponent: () =>
-            import('@features/production/production-list.component').then(m => m.ProductionListComponent),
+            import('@/domains/dms-production/features/production-list/production-list.component').then(m => m.ProductionListComponent),
         title: 'Production History'
     },
     {

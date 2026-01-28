@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
@@ -14,16 +14,17 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { MessageService, ConfirmationService } from 'primeng/api';
+import { forkJoin } from 'rxjs';
 import { ProductionService } from '../../../core/services/production.service';
 
 interface Machine {
     id?: number;
     name: string;
-    code: string;
     workstation: number;
     workstation_name?: string;
-    production_line_name?: string;
     description?: string;
     manufacturer?: string;
     model_number?: string;
@@ -50,9 +51,12 @@ interface Machine {
         ToggleSwitchModule,
         CardModule,
         ToolbarModule,
-        TooltipModule
+        TooltipModule,
+        IconFieldModule,
+        InputIconModule
     ],
     providers: [MessageService, ConfirmationService],
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <p-toast></p-toast>
         <p-confirmDialog></p-confirmDialog>
@@ -81,22 +85,37 @@ interface Machine {
             </p-toolbar>
 
             <p-table
+                #dt
                 [value]="machines"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
                 [rows]="10"
                 [showCurrentPageReport]="true"
+                [globalFilterFields]="['name', 'workstation_name', 'status', 'manufacturer', 'model_number']"
                 currentPageReportTemplate="Showing {first} to {last} of {totalRecords} machines"
                 styleClass="p-datatable-sm">
+
+                <ng-template pTemplate="caption">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xl font-semibold">Machines List</span>
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input
+                                pInputText
+                                type="text"
+                                (input)="onGlobalFilter(dt, $event)"
+                                placeholder="Search machines..."
+                                class="w-full sm:w-auto" />
+                        </p-iconfield>
+                    </div>
+                </ng-template>
 
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
                         <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
                         <th>Workstation</th>
-                        <th>Production Line</th>
                         <th style="width: 120px">Status</th>
                         <th style="width: 80px">Active</th>
                         <th style="width: 150px">Actions</th>
@@ -106,10 +125,8 @@ interface Machine {
                 <ng-template pTemplate="body" let-machine>
                     <tr>
                         <td>{{ machine.id }}</td>
-                        <td><strong class="text-primary">{{ machine.code }}</strong></td>
                         <td>{{ machine.name }}</td>
                         <td>{{ machine.workstation_name || '-' }}</td>
-                        <td>{{ machine.production_line_name || '-' }}</td>
                         <td>
                             <p-tag
                                 [value]="machine.status"
@@ -138,7 +155,7 @@ interface Machine {
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="8" class="text-center p-4">
+                        <td colspan="6" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No machines found.</span>
                         </td>
@@ -157,19 +174,6 @@ interface Machine {
 
             <ng-template pTemplate="content">
                 <div class="form-grid">
-                    <div class="form-field">
-                        <label for="code">Code <span class="required">*</span></label>
-                        <input
-                            type="text"
-                            pInputText
-                            id="code"
-                            [(ngModel)]="machine.code"
-                            required
-                            placeholder="e.g., MCH001"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !machine.code}" />
-                        <small class="error-message" *ngIf="submitted && !machine.code">Code is required.</small>
-                    </div>
-
                     <div class="form-field">
                         <label for="name">Name <span class="required">*</span></label>
                         <input
@@ -192,6 +196,9 @@ interface Machine {
                             optionLabel="name"
                             optionValue="id"
                             placeholder="Select Workstation"
+                            [filter]="true"
+                            filterBy="name"
+                            [showClear]="true"
                             [ngClass]="{'ng-invalid ng-dirty': submitted && !machine.workstation}">
                         </p-select>
                         <small class="error-message" *ngIf="submitted && !machine.workstation">Workstation is required.</small>
@@ -289,7 +296,8 @@ export class MachinesComponent implements OnInit {
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
@@ -298,27 +306,31 @@ export class MachinesComponent implements OnInit {
 
     loadData(): void {
         this.loading = true;
+        this.cdr.markForCheck();
 
-        this.productionService.getWorkstations().subscribe({
-            next: (data: any) => {
-                this.workstations = (data.results || data).map((w: any) => ({
+        forkJoin({
+            workstations: this.productionService.getWorkstations(),
+            machines: this.productionService.getMachines()
+        }).subscribe({
+            next: ({ workstations, machines }: any) => {
+                this.workstations = (workstations.results || workstations).map((w: any) => ({
                     id: w.id,
-                    name: w.name,
-                    code: w.code
+                    name: w.name
                 }));
-            }
-        });
-
-        this.productionService.getMachines().subscribe({
-            next: (data: any) => {
-                this.machines = data.results || data;
+                this.machines = machines.results || machines;
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: () => {
                 this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load machines' });
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
+    }
+
+    onGlobalFilter(table: any, event: Event): void {
+        table.filterGlobal((event.target as HTMLInputElement).value, 'contains');
     }
 
     getStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' | undefined {
@@ -333,7 +345,6 @@ export class MachinesComponent implements OnInit {
 
     openNew(): void {
         this.machine = {
-            code: '',
             name: '',
             workstation: undefined,
             status: 'operational',
@@ -359,7 +370,7 @@ export class MachinesComponent implements OnInit {
     saveMachine(): void {
         this.submitted = true;
 
-        if (!this.machine.code || !this.machine.name || !this.machine.workstation) {
+        if (!this.machine.name || !this.machine.workstation) {
             this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Please fill all required fields' });
             return;
         }
@@ -373,6 +384,7 @@ export class MachinesComponent implements OnInit {
                 },
                 error: (error) => {
                     this.messageService.add({ severity: 'error', summary: 'Error', detail: error.error?.detail || 'Failed to update' });
+                    this.cdr.markForCheck();
                 }
             });
         } else {
@@ -384,6 +396,7 @@ export class MachinesComponent implements OnInit {
                 },
                 error: (error) => {
                     this.messageService.add({ severity: 'error', summary: 'Error', detail: error.error?.detail || 'Failed to create' });
+                    this.cdr.markForCheck();
                 }
             });
         }
@@ -408,6 +421,7 @@ export class MachinesComponent implements OnInit {
             },
             error: (error) => {
                 this.messageService.add({ severity: 'error', summary: 'Error', detail: error.error?.detail || 'Failed to delete' });
+                this.cdr.markForCheck();
             }
         });
     }

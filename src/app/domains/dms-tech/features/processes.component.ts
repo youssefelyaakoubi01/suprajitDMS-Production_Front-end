@@ -22,12 +22,9 @@ import { forkJoin } from 'rxjs';
 interface Process {
     id?: number;
     name: string;
-    code: string;
     description?: string;
     project: number;
     project_name?: string;
-    sequence_order?: number;
-    cycle_time_seconds?: number;
     is_active: boolean;
     parts_count?: number;
 }
@@ -125,11 +122,8 @@ interface Project {
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th pSortableColumn="code">Code <p-sortIcon field="code"></p-sortIcon></th>
                         <th pSortableColumn="name">Name <p-sortIcon field="name"></p-sortIcon></th>
                         <th>Project</th>
-                        <th pSortableColumn="sequence_order" style="width: 120px">Sequence <p-sortIcon field="sequence_order"></p-sortIcon></th>
-                        <th style="width: 120px">Cycle Time</th>
                         <th style="width: 100px">Parts</th>
                         <th style="width: 100px">Status</th>
                         <th style="width: 150px">Actions</th>
@@ -139,17 +133,9 @@ interface Project {
                 <ng-template pTemplate="body" let-process>
                     <tr>
                         <td>{{ process.id }}</td>
-                        <td><strong class="text-primary">{{ process.code }}</strong></td>
                         <td>{{ process.name }}</td>
                         <td>
                             <p-tag [value]="process.project_name" severity="info"></p-tag>
-                        </td>
-                        <td class="text-center">
-                            <span class="font-bold">{{ process.sequence_order }}</span>
-                        </td>
-                        <td class="text-center">
-                            <span *ngIf="process.cycle_time_seconds">{{ process.cycle_time_seconds }}s</span>
-                            <span *ngIf="!process.cycle_time_seconds" class="text-gray-400">-</span>
                         </td>
                         <td class="text-center">
                             <p-tag
@@ -182,7 +168,7 @@ interface Project {
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="9" class="text-center p-4">
+                        <td colspan="6" class="text-center p-4">
                             <i class="pi pi-sitemap text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No processes found. Click "New Process" to create one.</span>
                         </td>
@@ -201,20 +187,6 @@ interface Project {
 
             <ng-template pTemplate="content">
                 <div class="form-grid">
-                    <div class="form-field">
-                        <label for="code">Code <span class="required">*</span></label>
-                        <input
-                            type="text"
-                            pInputText
-                            id="code"
-                            [(ngModel)]="process.code"
-                            required
-                            autofocus
-                            placeholder="e.g., PROC-001"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !process.code}" />
-                        <small class="error-message" *ngIf="submitted && !process.code">Code is required.</small>
-                    </div>
-
                     <div class="form-field">
                         <label for="name">Name <span class="required">*</span></label>
                         <input
@@ -240,27 +212,6 @@ interface Project {
                             [ngClass]="{'ng-invalid ng-dirty': submitted && !process.project}">
                         </p-select>
                         <small class="error-message" *ngIf="submitted && !process.project">Project is required.</small>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="sequenceOrder">Sequence Order</label>
-                        <p-inputNumber
-                            id="sequenceOrder"
-                            [(ngModel)]="process.sequence_order"
-                            [min]="0"
-                            placeholder="Order in manufacturing sequence">
-                        </p-inputNumber>
-                        <small class="help-text">Order of this process in the manufacturing sequence</small>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="cycleTime">Cycle Time (seconds)</label>
-                        <p-inputNumber
-                            id="cycleTime"
-                            [(ngModel)]="process.cycle_time_seconds"
-                            [min]="0"
-                            placeholder="Default cycle time">
-                        </p-inputNumber>
                     </div>
 
                     <div class="form-field toggle-field">
@@ -290,13 +241,6 @@ interface Project {
     styles: [`
         :host ::ng-deep .p-datatable .p-datatable-thead > tr > th {
             background-color: var(--surface-50);
-        }
-
-        .help-text {
-            display: block;
-            margin-top: 0.25rem;
-            color: var(--text-color-secondary);
-            font-size: 0.75rem;
         }
     `]
 })
@@ -357,12 +301,9 @@ export class ProcessesComponent implements OnInit {
 
     openNew(): void {
         this.process = {
-            code: '',
             name: '',
             description: '',
             project: this.selectedProjectId || undefined,
-            sequence_order: 0,
-            cycle_time_seconds: 0,
             is_active: true
         };
         this.editMode = false;
@@ -385,7 +326,7 @@ export class ProcessesComponent implements OnInit {
     saveProcess(): void {
         this.submitted = true;
 
-        if (!this.process.code || !this.process.name || !this.process.project) {
+        if (!this.process.name || !this.process.project) {
             this.messageService.add({ severity: 'warn', summary: 'Validation Error', detail: 'Please fill all required fields' });
             return;
         }

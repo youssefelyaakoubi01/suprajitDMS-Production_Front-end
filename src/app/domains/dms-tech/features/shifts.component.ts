@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
@@ -12,9 +12,13 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
 import { Shift } from '../../../core/models/production.model';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 @Component({
     selector: 'app-shifts',
@@ -32,7 +36,9 @@ import { Shift } from '../../../core/models/production.model';
         ToggleSwitchModule,
         CardModule,
         ToolbarModule,
-        TooltipModule
+        TooltipModule,
+        IconFieldModule,
+        InputIconModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -43,6 +49,25 @@ import { Shift } from '../../../core/models/production.model';
             <p-toolbar styleClass="mb-4">
                 <ng-template pTemplate="left">
                     <h2 class="m-0">Shift Management</h2>
+                </ng-template>
+                <ng-template pTemplate="center">
+                    <div class="flex align-items-center gap-2">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input
+                                pInputText
+                                type="text"
+                                [(ngModel)]="searchTerm"
+                                (ngModelChange)="onSearchChange($event)"
+                                placeholder="Search shifts..."
+                                class="w-20rem" />
+                        </p-iconfield>
+                        <p-button *ngIf="searchTerm"
+                            icon="pi pi-times"
+                            styleClass="p-button-text"
+                            (onClick)="clearFilters()">
+                        </p-button>
+                    </div>
                 </ng-template>
                 <ng-template pTemplate="right">
                     <p-button
@@ -61,7 +86,7 @@ import { Shift } from '../../../core/models/production.model';
             </p-toolbar>
 
             <p-table
-                [value]="shifts"
+                [value]="filteredShifts"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
@@ -73,7 +98,6 @@ import { Shift } from '../../../core/models/production.model';
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th>Code</th>
                         <th>Name</th>
                         <th>Start Time</th>
                         <th>End Time</th>
@@ -85,8 +109,7 @@ import { Shift } from '../../../core/models/production.model';
                 <ng-template pTemplate="body" let-shift>
                     <tr>
                         <td>{{ shift.id }}</td>
-                        <td><strong>{{ shift.code }}</strong></td>
-                        <td>{{ shift.name }}</td>
+                        <td><strong>{{ shift.name }}</strong></td>
                         <td>{{ shift.start_time }}</td>
                         <td>{{ shift.end_time }}</td>
                         <td>
@@ -120,7 +143,7 @@ import { Shift } from '../../../core/models/production.model';
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="7" class="text-center p-4">
+                        <td colspan="6" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No shifts found. Click "New Shift" to create one.</span>
                         </td>
@@ -139,10 +162,6 @@ import { Shift } from '../../../core/models/production.model';
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">ID</label>
                     <div class="text-lg">{{ selectedShift.id }}</div>
-                </div>
-                <div class="field mb-4">
-                    <label class="font-bold text-gray-600">Code</label>
-                    <div class="text-lg">{{ selectedShift.code }}</div>
                 </div>
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">Name</label>
@@ -181,20 +200,6 @@ import { Shift } from '../../../core/models/production.model';
             styleClass="p-fluid">
 
             <ng-template pTemplate="content">
-                <div class="field mb-4">
-                    <label for="code" class="font-bold">Code *</label>
-                    <input
-                        type="text"
-                        pInputText
-                        id="code"
-                        [(ngModel)]="shift.code"
-                        required
-                        autofocus
-                        placeholder="e.g., S1, S2, S3"
-                        [ngClass]="{'ng-invalid ng-dirty': submitted && !shift.code}" />
-                    <small class="p-error" *ngIf="submitted && !shift.code">Code is required.</small>
-                </div>
-
                 <div class="field mb-4">
                     <label for="name" class="font-bold">Name *</label>
                     <input
@@ -253,10 +258,12 @@ import { Shift } from '../../../core/models/production.model';
         :host ::ng-deep .p-datatable .p-datatable-thead > tr > th {
             background-color: var(--surface-50);
         }
-    `]
+    `],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ShiftsComponent implements OnInit {
+export class ShiftsComponent implements OnInit, OnDestroy {
     shifts: Shift[] = [];
+    filteredShifts: Shift[] = [];
     shift: Partial<Shift> = {};
     selectedShift: Shift | null = null;
 
@@ -266,14 +273,59 @@ export class ShiftsComponent implements OnInit {
     submitted = false;
     loading = false;
 
+    // Filter properties
+    searchTerm = '';
+    private searchSubject = new Subject<string>();
+    private destroy$ = new Subject<void>();
+
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
+        this.setupSearch();
         this.loadShifts();
+    }
+
+    ngOnDestroy(): void {
+        this.destroy$.next();
+        this.destroy$.complete();
+    }
+
+    private setupSearch(): void {
+        this.searchSubject.pipe(
+            debounceTime(300),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.applyFilters();
+        });
+    }
+
+    onSearchChange(value: string): void {
+        this.searchSubject.next(value);
+    }
+
+    applyFilters(): void {
+        let result = [...this.shifts];
+
+        if (this.searchTerm) {
+            const search = this.searchTerm.toLowerCase();
+            result = result.filter(item =>
+                item.name?.toLowerCase().includes(search)
+            );
+        }
+
+        this.filteredShifts = result;
+        this.cdr.markForCheck();
+    }
+
+    clearFilters(): void {
+        this.searchTerm = '';
+        this.applyFilters();
     }
 
     loadShifts(): void {
@@ -282,7 +334,9 @@ export class ShiftsComponent implements OnInit {
             next: (data: any) => {
                 // Handle paginated response or direct array
                 this.shifts = data.results || data;
+                this.applyFilters();
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (error) => {
                 this.messageService.add({
@@ -291,6 +345,7 @@ export class ShiftsComponent implements OnInit {
                     detail: 'Failed to load shifts'
                 });
                 this.loading = false;
+                this.cdr.markForCheck();
                 console.error('Error loading shifts:', error);
             }
         });
@@ -298,7 +353,6 @@ export class ShiftsComponent implements OnInit {
 
     openNew(): void {
         this.shift = {
-            code: '',
             name: '',
             start_time: '06:00',
             end_time: '14:00',
@@ -343,7 +397,7 @@ export class ShiftsComponent implements OnInit {
     saveShift(): void {
         this.submitted = true;
 
-        if (!this.shift.code || !this.shift.name || !this.shift.start_time || !this.shift.end_time) {
+        if (!this.shift.name || !this.shift.start_time || !this.shift.end_time) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Validation Error',

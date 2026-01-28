@@ -20,7 +20,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { CheckboxModule } from 'primeng/checkbox';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { MaintenanceService, DowntimeDeclaration } from '@core/services/maintenance.service';
-import { ProductionService } from '@features/production/production.service';
+import { ProductionService } from '@/domains/dms-production/features/production-tracking/production.service';
 import { EmployeeService } from '@core/services/employee.service';
 import { DowntimeNotificationService, AlertPriority } from '@core/services/downtime-notification.service';
 import { ProductionLine, Workstation, Machine, Zone } from '@core/models';

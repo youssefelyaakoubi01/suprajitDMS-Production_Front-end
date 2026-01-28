@@ -1,1 +1,1 @@
-export * from './production-tracking.component';
+export * from './production.component';

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
@@ -16,9 +16,13 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { SliderModule } from 'primeng/slider';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
 import { ShiftType } from '../../../core/models/production.model';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 @Component({
     selector: 'app-shift-types',
@@ -40,7 +44,9 @@ import { ShiftType } from '../../../core/models/production.model';
         ToolbarModule,
         TooltipModule,
         SliderModule,
-        ProgressBarModule
+        ProgressBarModule,
+        IconFieldModule,
+        InputIconModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -51,6 +57,25 @@ import { ShiftType } from '../../../core/models/production.model';
             <p-toolbar styleClass="mb-4">
                 <ng-template pTemplate="left">
                     <h2 class="m-0">Shift Type Management</h2>
+                </ng-template>
+                <ng-template pTemplate="center">
+                    <div class="flex align-items-center gap-2">
+                        <p-iconfield>
+                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                            <input
+                                pInputText
+                                type="text"
+                                [(ngModel)]="searchTerm"
+                                (ngModelChange)="onSearchChange($event)"
+                                placeholder="Search shift types..."
+                                class="w-20rem" />
+                        </p-iconfield>
+                        <p-button *ngIf="searchTerm"
+                            icon="pi pi-times"
+                            styleClass="p-button-text"
+                            (onClick)="clearFilters()">
+                        </p-button>
+                    </div>
                 </ng-template>
                 <ng-template pTemplate="right">
                     <p-button
@@ -69,7 +94,7 @@ import { ShiftType } from '../../../core/models/production.model';
             </p-toolbar>
 
             <p-table
-                [value]="shiftTypes"
+                [value]="filteredShiftTypes"
                 [loading]="loading"
                 [rowHover]="true"
                 [paginator]="true"
@@ -81,7 +106,6 @@ import { ShiftType } from '../../../core/models/production.model';
                 <ng-template pTemplate="header">
                     <tr>
                         <th style="width: 80px">ID</th>
-                        <th>Code</th>
                         <th>Name</th>
                         <th style="width: 200px">Target %</th>
                         <th>Description</th>
@@ -93,8 +117,7 @@ import { ShiftType } from '../../../core/models/production.model';
                 <ng-template pTemplate="body" let-shiftType>
                     <tr>
                         <td>{{ shiftType.id }}</td>
-                        <td><strong>{{ shiftType.code }}</strong></td>
-                        <td>{{ shiftType.name }}</td>
+                        <td><strong>{{ shiftType.name }}</strong></td>
                         <td>
                             <div class="flex align-items-center gap-2">
                                 <p-progressBar
@@ -138,7 +161,7 @@ import { ShiftType } from '../../../core/models/production.model';
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="7" class="text-center p-4">
+                        <td colspan="6" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No shift types found. Click "New Shift Type" to create one.</span>
                         </td>
@@ -157,10 +180,6 @@ import { ShiftType } from '../../../core/models/production.model';
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">ID</label>
                     <div class="text-lg">{{ selectedShiftType.id }}</div>
-                </div>
-                <div class="field mb-4">
-                    <label class="font-bold text-gray-600">Code</label>
-                    <div class="text-lg">{{ selectedShiftType.code }}</div>
                 </div>
                 <div class="field mb-4">
                     <label class="font-bold text-gray-600">Name</label>
@@ -208,21 +227,6 @@ import { ShiftType } from '../../../core/models/production.model';
             styleClass="p-fluid">
 
             <ng-template pTemplate="content">
-                <div class="field mb-4">
-                    <label for="code" class="font-bold">Code *</label>
-                    <input
-                        type="text"
-                        pInputText
-                        id="code"
-                        [(ngModel)]="shiftType.code"
-                        required
-                        autofocus
-                        placeholder="e.g., normal, setup, break"
-                        [ngClass]="{'ng-invalid ng-dirty': submitted && !shiftType.code}" />
-                    <small class="p-error" *ngIf="submitted && !shiftType.code">Code is required.</small>
-                    <small class="text-gray-500">Unique identifier (lowercase, no spaces recommended)</small>
-                </div>
-
                 <div class="field mb-4">
                     <label for="name" class="font-bold">Name *</label>
                     <input
@@ -295,10 +299,12 @@ import { ShiftType } from '../../../core/models/production.model';
         :host ::ng-deep .p-slider {
             width: 100%;
         }
-    `]
+    `],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ShiftTypesComponent implements OnInit {
+export class ShiftTypesComponent implements OnInit, OnDestroy {
     shiftTypes: ShiftType[] = [];
+    filteredShiftTypes: ShiftType[] = [];
     shiftType: Partial<ShiftType> = {};
     selectedShiftType: ShiftType | null = null;
 
@@ -308,14 +314,60 @@ export class ShiftTypesComponent implements OnInit {
     submitted = false;
     loading = false;
 
+    // Filter properties
+    searchTerm = '';
+    private searchSubject = new Subject<string>();
+    private destroy$ = new Subject<void>();
+
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
+        this.setupSearch();
         this.loadShiftTypes();
+    }
+
+    ngOnDestroy(): void {
+        this.destroy$.next();
+        this.destroy$.complete();
+    }
+
+    private setupSearch(): void {
+        this.searchSubject.pipe(
+            debounceTime(300),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.applyFilters();
+        });
+    }
+
+    onSearchChange(value: string): void {
+        this.searchSubject.next(value);
+    }
+
+    applyFilters(): void {
+        let result = [...this.shiftTypes];
+
+        if (this.searchTerm) {
+            const search = this.searchTerm.toLowerCase();
+            result = result.filter(item =>
+                item.name?.toLowerCase().includes(search) ||
+                item.description?.toLowerCase().includes(search)
+            );
+        }
+
+        this.filteredShiftTypes = result;
+        this.cdr.markForCheck();
+    }
+
+    clearFilters(): void {
+        this.searchTerm = '';
+        this.applyFilters();
     }
 
     loadShiftTypes(): void {
@@ -323,7 +375,9 @@ export class ShiftTypesComponent implements OnInit {
         this.productionService.getShiftTypes().subscribe({
             next: (data: any) => {
                 this.shiftTypes = data.results || data;
+                this.applyFilters();
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (error) => {
                 this.messageService.add({
@@ -332,6 +386,7 @@ export class ShiftTypesComponent implements OnInit {
                     detail: 'Failed to load shift types'
                 });
                 this.loading = false;
+                this.cdr.markForCheck();
                 console.error('Error loading shift types:', error);
             }
         });
@@ -339,7 +394,6 @@ export class ShiftTypesComponent implements OnInit {
 
     openNew(): void {
         this.shiftType = {
-            code: '',
             name: '',
             target_percentage: 100,
             description: '',
@@ -377,7 +431,7 @@ export class ShiftTypesComponent implements OnInit {
     saveShiftType(): void {
         this.submitted = true;
 
-        if (!this.shiftType.code || !this.shiftType.name || this.shiftType.target_percentage === undefined) {
+        if (!this.shiftType.name || this.shiftType.target_percentage === undefined) {
             this.messageService.add({
                 severity: 'warn',
                 summary: 'Validation Error',

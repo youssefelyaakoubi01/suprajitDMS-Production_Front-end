@@ -50,6 +50,12 @@ export class ProductionService {
         return this.api.delete<void>(`${this.endpoint}/projects/${id}`);
     }
 
+    uploadProjectImage(projectId: number, image: File): Observable<Project> {
+        const formData = new FormData();
+        formData.append('image', image, image.name);
+        return this.api.postFormData<Project>(`${this.endpoint}/projects/${projectId}/upload-image`, formData);
+    }
+
     // Production Lines
     getProductionLines(projectId?: number): Observable<ProductionLine[]> {
         const params = projectId ? { project: projectId } : undefined;
@@ -502,5 +508,27 @@ export class ProductionService {
 
     setPrimaryProcessForPart(assignmentId: number): Observable<PartProcessAssignment> {
         return this.api.post<PartProcessAssignment>(`${this.endpoint}/part-process-assignments/${assignmentId}/set_primary`, {});
+    }
+
+    // MH Configurations
+    getMHConfigurations(partId?: number): Observable<any> {
+        const params = partId ? { part: partId } : undefined;
+        return this.api.get<any>(`${this.endpoint}/mh-configurations`, params);
+    }
+
+    getMHConfiguration(id: number): Observable<any> {
+        return this.api.get<any>(`${this.endpoint}/mh-configurations/${id}`);
+    }
+
+    createMHConfiguration(data: any): Observable<any> {
+        return this.api.post<any>(`${this.endpoint}/mh-configurations`, data);
+    }
+
+    updateMHConfiguration(id: number, data: any): Observable<any> {
+        return this.api.put<any>(`${this.endpoint}/mh-configurations/${id}`, data);
+    }
+
+    deleteMHConfiguration(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/mh-configurations/${id}`);
     }
 }

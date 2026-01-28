@@ -5,11 +5,11 @@
  * Displays production hours data (Date, HP, temp Ouverture, Week Number)
  * Based on Image 5 - Simple production KPI table
  */
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 // PrimeNG v19
 import { TableModule } from 'primeng/table';
@@ -22,6 +22,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { PaginatorModule } from 'primeng/paginator';
+import { DatePickerModule } from 'primeng/datepicker';
 
 // Domain imports
 import { DmsMaintenanceService } from '../../services/maintenance.service';
@@ -41,7 +42,8 @@ import { ProductionKPIData } from '../../models';
         InputIconModule,
         InputTextModule,
         ToastModule,
-        PaginatorModule
+        PaginatorModule,
+        DatePickerModule
     ],
     providers: [MessageService],
     template: `
@@ -85,12 +87,33 @@ import { ProductionKPIData } from '../../models';
                                     pTooltip="Save">
                             </button>
                         </div>
-                        <p-iconfield iconPosition="left">
-                            <p-inputicon styleClass="pi pi-search"></p-inputicon>
-                            <input pInputText type="text"
-                                   (input)="dt.filterGlobal($any($event.target).value, 'contains')"
-                                   placeholder="Search..." />
-                        </p-iconfield>
+                        <div class="flex align-items-center gap-2">
+                            <p-iconfield iconPosition="left">
+                                <p-inputicon styleClass="pi pi-search"></p-inputicon>
+                                <input pInputText type="text"
+                                       [(ngModel)]="searchTerm"
+                                       (ngModelChange)="onSearchChange($event)"
+                                       placeholder="Search..."
+                                       class="w-10rem" />
+                            </p-iconfield>
+                            <p-datepicker
+                                [(ngModel)]="dateRange"
+                                selectionMode="range"
+                                [readonlyInput]="true"
+                                [showIcon]="true"
+                                placeholder="Date range"
+                                dateFormat="dd/mm/yy"
+                                (onSelect)="applyFilters()"
+                                (onClear)="applyFilters()"
+                                [showClear]="true"
+                                styleClass="w-14rem">
+                            </p-datepicker>
+                            <p-button *ngIf="searchTerm || (dateRange && dateRange.length)"
+                                icon="pi pi-times"
+                                styleClass="p-button-text"
+                                (onClick)="clearFilters()">
+                            </p-button>
+                        </div>
                     </div>
                 </ng-template>
 
@@ -101,7 +124,7 @@ import { ProductionKPIData } from '../../models';
                 </div>
 
                 <!-- Data Table -->
-                <p-table [value]="productionData"
+                <p-table [value]="filteredProductionData"
                          [loading]="loading"
                          [rowHover]="true"
                          [showCurrentPageReport]="true"
@@ -257,30 +280,87 @@ import { ProductionKPIData } from '../../models';
             font-weight: 600;
             color: var(--primary-color);
         }
-    `]
+    `],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProductionKpiComponent implements OnInit, OnDestroy {
     private destroy$ = new Subject<void>();
 
     productionData: ProductionKPIData[] = [];
+    filteredProductionData: ProductionKPIData[] = [];
     loading = false;
 
     currentPage = 1;
     totalPages = 3;
     selectedRowIndex: number | null = null;
 
+    // Filter properties
+    searchTerm = '';
+    dateRange: Date[] | null = null;
+    private searchSubject = new Subject<string>();
+
     constructor(
         private maintenanceService: DmsMaintenanceService,
-        private messageService: MessageService
+        private messageService: MessageService,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
+        this.setupSearch();
         this.loadData();
     }
 
     ngOnDestroy(): void {
         this.destroy$.next();
         this.destroy$.complete();
+    }
+
+    private setupSearch(): void {
+        this.searchSubject.pipe(
+            debounceTime(300),
+            distinctUntilChanged(),
+            takeUntil(this.destroy$)
+        ).subscribe(() => {
+            this.applyFilters();
+        });
+    }
+
+    onSearchChange(value: string): void {
+        this.searchSubject.next(value);
+    }
+
+    applyFilters(): void {
+        let result = [...this.productionData];
+
+        if (this.searchTerm) {
+            const search = this.searchTerm.toLowerCase();
+            result = result.filter(item =>
+                item.hp?.toString().includes(search) ||
+                item.weekNumber?.toString().includes(search) ||
+                item.tempOuverture?.toString().includes(search)
+            );
+        }
+
+        if (this.dateRange && this.dateRange.length === 2 && this.dateRange[0] && this.dateRange[1]) {
+            const startDate = new Date(this.dateRange[0]);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(this.dateRange[1]);
+            endDate.setHours(23, 59, 59, 999);
+
+            result = result.filter(item => {
+                const itemDate = new Date(item.date);
+                return itemDate >= startDate && itemDate <= endDate;
+            });
+        }
+
+        this.filteredProductionData = result;
+        this.cdr.markForCheck();
+    }
+
+    clearFilters(): void {
+        this.searchTerm = '';
+        this.dateRange = null;
+        this.applyFilters();
     }
 
     loadData(): void {
@@ -290,10 +370,13 @@ export class ProductionKpiComponent implements OnInit, OnDestroy {
             .subscribe({
                 next: (data) => {
                     this.productionData = data;
+                    this.applyFilters();
                     this.loading = false;
+                    this.cdr.markForCheck();
                 },
                 error: () => {
                     this.loading = false;
+                    this.cdr.markForCheck();
                     this.messageService.add({
                         severity: 'error',
                         summary: 'Error',

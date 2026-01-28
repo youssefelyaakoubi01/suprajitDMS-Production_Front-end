@@ -33,10 +33,10 @@ import { ConfirmPopupModule } from 'primeng/confirmpopup';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { ProductionService } from './production.service';
-import { EmployeeService } from '../../core/services/employee.service';
-import { HRService } from '../../core/services/hr.service';
-import { EmployeePrimaryAssignment } from '../../domains/dms-rh/models/assignment.model';
-import { NonQualifiedAssignmentCreate, QualificationCheckResult } from '../../domains/dms-rh/models/non-qualified-assignment.model';
+import { EmployeeService } from '../../../../core/services/employee.service';
+import { HRService } from '../../../../core/services/hr.service';
+import { EmployeePrimaryAssignment } from '../../../dms-rh/models/assignment.model';
+import { NonQualifiedAssignmentCreate, QualificationCheckResult } from '../../../dms-rh/models/non-qualified-assignment.model';
 import {
     Project,
     ProductionLine,
@@ -50,7 +50,7 @@ import {
     Zone,
     Process,
     PRODUCT_TYPE_OPTIONS
-} from '../../core/models';
+} from '../../../../core/models';
 import {
     ShiftProductionSession,
     HourlyProductionState,
@@ -60,10 +60,10 @@ import {
     HourType,
     WorkflowStep,
     MeterItem
-} from '../../core/models/production-session.model';
-import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '../../core/models/employee.model';
-import { environment } from '../../../environments/environment';
-import { TeamAssignmentStateService } from '../../core/state/team-assignment-state.service';
+} from '../../../../core/models/production-session.model';
+import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '../../../../core/models/employee.model';
+import { environment } from '../../../../../environments/environment';
+import { TeamAssignmentStateService } from '../../../../core/state/team-assignment-state.service';
 
 // Export libraries
 import jsPDF from 'jspdf';
@@ -286,6 +286,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
     private orderNoChange$ = new Subject<string>();
     private destroy$ = new Subject<void>();
     isUpdatingOrderNo = false;
+
+    // Flag to prevent circular reset when productType is set from part selection
+    private isSettingProductTypeFromPart = false;
 
     // Mode (from query params)
     mode: 'new' | 'view' | 'edit' = 'new';
@@ -1438,10 +1441,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Watch for partNumber changes - auto-set productType from part's product_type
         this.shiftSetupForm.get('partNumber')?.valueChanges.subscribe((part: Part) => {
             if (part?.product_type) {
-                // Auto-populate productType from the selected part
-                this.shiftSetupForm.get('productType')?.setValue(part.product_type, { emitEvent: true });
-                // Note: The productType valueChanges subscription will trigger
-                // updateValidationByProductType() automatically, making process required for semi-finished
+                // Set flag to prevent onProductTypeChange() from resetting partNumber
+                // This is needed because PrimeNG's (onChange) event still fires even with emitEvent: false
+                this.isSettingProductTypeFromPart = true;
+                this.shiftSetupForm.get('productType')?.setValue(part.product_type, { emitEvent: false });
+                // Manually update validation since emitEvent is false
+                this.updateValidationByProductType(part.product_type);
+                // Reset flag after a microtask to allow PrimeNG onChange to complete
+                setTimeout(() => this.isSettingProductTypeFromPart = false, 0);
             }
         });
 
@@ -1504,7 +1511,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 if (results.shiftTypes && results.shiftTypes.length > 0) {
                     this.hourTypeOptions = results.shiftTypes.map(st => ({
                         label: `${st.name} (${st.target_percentage}%)`,
-                        value: st.code
+                        value: st.name
                     }));
                     console.log('Updated hourTypeOptions:', this.hourTypeOptions);
                     // Synchronize existing hours with valid shift type codes (with delay to ensure hours are loaded)
@@ -1541,6 +1548,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     onProductTypeChange(): void {
+        // Skip reset if productType was set programmatically from part selection
+        // This prevents a circular reset bug where selecting a part auto-sets productType,
+        // which triggers this method and clears the just-selected part
+        if (this.isSettingProductTypeFromPart) {
+            return;
+        }
+
         const project = this.shiftSetupForm.get('project')?.value;
         const productType = this.shiftSetupForm.get('productType')?.value;
 
@@ -1557,6 +1571,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 // Semi-finished: load processes, clear production lines
                 this.loadProcesses(project.Id_Project);
                 this.productionLines = [];
+                // Load parts filtered by semi_finished type
+                this.loadParts(project.Id_Project, productType);
             } else if (productType === 'finished_good') {
                 // Finished good: load production lines, clear processes
                 this.loadProductionLines(project.Id_Project);
@@ -2572,7 +2588,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         console.log(`Hour ${hour.hour} type set to: ${hour.hourType}`);
 
         // Recalculate target based on hour type using dynamic ShiftType percentage
-        const shiftType = this.shiftTypes.find(st => st.code === newType);
+        const shiftType = this.shiftTypes.find(st => st.name === newType);
         const targetPercentage = shiftType?.target_percentage ?? 100;
         hour.target = Math.round(baseTarget * (targetPercentage / 100));
 
@@ -2628,7 +2644,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     getHourTypeLabel(type: HourType): string {
         // First try to find in loaded shiftTypes
-        const shiftType = this.shiftTypes.find(st => st.code === type);
+        const shiftType = this.shiftTypes.find(st => st.name === type);
         if (shiftType) {
             return `${shiftType.name} (${shiftType.target_percentage}%)`;
         }
@@ -2642,7 +2658,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     getHourTypeSeverity(type: HourType): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
-        const shiftType = this.shiftTypes.find(st => st.code === type);
+        const shiftType = this.shiftTypes.find(st => st.name === type);
         if (shiftType) {
             // Color based on target percentage
             if (shiftType.target_percentage >= 100) return 'success';
@@ -2662,14 +2678,14 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     getDefaultHourType(): HourType {
-        // Return the code of the first ShiftType with 100% target, or the first available
+        // Return the name of the first ShiftType with 100% target, or the first available
         const normalType = this.shiftTypes.find(st => st.target_percentage === 100);
         if (normalType) {
-            return normalType.code as HourType;
+            return normalType.name as HourType;
         }
         // Fallback to first available ShiftType
         if (this.shiftTypes.length > 0) {
-            return this.shiftTypes[0].code as HourType;
+            return this.shiftTypes[0].name as HourType;
         }
         // Return empty string if no shift types loaded yet - will be synced later
         return '' as HourType;
@@ -2680,7 +2696,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
         if (!this.session.hours || this.session.hours.length === 0) return;
         if (this.shiftTypes.length === 0) return; // Don't sync if no shift types loaded
 
-        const validCodes = this.shiftTypes.map(st => st.code);
+        const validCodes = this.shiftTypes.map(st => st.name);
         const defaultType = this.getDefaultHourType();
 
         console.log('Valid shift type codes:', validCodes);
@@ -3058,9 +3074,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Mark hour as in progress
         hour.status = 'in_progress';
 
-        // Find the ShiftType based on the hour_type code (case-insensitive)
+        // Find the ShiftType based on the hour_type name (case-insensitive)
         const shiftType = this.shiftTypes.find(st =>
-            st.code.toLowerCase() === (hour.hourType || '').toLowerCase()
+            st.name.toLowerCase() === (hour.hourType || '').toLowerCase()
         );
 
         // Backend expects lowercase hour_type values: 'normal', 'setup', 'break', 'extra_hour_break'

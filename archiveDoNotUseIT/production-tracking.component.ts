@@ -126,7 +126,7 @@ interface HourOption {
                         </p-select>
                     </div>
                     <div class="col-12 md:col-4 lg:col-2">
-                        <label class="block mb-2 font-medium">Part Number</label>
+                        <label class="block mb-2 font-medium">Youssef</label>
                         <p-select [options]="parts" formControlName="partId"
                                   optionLabel="PN_Part" optionValue="Id_Part"
                                   placeholder="Select Part" styleClass="w-full"

@@ -61,40 +61,10 @@ export const DMS_TECH_ROUTES: Routes = [
         title: 'Workstations Management'
     },
     {
-        path: 'targets',
-        loadComponent: () =>
-            import('./features/targets.component').then(m => m.TargetsComponent),
-        title: 'Targets Configuration'
-    },
-    {
-        path: 'part-line-assignments',
-        loadComponent: () =>
-            import('./features/part-line-assignments.component').then(m => m.PartLineAssignmentsComponent),
-        title: 'Part-Line Assignments'
-    },
-    {
         path: 'processes',
         loadComponent: () =>
             import('./features/processes.component').then(m => m.ProcessesComponent),
         title: 'Processes Management'
-    },
-    {
-        path: 'part-process-assignments',
-        loadComponent: () =>
-            import('./features/part-process-assignments.component').then(m => m.PartProcessAssignmentsComponent),
-        title: 'Part-Process Assignments'
-    },
-    {
-        path: 'headcount-config',
-        loadComponent: () =>
-            import('./features/headcount-config.component').then(m => m.HeadcountConfigComponent),
-        title: 'Headcount Configuration'
-    },
-    {
-        path: 'problem-types',
-        loadComponent: () =>
-            import('./features/problem-types.component').then(m => m.ProblemTypesComponent),
-        title: 'Problem Types Management'
     },
     {
         path: 'shifts',
@@ -107,6 +77,12 @@ export const DMS_TECH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/shift-types.component').then(m => m.ShiftTypesComponent),
         title: 'Shift Types Management'
+    },
+    {
+        path: 'mh-calculator',
+        loadComponent: () =>
+            import('./features/mh-calculator.component').then(m => m.MHCalculatorComponent),
+        title: 'MH Calculator'
     }
 ];
 

@@ -14,10 +14,10 @@ import {
     Downtime,
     Zone,
     Process
-} from '../../core/models';
-import { EmployeeWithAssignment } from '../../core/models/employee.model';
-import { ProductionService as CoreProductionService } from '../../core/services/production.service';
-import { environment } from '../../../environments/environment';
+} from '../../../../core/models';
+import { EmployeeWithAssignment } from '../../../../core/models/employee.model';
+import { ProductionService as CoreProductionService } from '../../../../core/services/production.service';
+import { environment } from '../../../../../environments/environment';
 
 @Injectable({
     providedIn: 'root'
