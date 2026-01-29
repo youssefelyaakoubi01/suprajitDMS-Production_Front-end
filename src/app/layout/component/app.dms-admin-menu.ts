@@ -41,7 +41,24 @@ export class AppDmsAdminMenu {
                     {
                         label: 'Activity Logs',
                         icon: 'pi pi-fw pi-history',
-                        routerLink: ['/dms-admin/activity-logs']
+                        items: [
+                            {
+                                label: 'User Activity',
+                                icon: 'pi pi-fw pi-users',
+                                routerLink: ['/dms-admin/activity-logs']
+                            },
+                            {
+                                label: 'DMS-Tech',
+                                icon: 'pi pi-fw pi-cog',
+                                items: [
+                                    {
+                                        label: 'Parts History',
+                                        icon: 'pi pi-fw pi-box',
+                                        routerLink: ['/dms-admin/activity-logs/parts-history']
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     {
                         label: 'Data Import',

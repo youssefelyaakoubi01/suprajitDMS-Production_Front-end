@@ -531,4 +531,42 @@ export class ProductionService {
     deleteMHConfiguration(id: number): Observable<void> {
         return this.api.delete<void>(`${this.endpoint}/mh-configurations/${id}`);
     }
+
+    // Part History
+    getPartHistory(params?: {
+        part_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+        part_number?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/part-history`, params);
+    }
+
+    getPartHistoryByPart(partId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/part-history/by_part`, { part_id: partId });
+    }
+
+    getPartHistoryByUser(user: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/part-history/by_user`, { user });
+    }
+
+    getPartHistoryByProject(projectId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/part-history/by_project`, { project_id: projectId });
+    }
+
+    getPartHistoryUsers(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/part-history/users`);
+    }
+
+    exportPartHistory(params?: {
+        part_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/part-history/export`, params);
+    }
 }

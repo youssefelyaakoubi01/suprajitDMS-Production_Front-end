@@ -52,7 +52,7 @@ interface ModuleConfig {
                         </div>
 
                         <!-- Login Form -->
-                        <div class="mb-6">
+                        <form (ngSubmit)="onLogin()" class="mb-6">
                             <div class="text-center mb-6">
                                 <span class="text-surface-600 dark:text-surface-300 text-xl font-semibold">{{ moduleConfig.loginLabel }}</span>
                             </div>
@@ -61,6 +61,7 @@ interface ModuleConfig {
                             <input
                                 pInputText
                                 id="username"
+                                name="username"
                                 type="text"
                                 placeholder="Enter your username"
                                 class="w-full md:w-120 mb-6"
@@ -70,6 +71,7 @@ interface ModuleConfig {
                             <label for="password" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
                             <p-password
                                 id="password"
+                                name="password"
                                 [(ngModel)]="password"
                                 placeholder="Enter your password"
                                 [toggleMask]="true"
@@ -81,7 +83,7 @@ interface ModuleConfig {
 
                             <div class="flex items-center justify-between mt-2 mb-6 gap-8">
                                 <div class="flex items-center">
-                                    <p-checkbox [(ngModel)]="rememberMe" id="rememberMe" binary class="mr-2"></p-checkbox>
+                                    <p-checkbox [(ngModel)]="rememberMe" id="rememberMe" name="rememberMe" binary class="mr-2"></p-checkbox>
                                     <label for="rememberMe" class="text-surface-900 dark:text-surface-0">Remember me</label>
                                 </div>
                             </div>
@@ -111,7 +113,7 @@ interface ModuleConfig {
                                     (click)="onScanBadge()">
                                 </p-button>
                             </ng-container>
-                        </div>
+                        </form>
 
                         <!-- Back to Home -->
                         <div class="text-center mb-4">

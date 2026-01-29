@@ -83,6 +83,12 @@ export const DMS_TECH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/mh-calculator.component').then(m => m.MHCalculatorComponent),
         title: 'MH Calculator'
+    },
+    {
+        path: 'parts-history',
+        loadComponent: () =>
+            import('./features/parts-history.component').then(m => m.PartsHistoryComponent),
+        title: 'Parts History'
     }
 ];
 

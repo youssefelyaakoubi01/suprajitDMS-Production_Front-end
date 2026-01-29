@@ -32,6 +32,13 @@ export const DMS_ADMIN_ROUTES: Routes = [
         title: 'Logs d\'activité'
     },
     {
+        path: 'activity-logs/parts-history',
+        loadComponent: () =>
+            import('../dms-tech/features/parts-history.component')
+                .then(m => m.PartsHistoryComponent),
+        title: 'Parts History'
+    },
+    {
         path: 'positions',
         loadComponent: () =>
             import('./features/positions/positions-list.component')

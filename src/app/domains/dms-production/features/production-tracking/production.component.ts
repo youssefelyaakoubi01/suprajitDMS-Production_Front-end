@@ -1447,8 +1447,13 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 this.shiftSetupForm.get('productType')?.setValue(part.product_type, { emitEvent: false });
                 // Manually update validation since emitEvent is false
                 this.updateValidationByProductType(part.product_type);
-                // Reset flag after a microtask to allow PrimeNG onChange to complete
-                setTimeout(() => this.isSettingProductTypeFromPart = false, 0);
+                // Reset flag after a longer delay to guarantee PrimeNG's async change detection completes
+                // Using Promise.resolve().then() + setTimeout ensures we wait for both microtask and macrotask queues
+                Promise.resolve().then(() => {
+                    setTimeout(() => {
+                        this.isSettingProductTypeFromPart = false;
+                    }, 50);
+                });
             }
         });
 
@@ -1619,15 +1624,22 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
     onProcessChange(): void {
         const process = this.shiftSetupForm.get('process')?.value;
+        const currentPart = this.shiftSetupForm.get('partNumber')?.value;
 
-        // Reset part selection when process changes
-        this.shiftSetupForm.patchValue({ partNumber: null });
+        // Reset part selection when process changes (use emitEvent: false to avoid triggering valueChanges)
+        this.shiftSetupForm.patchValue({ partNumber: null }, { emitEvent: false });
 
         if (process) {
             // Load parts associated with this process
             this.productionService.getPartsByProcess(process.id).subscribe({
                 next: (parts) => {
                     this.parts = parts;
+                    // Restore selection if the part is still valid in the new parts list
+                    if (currentPart && parts.some(p => p.Id_Part === currentPart.Id_Part)) {
+                        // Find the matching part object from the new array (to ensure reference equality with compareWith)
+                        const matchingPart = parts.find(p => p.Id_Part === currentPart.Id_Part);
+                        this.shiftSetupForm.patchValue({ partNumber: matchingPart }, { emitEvent: false });
+                    }
                 },
                 error: (err) => {
                     console.error('Error loading parts by process:', err);
@@ -1823,8 +1835,17 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 console.log('Already in team:', existingInTeam, 'Employee ID:', employee.id);
 
                 // Check if employee is NOT an operator (non-operators don't need workstation/qualification checks)
-                const category = (employee.category || employee.Categorie_Emp || '').toLowerCase();
-                const isOperator = category === 'operator' || category === 'operateur' || category === 'op';
+                // IMPORTANT: Prioritize custom category (Categorie_Emp, category_fk_detail) over default model field (category)
+                // The backend returns "category" with default value "operator" even for non-operators
+                const category = (
+                    employee.Categorie_Emp ||                    // Custom category from serializer method field
+                    employee.category_fk_detail?.name ||         // FK detail object
+                    employee.category ||                         // Default model field (fallback)
+                    ''
+                ).toLowerCase().trim();
+                const isOperator = category.includes('operator') ||
+                                   category.includes('operateur') ||
+                                   category.includes('opérateur');
                 console.log('Employee category:', category, 'isOperator:', isOperator);
 
                 if (!isOperator) {
@@ -1848,7 +1869,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         Prenom_Emp: employee.first_name,
                         DateNaissance_Emp: employee.date_of_birth ? new Date(employee.date_of_birth) : new Date(),
                         Genre_Emp: employee.gender,
-                        Categorie_Emp: employee.category,
+                        Categorie_Emp: employee.Categorie_Emp || employee.category_fk_detail?.name || employee.category,
                         DateEmbauche_Emp: new Date(employee.hire_date),
                         Departement_Emp: employee.department,
                         Picture: this.getEmployeePictureUrl(employee.picture),
@@ -1856,7 +1877,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         BadgeNumber: employee.badge_number || employee.BadgeNumber,
                         badgeId: cleanBadgeId,
                         workstation: employee.department || 'N/A',
-                        qualification: employee.category || 'Staff',
+                        qualification: employee.Categorie_Emp || employee.category_fk_detail?.name || employee.category || 'Staff',
                         qualificationLevel: 3, // Non-operators are considered qualified
                         role: roleFromCategory
                     };
@@ -3929,6 +3950,17 @@ export class ProductionComponent implements OnInit, OnDestroy {
      * Get qualification status label based on validity and end date
      */
     getQualificationStatusLabel(emp: EmployeeWithAssignment): string {
+        // Check if operator by category pattern (same logic as isOperator detection)
+        const category = (emp.Categorie_Emp || '').toLowerCase();
+        const isOperatorByCategory = category.includes('operator') ||
+                                      category.includes('operateur') ||
+                                      category.includes('opérateur') ||
+                                      category === '';
+        // Non-operators don't need qualification status
+        if (!isOperatorByCategory) {
+            return '-';
+        }
+
         if (emp.isNonQualified || !emp.qualificationValid) {
             return 'Expired';
         }
@@ -3949,7 +3981,18 @@ export class ProductionComponent implements OnInit, OnDestroy {
     /**
      * Get qualification status severity for tag color
      */
-    getQualificationStatusSeverity(emp: EmployeeWithAssignment): 'success' | 'warn' | 'danger' {
+    getQualificationStatusSeverity(emp: EmployeeWithAssignment): 'success' | 'warn' | 'danger' | 'secondary' {
+        // Check if operator by category pattern (same logic as isOperator detection)
+        const category = (emp.Categorie_Emp || '').toLowerCase();
+        const isOperatorByCategory = category.includes('operator') ||
+                                      category.includes('operateur') ||
+                                      category.includes('opérateur') ||
+                                      category === '';
+        // Non-operators: neutral color (grey)
+        if (!isOperatorByCategory) {
+            return 'secondary';
+        }
+
         if (emp.isNonQualified || !emp.qualificationValid) {
             return 'danger';
         }

@@ -60,6 +60,11 @@ export class AppDmsTechMenu {
                         routerLink: ['/dms-tech/parts']
                     },
                     {
+                        label: 'Parts History',
+                        icon: 'pi pi-fw pi-history',
+                        routerLink: ['/dms-tech/parts-history']
+                    },
+                    {
                         label: 'Workstations',
                         icon: 'pi pi-fw pi-desktop',
                         routerLink: ['/dms-tech/workstations']

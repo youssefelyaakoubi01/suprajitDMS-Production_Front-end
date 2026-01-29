@@ -12,7 +12,7 @@ import { AppDmsMaintenanceLayout } from './app/layout/component/app.dms-maintena
 import { AppDmsTechLayout } from './app/layout/component/app.dms-tech-layout';
 import { AppDmsAdminLayout } from './app/layout/component/app.dms-admin-layout';
 import { adminGuard } from './app/core/guards/admin.guard';
-import { productionGuard, hrGuard } from './app/core/guards/module-access.guard';
+import { productionGuard, hrGuard, techGuard } from './app/core/guards/module-access.guard';
 
 export const appRoutes: Routes = [
     {
@@ -86,6 +86,7 @@ export const appRoutes: Routes = [
         path: 'dms-tech',
         component: AppDmsTechLayout,
         title: 'DMS Tech - Configuration',
+        canActivate: [techGuard],
         loadChildren: () => import('./app/domains/dms-tech/dms-tech.routes').then(m => m.DMS_TECH_ROUTES)
     },
     // ==================== DMS ADMIN ====================
