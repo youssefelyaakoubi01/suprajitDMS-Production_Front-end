@@ -90,12 +90,6 @@ interface ConfigCard {
                         styleClass="w-full p-button-outlined"
                         routerLink="/dms-tech/parts">
                     </p-button>
-                    <p-button
-                        label="Configure Targets"
-                        icon="pi pi-sliders-h"
-                        styleClass="w-full p-button-outlined"
-                        routerLink="/dms-tech/targets">
-                    </p-button>
                 </div>
             </div>
         </div>
@@ -299,14 +293,6 @@ export class TechDashboardComponent implements OnInit {
             count: 0,
             description: 'Manage workstations per production line',
             color: '#EC4899'
-        },
-        {
-            title: 'Targets & Headcount',
-            icon: 'pi pi-chart-bar',
-            route: '/dms-tech/targets',
-            count: 0,
-            description: 'Set hourly targets and headcount requirements',
-            color: '#EF4444'
         }
     ];
 
