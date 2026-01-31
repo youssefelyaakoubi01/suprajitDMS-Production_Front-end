@@ -123,6 +123,14 @@
     }
 }
 
+.employees-list {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
 .action-buttons {
     display: flex;
     gap: 0.25rem;

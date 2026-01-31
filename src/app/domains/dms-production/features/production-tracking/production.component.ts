@@ -149,8 +149,11 @@ export class ProductionComponent implements OnInit, OnDestroy {
     teamAssignmentForm!: FormGroup;
 
     // Reference Data
+    today: Date = new Date();
     shifts: Shift[] = [];
     projects: Project[] = [];
+    allProjects: Project[] = [];        // Stores all projects for filtering
+    filteredProjects: Project[] = [];   // Projects filtered by zone
     productionLines: ProductionLine[] = [];
     processes: Process[] = [];  // For semi-finished products
     parts: Part[] = [];
@@ -172,6 +175,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
     selectedMachineForAssignment: Machine | null = null;
     filteredMachinesForAssignment: Machine[] = [];
     selectedRole: ProductionRole = 'operator';
+    filteredMachinesForDowntime: Machine[] = [];
     roleOptions: ProductionRoleOption[] = [
         { label: 'Operator', value: 'operator', icon: 'pi pi-user' },
         { label: 'Line Leader', value: 'line_leader', icon: 'pi pi-star' },
@@ -815,6 +819,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                         if (this.teamState.team().length === 0) {
                             console.log('Syncing session.team to teamState:', this.session.team.length, 'members');
                             this.teamState.setTeam(this.session.team);
+                            this.updateFilteredMachinesForDowntime();
                         }
                         this.session.isTeamComplete = true;
                     } else {
@@ -993,6 +998,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                             this.session.isTeamComplete = true;
                             // Sync to teamState for reactive UI updates
                             this.teamState.setTeam(localStorageTeam);
+                            this.updateFilteredMachinesForDowntime();
                             this.messageService.add({
                                 severity: 'success',
                                 summary: 'Team Restored',
@@ -1147,6 +1153,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 this.session.team = localStorageTeam;
                 this.session.isTeamComplete = true;
                 this.teamState.setTeam(localStorageTeam);
+                this.updateFilteredMachinesForDowntime();
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Team Restored',
@@ -1171,6 +1178,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 // Ensure teamState is in sync
                 if (this.teamState.team().length === 0) {
                     this.teamState.setTeam(this.session.team);
+                    this.updateFilteredMachinesForDowntime();
                 }
                 this.session.isTeamComplete = true;
             } else {
@@ -1181,6 +1189,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     this.session.team = localStorageTeam;
                     this.session.isTeamComplete = true;
                     this.teamState.setTeam(localStorageTeam);
+                    this.updateFilteredMachinesForDowntime();
                 }
             }
         } else if (totalAssignmentsFound > 0) {
@@ -1466,6 +1475,28 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 console.log('Session date updated to:', date);
             }
         });
+
+        // Watch for zone changes - filter projects by selected zone
+        this.shiftSetupForm.get('zone')?.valueChanges.subscribe((zone: Zone) => {
+            if (zone) {
+                // Filter projects by the selected zone
+                this.filteredProjects = this.allProjects.filter(p => p.zone === zone.id);
+            } else {
+                // If no zone selected, show all projects
+                this.filteredProjects = [...this.allProjects];
+            }
+            // Reset the project selection and all dependent fields
+            this.shiftSetupForm.patchValue({
+                project: null,
+                productionLine: null,
+                process: null,
+                partNumber: null
+            }, { emitEvent: false });
+            // Clear dependent data lists
+            this.productionLines = [];
+            this.processes = [];
+            this.parts = [];
+        });
     }
 
     /**
@@ -1509,6 +1540,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
             next: (results) => {
                 this.shifts = results.shifts;
                 this.projects = results.projects;
+                this.allProjects = results.projects;           // Store all projects for filtering
+                this.filteredProjects = results.projects;      // Initially, show all projects
                 this.downtimeProblems = results.downtimeProblems;
                 this.zones = results.zones;
 
@@ -1666,7 +1699,41 @@ export class ProductionComponent implements OnInit, OnDestroy {
     loadMachines(lineId: number): void {
         this.productionService.getMachinesByProductionLine(lineId).subscribe(machines => {
             this.machines = machines;
+            this.updateFilteredMachinesForDowntime();
         });
+    }
+
+    /**
+     * Filter machines based on workstations used by employees in the current team.
+     * Only machines belonging to workstations where team members are assigned will be shown.
+     */
+    updateFilteredMachinesForDowntime(): void {
+        const currentTeam = this.teamState.team();
+
+        if (!currentTeam || currentTeam.length === 0) {
+            // No team members - show all machines as fallback
+            this.filteredMachinesForDowntime = [...this.machines];
+            return;
+        }
+
+        // Collect all workstation IDs from team members
+        const employeeWorkstationIds = new Set<number>();
+        for (const emp of currentTeam) {
+            if (emp.workstationId) {
+                employeeWorkstationIds.add(emp.workstationId);
+            }
+        }
+
+        // If no team member has a workstation assigned, show all machines
+        if (employeeWorkstationIds.size === 0) {
+            this.filteredMachinesForDowntime = [...this.machines];
+            return;
+        }
+
+        // Filter machines whose workstation is in the list
+        this.filteredMachinesForDowntime = this.machines.filter(
+            machine => employeeWorkstationIds.has(machine.workstation)
+        );
     }
 
     loadShiftsForProductionLine(lineId: number): void {
@@ -1951,6 +2018,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
         this.saveSessionToStorage();
         console.log('Session saved. teamState.team().length:', this.teamState.team().length);
 
+        // Update filtered machines for downtime based on new team member's workstation
+        this.updateFilteredMachinesForDowntime();
+
         // Reset form
         this.employeeIdScan = '';
         this.selectedWorkstation = null;
@@ -2156,6 +2226,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     detail: `${employee.first_name} ${employee.last_name} réaffecté(e) à ${newAssignment.workstation}`
                 });
                 this.saveSessionToStorage();
+                this.updateFilteredMachinesForDowntime();
             } else {
                 // New assignment
                 this.finalizeEmployeeAssignment(newAssignment, employee, badgeId);
@@ -2299,6 +2370,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 detail: `${employee.first_name} ${employee.last_name} réaffecté(e) à ${newAssignment.workstation}${newAssignment.machine ? ' - ' + newAssignment.machine : ''}`
             });
             this.saveSessionToStorage();
+            this.updateFilteredMachinesForDowntime();
         } else {
             // New assignment
             this.finalizeEmployeeAssignment(newAssignment, employee, badgeId);
@@ -2446,6 +2518,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Save session to localStorage
         this.saveSessionToStorage();
+
+        // Update filtered machines for downtime after removing team member
+        this.updateFilteredMachinesForDowntime();
     }
 
     onWorkstationChange(): void {
@@ -2835,6 +2910,9 @@ export class ProductionComponent implements OnInit, OnDestroy {
 
         // Initialize per-hour team confirmation
         this.initializeHourTeam(hourIndex);
+
+        // Update filtered machines for downtime based on current team
+        this.updateFilteredMachinesForDowntime();
 
         this.showHourDialog = true;
     }
@@ -3727,6 +3805,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
             return;
         }
 
+        // Validate Problem Category is required
+        if (!this.newDowntimeInput.problemId || this.newDowntimeInput.problemId === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Required Field',
+                detail: 'Problem category is required'
+            });
+            return;
+        }
+
         // Validate Description is required
         if (!this.newDowntimeInput.comment || this.newDowntimeInput.comment.trim() === '') {
             this.messageService.add({
@@ -3824,6 +3912,16 @@ export class ProductionComponent implements OnInit, OnDestroy {
                 severity: 'warn',
                 summary: 'Invalid Input',
                 detail: 'Please enter a valid duration'
+            });
+            return;
+        }
+
+        // Validate Problem Category is required
+        if (!this.downtimeInput.Id_DowntimeProblems || this.downtimeInput.Id_DowntimeProblems === 0) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Required Field',
+                detail: 'Problem category is required'
             });
             return;
         }
@@ -4224,6 +4322,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             if (this.session.team && this.session.team.length > 0) {
                 console.log('Restoring main team to teamState:', this.session.team.length, 'employees');
                 this.teamState.setTeam(this.session.team);
+                this.updateFilteredMachinesForDowntime();
 
                 // Ensure isTeamComplete is set if team has members
                 if (!this.session.isTeamComplete) {
@@ -4238,6 +4337,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
                     console.log('Fallback: Loaded team from teamState localStorage:', fallbackTeam.length, 'employees');
                     this.session.team = fallbackTeam;
                     this.session.isTeamComplete = true;
+                    this.updateFilteredMachinesForDowntime();
                 }
             }
 

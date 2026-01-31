@@ -211,6 +211,50 @@
             <!-- Actual Form -->
             <form *ngIf="!isLoadingReferenceData" [formGroup]="shiftSetupForm" class="setup-form">
                 <div class="form-grid">
+                    <!-- Zone - First field (optional, filters projects) -->
+                    <div class="form-field">
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="zone"
+                                formControlName="zone"
+                                [options]="zones"
+                                optionLabel="name"
+                                placeholder="Select Zone"
+                                [filter]="true"
+                                filterBy="name"
+                                filterPlaceholder="Rechercher une zone..."
+                                [showClear]="true"
+                                appendTo="body"
+                                styleClass="w-full">
+                            </p-select>
+                            <label for="zone">Zone</label>
+                        </p-floatLabel>
+                        <small class="text-color-secondary text-xs mt-1">Filtrer les projets par zone</small>
+                    </div>
+
+                    <!-- Project - Filtered by zone selection -->
+                    <div class="form-field">
+                        <p-floatLabel variant="on">
+                            <p-select
+                                id="project"
+                                formControlName="project"
+                                [options]="filteredProjects"
+                                optionLabel="Name_Project"
+                                placeholder="Select Project"
+                                [filter]="true"
+                                filterBy="Name_Project"
+                                filterPlaceholder="Rechercher un projet..."
+                                appendTo="body"
+                                styleClass="w-full"
+                                [class.ng-invalid]="shiftSetupForm.get('project')?.invalid && shiftSetupForm.get('project')?.touched">
+                            </p-select>
+                            <label for="project">Project *</label>
+                        </p-floatLabel>
+                        <p-message *ngIf="shiftSetupForm.get('project')?.invalid && shiftSetupForm.get('project')?.touched"
+                            severity="error" text="Project is required" styleClass="mt-1 validation-message">
+                        </p-message>
+                    </div>
+
                     <div class="form-field">
                         <p-floatLabel variant="on">
                             <p-select
@@ -237,6 +281,8 @@
                                 formControlName="date"
                                 [showIcon]="true"
                                 dateFormat="dd/mm/yy"
+                                [maxDate]="today"
+                                [readonlyInput]="true"
                                 appendTo="body"
                                 styleClass="w-full"
                                 [class.ng-invalid]="shiftSetupForm.get('date')?.invalid && shiftSetupForm.get('date')?.touched">
@@ -245,28 +291,6 @@
                         </p-floatLabel>
                         <p-message *ngIf="shiftSetupForm.get('date')?.invalid && shiftSetupForm.get('date')?.touched"
                             severity="error" text="Date is required" styleClass="mt-1 validation-message">
-                        </p-message>
-                    </div>
-
-                    <div class="form-field">
-                        <p-floatLabel variant="on">
-                            <p-select
-                                id="project"
-                                formControlName="project"
-                                [options]="projects"
-                                optionLabel="Name_Project"
-                                placeholder="Select Project"
-                                [filter]="true"
-                                filterBy="Name_Project"
-                                filterPlaceholder="Rechercher un projet..."
-                                appendTo="body"
-                                styleClass="w-full"
-                                [class.ng-invalid]="shiftSetupForm.get('project')?.invalid && shiftSetupForm.get('project')?.touched">
-                            </p-select>
-                            <label for="project">Project *</label>
-                        </p-floatLabel>
-                        <p-message *ngIf="shiftSetupForm.get('project')?.invalid && shiftSetupForm.get('project')?.touched"
-                            severity="error" text="Project is required" styleClass="mt-1 validation-message">
                         </p-message>
                     </div>
 
@@ -321,6 +345,9 @@
                                 [options]="processes"
                                 optionLabel="name"
                                 placeholder="Select Process"
+                                [filter]="true"
+                                filterBy="name"
+                                filterPlaceholder="Rechercher un process..."
                                 appendTo="body"
                                 styleClass="w-full"
                                 [class.ng-invalid]="shiftSetupForm.get('process')?.invalid && shiftSetupForm.get('process')?.touched">
@@ -350,22 +377,6 @@
                         <p-message *ngIf="shiftSetupForm.get('partNumber')?.invalid && shiftSetupForm.get('partNumber')?.touched"
                             severity="error" text="Part Number is required" styleClass="mt-1 validation-message">
                         </p-message>
-                    </div>
-
-                    <div class="form-field">
-                        <p-floatLabel variant="on">
-                            <p-select
-                                id="zone"
-                                formControlName="zone"
-                                [options]="zones"
-                                optionLabel="name"
-                                placeholder="Select Zone"
-                                [showClear]="true"
-                                appendTo="body"
-                                styleClass="w-full">
-                            </p-select>
-                            <label for="zone">Zone</label>
-                        </p-floatLabel>
                     </div>
 
                     <div class="form-field">
@@ -1173,7 +1184,7 @@
                             id="newDowntimeDuration"
                             [(ngModel)]="newDowntimeInput.duration"
                             [min]="1"
-                            [max]="60"
+                            [max]="480"
                             [showButtons]="true"
                             buttonLayout="horizontal"
                             suffix=" min"
@@ -1189,7 +1200,7 @@
                         <p-select
                             id="newDowntimeMachine"
                             [(ngModel)]="newDowntimeInput.machineId"
-                            [options]="machines"
+                            [options]="filteredMachinesForDowntime"
                             optionLabel="name"
                             optionValue="id"
                             placeholder="Select Machine (Optional)"
@@ -1198,6 +1209,22 @@
                             filterPlaceholder="Search machine..."
                             [virtualScroll]="true"
                             [virtualScrollItemSize]="38"
+                            appendTo="body"
+                            [style]="{ width: '100%' }">
+                        </p-select>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="newDowntimeProblem"><i class="pi pi-exclamation-triangle"></i> Problem Category *</label>
+                        <p-select
+                            id="newDowntimeProblem"
+                            [(ngModel)]="newDowntimeInput.problemId"
+                            [options]="downtimeProblems"
+                            optionLabel="Name_DowntimeProblems"
+                            optionValue="Id_DowntimeProblems"
+                            placeholder="Select Problem Category"
+                            [filter]="true"
+                            filterPlaceholder="Search..."
                             appendTo="body"
                             [style]="{ width: '100%' }">
                         </p-select>
@@ -1276,7 +1303,7 @@
                 id="addDowntimeDuration"
                 [(ngModel)]="downtimeInput.Total_Downtime"
                 [min]="1"
-                [max]="60"
+                [max]="480"
                 [showButtons]="true"
                 buttonLayout="horizontal"
                 suffix=" min"
@@ -1285,6 +1312,22 @@
                 incrementButtonClass="input-number-btn"
                 styleClass="w-full">
             </p-inputNumber>
+        </div>
+
+        <div class="form-field">
+            <label for="addDowntimeProblem"><i class="pi pi-exclamation-triangle"></i> Problem Category *</label>
+            <p-select
+                id="addDowntimeProblem"
+                [(ngModel)]="downtimeInput.Id_DowntimeProblems"
+                [options]="downtimeProblems"
+                optionLabel="Name_DowntimeProblems"
+                optionValue="Id_DowntimeProblems"
+                placeholder="Select Problem Category"
+                [filter]="true"
+                filterPlaceholder="Search..."
+                appendTo="body"
+                [style]="{ width: '100%' }">
+            </p-select>
         </div>
 
         <div class="form-field">
@@ -1838,7 +1881,7 @@
                         <label>Duration (minutes) *</label>
                         <p-inputNumber
                             [(ngModel)]="newDowntimeInput.duration"
-                            [min]="1" [max]="60"
+                            [min]="1" [max]="480"
                             [showButtons]="true"
                             buttonLayout="horizontal"
                             suffix=" min"
@@ -1847,6 +1890,20 @@
                             incrementButtonClass="input-number-btn"
                             styleClass="w-full">
                         </p-inputNumber>
+                    </div>
+                    <div class="form-field mt-2">
+                        <label><i class="pi pi-exclamation-triangle"></i> Problem Category *</label>
+                        <p-select
+                            [(ngModel)]="newDowntimeInput.problemId"
+                            [options]="downtimeProblems"
+                            optionLabel="Name_DowntimeProblems"
+                            optionValue="Id_DowntimeProblems"
+                            placeholder="Select Problem Category"
+                            [filter]="true"
+                            filterPlaceholder="Search..."
+                            appendTo="body"
+                            [style]="{ width: '100%' }">
+                        </p-select>
                     </div>
                     <div class="form-field mt-2">
                         <label>Description *</label>

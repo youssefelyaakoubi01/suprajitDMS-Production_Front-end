@@ -98,7 +98,9 @@ export class ProductionService {
                     Id_Project: p.id,
                     Name_Project: p.name,
                     Code_Project: p.code,
-                    Status_Project: p.is_active ? 'Active' : 'Inactive'
+                    Status_Project: p.is_active ? 'Active' : 'Inactive',
+                    zone: p.zone,
+                    zone_name: p.zone_name
                 }));
             })
         );
@@ -476,6 +478,7 @@ export class ProductionService {
                     projectName: p.project_name,
                     lineName: p.line_name,
                     partNumber: p.part_number,
+                    zoneName: p.zone_name,
                     // Order number
                     order_no: p.order_no,
                     // Shift type info for hour type persistence

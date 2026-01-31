@@ -52,6 +52,11 @@ export class AppDmsMenu {
                         label: 'Qualified Employees',
                         icon: 'pi pi-fw pi-verified',
                         routerLink: ['/dms-production/qualified-employees']
+                    },
+                    {
+                        label: 'Production History',
+                        icon: 'pi pi-fw pi-history',
+                        routerLink: ['/dms-production/production-history']
                     }
                 ]
             },

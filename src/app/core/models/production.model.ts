@@ -24,6 +24,12 @@ export interface HourlyProduction {
     // For semi-finished products
     process?: number;
     process_name?: string;
+    // Shift type information
+    shift_type?: number;
+    shift_type_code?: string;
+    hour_type?: string;
+    // Zone information
+    zoneName?: string;
 }
 
 export type ProductType = 'semi_finished' | 'finished_good';

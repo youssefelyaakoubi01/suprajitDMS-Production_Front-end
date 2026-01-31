@@ -661,4 +661,64 @@ export class ProductionService {
     getProcessHistoryUsers(): Observable<string[]> {
         return this.api.get<string[]>(`${this.endpoint}/process-history/users`);
     }
+
+    // Hourly Production History
+    getHourlyProductionHistory(params?: {
+        hourly_production_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+        record_date_from?: string;
+        record_date_to?: string;
+        project_name?: string;
+        production_line_name?: string;
+        part_number?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history`, params);
+    }
+
+    getHourlyProductionHistoryByProduction(productionId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history/by_production`, { production_id: productionId });
+    }
+
+    getHourlyProductionHistoryByUser(user: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history/by_user`, { user });
+    }
+
+    getHourlyProductionHistoryByProject(projectName: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history/by_project`, { project_name: projectName });
+    }
+
+    getHourlyProductionHistoryByProductionLine(lineName: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history/by_production_line`, { line_name: lineName });
+    }
+
+    getHourlyProductionHistoryByDateRange(dateFrom: string, dateTo: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history/by_date_range`, { date_from: dateFrom, date_to: dateTo });
+    }
+
+    getHourlyProductionHistoryUsers(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/hourly-production-history/users`);
+    }
+
+    getHourlyProductionHistoryProjects(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/hourly-production-history/projects`);
+    }
+
+    getHourlyProductionHistoryProductionLines(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/hourly-production-history/production_lines`);
+    }
+
+    exportHourlyProductionHistory(params?: {
+        hourly_production_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+        project_name?: string;
+        production_line_name?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/hourly-production-history/export`, params);
+    }
 }

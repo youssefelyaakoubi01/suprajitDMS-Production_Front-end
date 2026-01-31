@@ -142,14 +142,18 @@
                     <th pSortableColumn="Date_HourlyProd">Date <p-sortIcon field="Date_HourlyProd"></p-sortIcon></th>
                     <th pSortableColumn="Shift_HourlyProd">Shift <p-sortIcon field="Shift_HourlyProd"></p-sortIcon></th>
                     <th pSortableColumn="Hour_HourlyProd">Hour <p-sortIcon field="Hour_HourlyProd"></p-sortIcon></th>
+                    <th>Type de Shift</th>
                     <th>Project</th>
                     <th>Production Line</th>
                     <th>Part Number</th>
+                    <th>Order NO</th>
                     <th>Type de produit</th>
                     <th>Result</th>
                     <th>Target</th>
                     <th>Efficiency</th>
                     <th>HC</th>
+                    <th>Employees</th>
+                    <th>Zone</th>
                     <th>Actions</th>
                 </tr>
             </ng-template>
@@ -167,6 +171,14 @@
                         <div class="text-xs text-color-secondary">{{ formatTime(production.Hour_HourlyProd, production.Shift_HourlyProd) }}</div>
                     </td>
                     <td>
+                        <p-tag
+                            *ngIf="production.shiftTypeName"
+                            [value]="getShiftTypeLabel(production.shiftTypeName)"
+                            [severity]="getShiftTypeSeverity(production.shiftTypeName)">
+                        </p-tag>
+                        <span *ngIf="!production.shiftTypeName" class="text-color-secondary">-</span>
+                    </td>
+                    <td>
                         <span class="project-name">{{ production.projectName || '-' }}</span>
                     </td>
                     <td>
@@ -174,6 +186,9 @@
                     </td>
                     <td>
                         <span class="part-number">{{ production.partNumber || '-' }}</span>
+                    </td>
+                    <td>
+                        <span>{{ production.orderNo || '-' }}</span>
                     </td>
                     <td>
                         <p-tag
@@ -200,6 +215,14 @@
                             <i class="pi pi-users"></i>
                             <span>{{ production.HC_HourlyProdPN }}</span>
                         </div>
+                    </td>
+                    <td>
+                        <span class="employees-list" [pTooltip]="production.employeeNames" tooltipPosition="top">
+                            {{ production.employeeNames || '-' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span>{{ production.zoneName || '-' }}</span>
                     </td>
                     <td>
                         <div class="action-buttons">
@@ -238,7 +261,7 @@
 
             <ng-template pTemplate="emptymessage">
                 <tr>
-                    <td colspan="12">
+                    <td colspan="16">
                         <div class="empty-state">
                             <i class="pi pi-inbox empty-icon"></i>
                             <p>No production records found</p>
@@ -299,6 +322,15 @@
                     <span class="text-sm text-color-secondary">Hour</span>
                     <p class="m-0 font-medium">H{{ selectedProduction.Hour_HourlyProd }}</p>
                 </div>
+                <div class="col-6" *ngIf="selectedProduction?.shiftTypeName">
+                    <span class="text-sm text-color-secondary">Type de Shift</span>
+                    <p class="m-0">
+                        <p-tag
+                            [value]="getShiftTypeLabel(selectedProduction.shiftTypeName)"
+                            [severity]="getShiftTypeSeverity(selectedProduction.shiftTypeName)">
+                        </p-tag>
+                    </p>
+                </div>
                 <div class="col-6" *ngIf="selectedProduction?.productType">
                     <span class="text-sm text-color-secondary">Type de produit</span>
                     <p class="m-0">
@@ -307,6 +339,14 @@
                             [severity]="getProductTypeSeverity(selectedProduction.productType)">
                         </p-tag>
                     </p>
+                </div>
+                <div class="col-6" *ngIf="selectedProduction?.zoneName && selectedProduction.zoneName !== '-'">
+                    <span class="text-sm text-color-secondary">Zone</span>
+                    <p class="m-0 font-medium">{{ selectedProduction.zoneName }}</p>
+                </div>
+                <div class="col-6" *ngIf="selectedProduction?.order_no">
+                    <span class="text-sm text-color-secondary">N° Commande</span>
+                    <p class="m-0 font-medium">{{ selectedProduction.order_no }}</p>
                 </div>
             </div>
         </div>
@@ -317,15 +357,21 @@
         <div class="mb-4">
             <h4 class="mt-0 mb-3"><i class="pi pi-box mr-2"></i>Output</h4>
             <div class="grid text-center">
-                <div class="col-4">
+                <div class="col-3">
                     <div class="text-2xl font-bold text-primary">{{ selectedProduction.Result_HourlyProdPN }}</div>
                     <div class="text-sm text-color-secondary">Output</div>
                 </div>
-                <div class="col-4">
+                <div class="col-3">
                     <div class="text-2xl font-bold">{{ selectedProduction.Target_HourlyProdPN }}</div>
                     <div class="text-sm text-color-secondary">Target</div>
                 </div>
-                <div class="col-4">
+                <div class="col-3">
+                    <div class="text-2xl font-bold" [ngClass]="{'text-red-500': (selectedProduction.Scrap_HourlyProdPN || 0) > 0}">
+                        {{ selectedProduction.Scrap_HourlyProdPN || 0 }}
+                    </div>
+                    <div class="text-sm text-color-secondary">Scrap</div>
+                </div>
+                <div class="col-3">
                     <div class="text-2xl font-bold">{{ selectedProduction.efficiency || 0 }}%</div>
                     <div class="text-sm text-color-secondary">Efficiency</div>
                 </div>

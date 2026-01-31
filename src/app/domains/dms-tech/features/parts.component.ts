@@ -80,6 +80,7 @@ interface Part {
 interface Project {
     id: number;
     name: string;
+    zone?: number;
 }
 
 interface Zone {
@@ -327,24 +328,7 @@ interface ProductionLine {
                         <small class="error-message" *ngIf="submitted && !part.part_number">Part number is required.</small>
                     </div>
 
-                    <div class="form-field">
-                        <label for="project">Project <span class="required">*</span></label>
-                        <p-select
-                            id="project"
-                            [(ngModel)]="part.project"
-                            [options]="projects"
-                            optionLabel="name"
-                            optionValue="id"
-                            placeholder="Select Project"
-                            [filter]="true"
-                            filterPlaceholder="Search projects..."
-                            (onChange)="onProjectChange()"
-                            [ngClass]="{'ng-invalid ng-dirty': submitted && !part.project}">
-                        </p-select>
-                        <small class="error-message" *ngIf="submitted && !part.project">Project is required.</small>
-                    </div>
-
-                    <!-- Zone - Required for semi-finished, optional for finished goods -->
+                    <!-- Zone dropdown FIRST -->
                     <div class="form-field">
                         <label for="zone">
                             Zone
@@ -353,13 +337,14 @@ interface ProductionLine {
                         <p-select
                             id="zone"
                             [(ngModel)]="part.zone"
-                            [options]="filteredZones"
+                            [options]="zones"
                             optionLabel="name"
                             optionValue="id"
                             placeholder="Select Zone"
                             [filter]="true"
                             filterPlaceholder="Search zones..."
                             [showClear]="part.product_type !== 'semi_finished'"
+                            (onChange)="onZoneChange()"
                             [ngClass]="{'ng-invalid ng-dirty': submitted && part.product_type === 'semi_finished' && !part.zone}">
                             <ng-template let-zone pTemplate="item">
                                 <div class="flex align-items-center gap-2">
@@ -371,6 +356,24 @@ interface ProductionLine {
                         <small class="error-message" *ngIf="submitted && part.product_type === 'semi_finished' && !part.zone">
                             Zone is required for semi-finished products.
                         </small>
+                    </div>
+
+                    <!-- Project dropdown SECOND (filtered by zone) -->
+                    <div class="form-field">
+                        <label for="project">Project <span class="required">*</span></label>
+                        <p-select
+                            id="project"
+                            [(ngModel)]="part.project"
+                            [options]="filteredProjects"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Select Project"
+                            [filter]="true"
+                            filterPlaceholder="Search projects..."
+                            (onChange)="onProjectChange()"
+                            [ngClass]="{'ng-invalid ng-dirty': submitted && !part.project}">
+                        </p-select>
+                        <small class="error-message" *ngIf="submitted && !part.project">Project is required.</small>
                     </div>
 
                     <!-- Process - Only for semi-finished products -->
@@ -929,12 +932,12 @@ export class PartsComponent implements OnInit {
     parts: Part[] = [];
     filteredParts: Part[] = [];
     projects: Project[] = [];
+    filteredProjects: Project[] = [];
     exportMenuItems: MenuItem[] = [];
     private projectsMap = new Map<number, string>();
     zones: Zone[] = [];
     processes: Process[] = [];
     productionLines: ProductionLine[] = [];
-    filteredZones: Zone[] = [];
     filteredProcesses: Process[] = [];
     filteredProductionLines: ProductionLine[] = [];
     part: Partial<Part> = {};
@@ -1207,11 +1210,13 @@ export class PartsComponent implements OnInit {
                 }));
                 this.projects = (data.projects.results || data.projects).map((p: any) => ({
                     id: p.id,
-                    name: p.name
+                    name: p.name,
+                    zone: p.zone
                 }));
                 // Build lookup map for O(1) access
                 this.projectsMap.clear();
                 this.projects.forEach(p => this.projectsMap.set(p.id, p.name));
+                this.filteredProjects = [...this.projects];
                 this.zones = (data.zones.results || data.zones).map((z: any) => ({
                     id: z.id,
                     name: z.name,
@@ -1275,22 +1280,35 @@ export class PartsComponent implements OnInit {
 
     onProjectChange(): void {
         this.updateFilteredOptions();
-        // Reset zone, process, and production_line when project changes
-        this.part.zone = undefined;
+        // Reset dependent fields when project changes
         this.part.process = undefined;
         this.part.production_line = undefined;
     }
 
+    onZoneChange(): void {
+        // Filter projects by selected zone
+        if (this.part.zone) {
+            this.filteredProjects = this.projects.filter(p => p.zone === this.part.zone);
+        } else {
+            this.filteredProjects = [...this.projects];
+        }
+
+        // Reset project and dependent fields when zone changes
+        this.part.project = undefined;
+        this.part.process = undefined;
+        this.part.production_line = undefined;
+
+        // Update other filtered options
+        this.updateFilteredOptions();
+    }
+
     updateFilteredOptions(): void {
         if (this.part.project) {
-            // Filter zones by project (or show all if project not set on zone)
-            this.filteredZones = this.zones.filter(z => !z.project || z.project === this.part.project);
             // Filter processes by project
             this.filteredProcesses = this.processes.filter(p => p.project === this.part.project);
             // Filter production lines by project
             this.filteredProductionLines = this.productionLines.filter(pl => pl.project === this.part.project);
         } else {
-            this.filteredZones = [...this.zones];
             this.filteredProcesses = [...this.processes];
             this.filteredProductionLines = [...this.productionLines];
         }
@@ -1324,7 +1342,7 @@ export class PartsComponent implements OnInit {
         this.partRealShiftTargetValue.set(0);
         this.partRealTargetPerHeadShiftValue.set(0);
 
-        this.filteredZones = [...this.zones];
+        this.filteredProjects = [...this.projects];
         this.filteredProcesses = [...this.processes];
         this.filteredProductionLines = [...this.productionLines];
         this.editMode = false;

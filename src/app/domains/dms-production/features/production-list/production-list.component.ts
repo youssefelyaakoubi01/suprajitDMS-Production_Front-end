@@ -30,6 +30,7 @@ import {
     ProductionLine,
     Part,
     Shift,
+    ShiftType,
     PRODUCT_TYPE_OPTIONS
 } from '../../../../core/models';
 
@@ -43,6 +44,9 @@ interface ProductionListItem extends HourlyProduction {
     productType?: string;
     productTypeDisplay?: string;
     processName?: string;
+    shiftTypeName?: string;
+    employeeNames?: string;  // Comma-separated list of employee names
+    zoneName?: string;  // Zone name from Part
 }
 
 @Component({
@@ -89,6 +93,7 @@ export class ProductionListComponent implements OnInit {
 
     // Filter options
     shifts: Shift[] = [];
+    shiftTypes: ShiftType[] = [];
     projects: Project[] = [];
     productionLines: ProductionLine[] = [];
     allProductionLines: ProductionLine[] = []; // Store all lines for independent filtering
@@ -161,6 +166,10 @@ export class ProductionListComponent implements OnInit {
         // Load all reference data first, then load productions
         this.productionService.getShifts().subscribe(shifts => {
             this.shifts = shifts;
+        });
+
+        this.productionService.getActiveShiftTypes().subscribe(shiftTypes => {
+            this.shiftTypes = shiftTypes;
         });
 
         this.productionService.getProjects().subscribe(projects => {
@@ -310,6 +319,20 @@ export class ProductionListComponent implements OnInit {
     getProductTypeSeverity(type: string | undefined): 'warn' | 'success' | 'secondary' {
         if (!type) return 'secondary';
         return type === 'semi_finished' ? 'warn' : 'success';
+    }
+
+    getShiftTypeLabel(shiftTypeName: string | undefined): string {
+        if (!shiftTypeName) return '-';
+        return shiftTypeName;
+    }
+
+    getShiftTypeSeverity(shiftTypeName: string | undefined): 'success' | 'info' | 'warn' | 'secondary' {
+        if (!shiftTypeName) return 'secondary';
+        const name = shiftTypeName.toLowerCase();
+        if (name.includes('break') || name.includes('pause')) return 'warn';
+        if (name.includes('normal')) return 'success';
+        if (name.includes('extra') || name.includes('overtime')) return 'info';
+        return 'secondary';
     }
 
     onProductTypeFilterChange(): void {
@@ -573,14 +596,18 @@ export class ProductionListComponent implements OnInit {
             'Date': this.formatDate(p.Date_HourlyProd),
             'Shift': p.shiftName || p.Shift_HourlyProd,
             'Hour': p.Hour_HourlyProd,
+            'Type de Shift': p.shiftTypeName || '-',
             'Time': this.formatTime(p.Hour_HourlyProd, p.Shift_HourlyProd),
             'Project': p.projectName || '',
             'Production Line': p.lineName || '',
             'Part Number': p.partNumber || '',
+            'Order NO': p.orderNo || '-',
             'Output': p.Result_HourlyProdPN,
             'Target': p.Target_HourlyProdPN,
             'Efficiency (%)': p.efficiency || 0,
-            'Headcount': p.HC_HourlyProdPN
+            'Headcount': p.HC_HourlyProdPN,
+            'Employees': p.employeeNames || '-',
+            'Zone': p.zoneName || '-'
         }));
 
         const timestamp = new Date().toISOString().split('T')[0];
@@ -607,14 +634,18 @@ export class ProductionListComponent implements OnInit {
             'Date': this.formatDate(p.Date_HourlyProd),
             'Shift': p.shiftName || p.Shift_HourlyProd,
             'Hour': p.Hour_HourlyProd,
+            'Type de Shift': p.shiftTypeName || '-',
             'Time': this.formatTime(p.Hour_HourlyProd, p.Shift_HourlyProd),
             'Project': p.projectName || '',
             'Production Line': p.lineName || '',
             'Part Number': p.partNumber || '',
+            'Order NO': p.orderNo || '-',
             'Output': p.Result_HourlyProdPN,
             'Target': p.Target_HourlyProdPN,
             'Efficiency (%)': p.efficiency || 0,
-            'Headcount': p.HC_HourlyProdPN
+            'Headcount': p.HC_HourlyProdPN,
+            'Employees': p.employeeNames || '-',
+            'Zone': p.zoneName || '-'
         }));
 
         const timestamp = new Date().toISOString().split('T')[0];
@@ -673,6 +704,10 @@ export class ProductionListComponent implements OnInit {
         const shift = this.shifts.find(s => String(s.id) === String(production.Shift_HourlyProd));
         const shiftName = shift?.name || production.Shift_HourlyProd?.toString();
 
+        // Find shift type name
+        const shiftType = this.shiftTypes.find(st => st.id === production.shift_type);
+        const shiftTypeName = shiftType?.name || production.hour_type || undefined;
+
         // Find part to get product_type (in case it's not already set from API)
         const part = this.allParts.find(p => p.Id_Part === production.Id_Part);
         const productType = part?.product_type || production.productType;
@@ -684,12 +719,15 @@ export class ProductionListComponent implements OnInit {
             ...production,
             efficiency,
             shiftName,
+            shiftTypeName,
             orderNo: (production as any).order_no || production.orderNo,
             productType,
             productTypeDisplay,
             // Copy process info from API response
             process: (production as any).process,
-            processName: (production as any).process_name
+            processName: (production as any).process_name,
+            // Copy zone info from API response or fallback to part's zone
+            zoneName: (production as any).zoneName || part?.zone_name || '-'
         };
     }
 
@@ -718,9 +756,23 @@ export class ProductionListComponent implements OnInit {
                     production.partNumber = part.PN_Part;
                     production.productType = part.product_type;
                     production.productTypeDisplay = part.product_type_display;
+                    production.zoneName = production.zoneName || part.zone_name || '-';
                 }
             });
         }
+
+        // Load employees for this hourly production
+        this.productionService.getTeamAssignments(production.Id_HourlyProd).subscribe({
+            next: (assignments: any[]) => {
+                const names = assignments
+                    .map(a => a.employee_name || 'Unknown')
+                    .filter(name => name !== 'Unknown');
+                production.employeeNames = names.length > 0 ? names.join(', ') : '-';
+            },
+            error: () => {
+                production.employeeNames = '-';
+            }
+        });
     }
 
     // ==========================================

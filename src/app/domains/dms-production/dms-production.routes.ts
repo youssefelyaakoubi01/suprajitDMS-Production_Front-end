@@ -72,6 +72,12 @@ export const DMS_PRODUCTION_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/qualified-employees/qualified-employees.component').then(m => m.QualifiedEmployeesComponent),
         title: 'Qualified Employees'
+    },
+    {
+        path: 'production-history',
+        loadComponent: () =>
+            import('./features/production-history.component').then(m => m.ProductionHistoryComponent),
+        title: 'Production Records History'
     }
 ];
 
