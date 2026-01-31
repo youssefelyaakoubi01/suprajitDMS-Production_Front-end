@@ -656,8 +656,9 @@ export class HrComponent implements OnInit, OnDestroy {
         if (picture.startsWith('http') || picture.startsWith('assets/')) {
             return picture;
         }
-        // Otherwise, prepend the media URL
-        return `${environment.mediaUrl}${picture}`;
+        // Ensure the path starts with /
+        const picturePath = picture.startsWith('/') ? picture : `/${picture}`;
+        return `${environment.mediaUrl}${picturePath}`;
     }
 
     // ==================== INITIALIZATION ====================
