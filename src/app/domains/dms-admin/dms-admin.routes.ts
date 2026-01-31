@@ -39,6 +39,34 @@ export const DMS_ADMIN_ROUTES: Routes = [
         title: 'Parts History'
     },
     {
+        path: 'activity-logs/projects-history',
+        loadComponent: () =>
+            import('../dms-tech/features/projects-history.component')
+                .then(m => m.ProjectsHistoryComponent),
+        title: 'Projects History'
+    },
+    {
+        path: 'activity-logs/zones-history',
+        loadComponent: () =>
+            import('../dms-tech/features/zones-history.component')
+                .then(m => m.ZonesHistoryComponent),
+        title: 'Zones History'
+    },
+    {
+        path: 'activity-logs/production-lines-history',
+        loadComponent: () =>
+            import('../dms-tech/features/production-lines-history.component')
+                .then(m => m.ProductionLinesHistoryComponent),
+        title: 'Production Lines History'
+    },
+    {
+        path: 'activity-logs/processes-history',
+        loadComponent: () =>
+            import('../dms-tech/features/processes-history.component')
+                .then(m => m.ProcessesHistoryComponent),
+        title: 'Processes History'
+    },
+    {
         path: 'positions',
         loadComponent: () =>
             import('./features/positions/positions-list.component')

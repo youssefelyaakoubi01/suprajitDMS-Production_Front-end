@@ -16,9 +16,11 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { forkJoin } from 'rxjs';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 
 interface Machine {
     id?: number;
@@ -53,7 +55,8 @@ interface Machine {
         ToolbarModule,
         TooltipModule,
         IconFieldModule,
-        InputIconModule
+        InputIconModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -69,6 +72,13 @@ interface Machine {
                     </h2>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Machine"
                         icon="pi pi-plus"
@@ -280,6 +290,7 @@ export class MachinesComponent implements OnInit {
     machines: Machine[] = [];
     workstations: any[] = [];
     machine: Partial<Machine> = {};
+    exportMenuItems: MenuItem[] = [];
 
     machineDialog = false;
     editMode = false;
@@ -297,11 +308,66 @@ export class MachinesComponent implements OnInit {
         private productionService: ProductionService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
-        private cdr: ChangeDetectorRef
+        private cdr: ChangeDetectorRef,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.loadData();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.machines.map(m => ({
+            ID: m.id,
+            Name: m.name,
+            Workstation: m.workstation_name || '',
+            Manufacturer: m.manufacturer || '',
+            Model: m.model_number || '',
+            Status: m.status,
+            Active: m.is_active ? 'Yes' : 'No'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `machines-export-${timestamp}`, 'Machines');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.machines.map(m => ({
+            ID: m.id,
+            Name: m.name,
+            Workstation: m.workstation_name || '',
+            Manufacturer: m.manufacturer || '',
+            Model: m.model_number || '',
+            Status: m.status,
+            Active: m.is_active ? 'Yes' : 'No'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `machines-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     loadData(): void {

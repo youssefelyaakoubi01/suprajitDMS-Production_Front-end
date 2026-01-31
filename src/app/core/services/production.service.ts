@@ -569,4 +569,96 @@ export class ProductionService {
     }): Observable<any[]> {
         return this.api.get<any[]>(`${this.endpoint}/part-history/export`, params);
     }
+
+    // Project History
+    getProjectHistory(params?: {
+        project_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/project-history`, params);
+    }
+
+    getProjectHistoryByProject(projectId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/project-history/by_project`, { project_id: projectId });
+    }
+
+    getProjectHistoryByUser(user: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/project-history/by_user`, { user });
+    }
+
+    getProjectHistoryUsers(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/project-history/users`);
+    }
+
+    // Zone History
+    getZoneHistory(params?: {
+        zone_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/zone-history`, params);
+    }
+
+    getZoneHistoryByZone(zoneId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/zone-history/by_zone`, { zone_id: zoneId });
+    }
+
+    getZoneHistoryByUser(user: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/zone-history/by_user`, { user });
+    }
+
+    getZoneHistoryUsers(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/zone-history/users`);
+    }
+
+    // Production Line History
+    getProductionLineHistory(params?: {
+        production_line_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/production-line-history`, params);
+    }
+
+    getProductionLineHistoryByLine(lineId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/production-line-history/by_line`, { line_id: lineId });
+    }
+
+    getProductionLineHistoryByUser(user: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/production-line-history/by_user`, { user });
+    }
+
+    getProductionLineHistoryUsers(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/production-line-history/users`);
+    }
+
+    // Process History
+    getProcessHistory(params?: {
+        process_id?: number;
+        user?: string;
+        change_type?: string;
+        date_from?: string;
+        date_to?: string;
+    }): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/process-history`, params);
+    }
+
+    getProcessHistoryByProcess(processId: number): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/process-history/by_process`, { process_id: processId });
+    }
+
+    getProcessHistoryByUser(user: string): Observable<any[]> {
+        return this.api.get<any[]>(`${this.endpoint}/process-history/by_user`, { user });
+    }
+
+    getProcessHistoryUsers(): Observable<string[]> {
+        return this.api.get<string[]>(`${this.endpoint}/process-history/users`);
+    }
 }

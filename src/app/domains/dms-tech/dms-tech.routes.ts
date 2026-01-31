@@ -89,6 +89,30 @@ export const DMS_TECH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/parts-history.component').then(m => m.PartsHistoryComponent),
         title: 'Parts History'
+    },
+    {
+        path: 'projects-history',
+        loadComponent: () =>
+            import('./features/projects-history.component').then(m => m.ProjectsHistoryComponent),
+        title: 'Projects History'
+    },
+    {
+        path: 'zones-history',
+        loadComponent: () =>
+            import('./features/zones-history.component').then(m => m.ZonesHistoryComponent),
+        title: 'Zones History'
+    },
+    {
+        path: 'production-lines-history',
+        loadComponent: () =>
+            import('./features/production-lines-history.component').then(m => m.ProductionLinesHistoryComponent),
+        title: 'Production Lines History'
+    },
+    {
+        path: 'processes-history',
+        loadComponent: () =>
+            import('./features/processes-history.component').then(m => m.ProcessesHistoryComponent),
+        title: 'Processes History'
     }
 ];
 

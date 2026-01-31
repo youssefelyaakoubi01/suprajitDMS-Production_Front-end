@@ -21,6 +21,9 @@ export interface HourlyProduction {
     Id_ProdLine: number;
     Scrap_HourlyProdPN?: number;
     order_no?: string;
+    // For semi-finished products
+    process?: number;
+    process_name?: string;
 }
 
 export type ProductType = 'semi_finished' | 'finished_good';

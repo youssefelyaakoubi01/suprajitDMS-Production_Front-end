@@ -15,8 +15,10 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 import { forkJoin } from 'rxjs';
 
 interface Process {
@@ -54,7 +56,8 @@ interface Project {
         ToggleSwitchModule,
         CardModule,
         ToolbarModule,
-        TooltipModule
+        TooltipModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -87,6 +90,13 @@ interface Project {
                     </div>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Process"
                         icon="pi pi-plus"
@@ -249,6 +259,7 @@ export class ProcessesComponent implements OnInit {
     filteredProcesses: Process[] = [];
     projects: Project[] = [];
     process: Partial<Process> = {};
+    exportMenuItems: MenuItem[] = [];
 
     selectedProjectId: number | null = null;
 
@@ -260,11 +271,62 @@ export class ProcessesComponent implements OnInit {
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.loadData();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.filteredProcesses.map(p => ({
+            ID: p.id,
+            Name: p.name,
+            Project: p.project_name || '',
+            'Parts Count': p.parts_count || 0,
+            Status: p.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `processes-export-${timestamp}`, 'Processes');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.filteredProcesses.map(p => ({
+            ID: p.id,
+            Name: p.name,
+            Project: p.project_name || '',
+            'Parts Count': p.parts_count || 0,
+            Status: p.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `processes-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     loadData(): void {

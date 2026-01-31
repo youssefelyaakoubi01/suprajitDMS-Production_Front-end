@@ -16,8 +16,10 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
@@ -56,7 +58,8 @@ interface Project {
         ToolbarModule,
         TooltipModule,
         IconFieldModule,
-        InputIconModule
+        InputIconModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -100,6 +103,13 @@ interface Project {
                     </div>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Production Line"
                         icon="pi pi-plus"
@@ -250,6 +260,7 @@ export class ProductionLinesComponent implements OnInit, OnDestroy {
     projects: Project[] = [];
     projectFilterOptions: { id: number; name: string }[] = [];
     line: Partial<ProductionLine> = {};
+    exportMenuItems: MenuItem[] = [];
 
     lineDialog = false;
     editMode = false;
@@ -267,12 +278,61 @@ export class ProductionLinesComponent implements OnInit, OnDestroy {
         private productionService: ProductionService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
-        private cdr: ChangeDetectorRef
+        private cdr: ChangeDetectorRef,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.setupSearch();
         this.loadData();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.filteredProductionLines.map(l => ({
+            ID: l.id,
+            Name: l.name,
+            Project: l.project_name || this.getProjectName(l.project),
+            Status: l.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `production-lines-export-${timestamp}`, 'ProductionLines');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.filteredProductionLines.map(l => ({
+            ID: l.id,
+            Name: l.name,
+            Project: l.project_name || this.getProjectName(l.project),
+            Status: l.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `production-lines-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     ngOnDestroy(): void {

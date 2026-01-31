@@ -16,8 +16,10 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
@@ -52,7 +54,8 @@ interface Zone {
         ToolbarModule,
         TooltipModule,
         IconFieldModule,
-        InputIconModule
+        InputIconModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -96,6 +99,13 @@ interface Zone {
                     </div>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Zone"
                         icon="pi pi-plus"
@@ -244,6 +254,7 @@ export class ZonesComponent implements OnInit, OnDestroy {
     zones: Zone[] = [];
     filteredZones: Zone[] = [];
     zone: Partial<Zone> = {};
+    exportMenuItems: MenuItem[] = [];
 
     zoneTypes = [
         { label: 'Production', value: 'production' },
@@ -268,12 +279,61 @@ export class ZonesComponent implements OnInit, OnDestroy {
         private productionService: ProductionService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
-        private cdr: ChangeDetectorRef
+        private cdr: ChangeDetectorRef,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.setupSearch();
         this.loadData();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.filteredZones.map(z => ({
+            ID: z.id,
+            Name: z.name,
+            Type: this.getZoneTypeLabel(z.zone_type),
+            Status: z.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `zones-export-${timestamp}`, 'Zones');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.filteredZones.map(z => ({
+            ID: z.id,
+            Name: z.name,
+            Type: this.getZoneTypeLabel(z.zone_type),
+            Status: z.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `zones-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     ngOnDestroy(): void {

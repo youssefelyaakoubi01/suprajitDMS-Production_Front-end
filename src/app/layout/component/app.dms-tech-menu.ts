@@ -60,11 +60,6 @@ export class AppDmsTechMenu {
                         routerLink: ['/dms-tech/parts']
                     },
                     {
-                        label: 'Parts History',
-                        icon: 'pi pi-fw pi-history',
-                        routerLink: ['/dms-tech/parts-history']
-                    },
-                    {
                         label: 'Workstations',
                         icon: 'pi pi-fw pi-desktop',
                         routerLink: ['/dms-tech/workstations']
@@ -89,6 +84,37 @@ export class AppDmsTechMenu {
                         label: 'Shift Types',
                         icon: 'pi pi-fw pi-sliders-h',
                         routerLink: ['/dms-tech/shift-types']
+                    }
+                ]
+            },
+            { separator: true },
+            {
+                label: 'Logs',
+                items: [
+                    {
+                        label: 'Parts History',
+                        icon: 'pi pi-fw pi-box',
+                        routerLink: ['/dms-tech/parts-history']
+                    },
+                    {
+                        label: 'Projects History',
+                        icon: 'pi pi-fw pi-briefcase',
+                        routerLink: ['/dms-tech/projects-history']
+                    },
+                    {
+                        label: 'Zones History',
+                        icon: 'pi pi-fw pi-map',
+                        routerLink: ['/dms-tech/zones-history']
+                    },
+                    {
+                        label: 'Production Lines History',
+                        icon: 'pi pi-fw pi-sitemap',
+                        routerLink: ['/dms-tech/production-lines-history']
+                    },
+                    {
+                        label: 'Processes History',
+                        icon: 'pi pi-fw pi-cog',
+                        routerLink: ['/dms-tech/processes-history']
                     }
                 ]
             },

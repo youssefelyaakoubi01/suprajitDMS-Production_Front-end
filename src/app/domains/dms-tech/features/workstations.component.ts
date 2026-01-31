@@ -15,8 +15,10 @@ import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { BadgeModule } from 'primeng/badge';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 
 interface Workstation {
     id?: number;
@@ -47,7 +49,8 @@ interface Workstation {
         CardModule,
         ToolbarModule,
         TooltipModule,
-        BadgeModule
+        BadgeModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -77,6 +80,13 @@ interface Workstation {
                     </div>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Workstation"
                         icon="pi pi-plus"
@@ -230,6 +240,7 @@ export class WorkstationsComponent implements OnInit {
     projects: any[] = [];
     workstation: Partial<Workstation> = {};
     selectedProjectFilter: number | null = null;
+    exportMenuItems: MenuItem[] = [];
 
     wsDialog = false;
     editMode = false;
@@ -239,11 +250,62 @@ export class WorkstationsComponent implements OnInit {
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.loadData();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.filteredWorkstations.map(ws => ({
+            ID: ws.id,
+            Name: ws.name,
+            Project: ws.project_name || this.getProjectName(ws.project),
+            'Machines Count': ws.machines_count || 0,
+            Status: ws.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `workstations-export-${timestamp}`, 'Workstations');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.filteredWorkstations.map(ws => ({
+            ID: ws.id,
+            Name: ws.name,
+            Project: ws.project_name || this.getProjectName(ws.project),
+            'Machines Count': ws.machines_count || 0,
+            Status: ws.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `workstations-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     loadData(): void {

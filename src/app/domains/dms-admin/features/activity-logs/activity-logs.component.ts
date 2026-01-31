@@ -100,6 +100,31 @@ interface StatSummary {
                 </div>
             </div>
 
+            <!-- DMS-Tech Logs Section -->
+            <div class="surface-card shadow-2 border-round-xl p-4">
+                <div class="flex align-items-center gap-3 mb-4">
+                    <div class="flex align-items-center justify-content-center border-round-xl"
+                         style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                        <i class="pi pi-database text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-semibold m-0 text-900">Logs DMS-Tech</h2>
+                        <p class="text-500 text-sm m-0">Historique des modifications des données de production</p>
+                    </div>
+                </div>
+                <div class="grid">
+                    <div class="col-6 md:col-4 lg:col-2" *ngFor="let log of techLogs">
+                        <a [routerLink]="log.route" class="no-underline">
+                            <div class="surface-hover border-round-lg p-3 text-center cursor-pointer transition-all transition-duration-200"
+                                 style="border: 1px solid var(--surface-border);">
+                                <i [class]="log.icon + ' text-2xl mb-2'" [style.color]="log.color"></i>
+                                <div class="text-900 font-medium text-sm">{{ log.label }}</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Stats Cards -->
             <div class="grid">
                 <div class="col-6 md:col-3" *ngFor="let stat of statsSummary; let i = index">
@@ -459,6 +484,14 @@ export class ActivityLogsComponent implements OnInit, OnDestroy {
         { label: 'Suppression', value: 'delete', icon: 'pi pi-trash', color: '#EF4444' },
         { label: 'Changement permissions', value: 'permission_change', icon: 'pi pi-lock', color: '#8B5CF6' },
         { label: 'Reset mot de passe', value: 'password_reset', icon: 'pi pi-key', color: '#EC4899' }
+    ];
+
+    techLogs = [
+        { label: 'Parts', icon: 'pi pi-box', route: '/dms-admin/activity-logs/parts-history', color: '#3B82F6' },
+        { label: 'Projects', icon: 'pi pi-folder', route: '/dms-admin/activity-logs/projects-history', color: '#8B5CF6' },
+        { label: 'Zones', icon: 'pi pi-map', route: '/dms-admin/activity-logs/zones-history', color: '#F59E0B' },
+        { label: 'Prod. Lines', icon: 'pi pi-sitemap', route: '/dms-admin/activity-logs/production-lines-history', color: '#10B981' },
+        { label: 'Processes', icon: 'pi pi-cog', route: '/dms-admin/activity-logs/processes-history', color: '#EC4899' }
     ];
 
     get hasActiveFilters(): boolean {

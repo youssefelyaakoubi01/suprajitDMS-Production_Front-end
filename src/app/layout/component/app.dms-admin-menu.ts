@@ -49,12 +49,32 @@ export class AppDmsAdminMenu {
                             },
                             {
                                 label: 'DMS-Tech',
-                                icon: 'pi pi-fw pi-cog',
+                                icon: 'pi pi-fw pi-database',
                                 items: [
                                     {
                                         label: 'Parts History',
                                         icon: 'pi pi-fw pi-box',
                                         routerLink: ['/dms-admin/activity-logs/parts-history']
+                                    },
+                                    {
+                                        label: 'Projects History',
+                                        icon: 'pi pi-fw pi-folder',
+                                        routerLink: ['/dms-admin/activity-logs/projects-history']
+                                    },
+                                    {
+                                        label: 'Zones History',
+                                        icon: 'pi pi-fw pi-map',
+                                        routerLink: ['/dms-admin/activity-logs/zones-history']
+                                    },
+                                    {
+                                        label: 'Prod. Lines History',
+                                        icon: 'pi pi-fw pi-sitemap',
+                                        routerLink: ['/dms-admin/activity-logs/production-lines-history']
+                                    },
+                                    {
+                                        label: 'Processes History',
+                                        icon: 'pi pi-fw pi-cog',
+                                        routerLink: ['/dms-admin/activity-logs/processes-history']
                                     }
                                 ]
                             }

@@ -468,6 +468,9 @@ export class ProductionService {
                     HC_HourlyProdPN: p.headcount,
                     Scrap_HourlyProdPN: p.scrap,
                     Id_ProdLine: p.production_line,
+                    // For semi-finished products
+                    process: p.process,
+                    process_name: p.process_name,
                     // Additional fields for display
                     shiftName: p.shift_name,
                     projectName: p.project_name,
@@ -495,7 +498,10 @@ export class ProductionService {
                 Result_HourlyProdPN: p.result,
                 Target_HourlyProdPN: p.target,
                 HC_HourlyProdPN: p.headcount,
-                Id_ProdLine: p.production_line
+                Id_ProdLine: p.production_line,
+                // For semi-finished products
+                process: p.process,
+                process_name: p.process_name
             }))
         );
     }

@@ -17,8 +17,10 @@ import { TooltipModule } from 'primeng/tooltip';
 import { FileUploadModule } from 'primeng/fileupload';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 import { forkJoin, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
@@ -60,7 +62,8 @@ interface Zone {
         TooltipModule,
         FileUploadModule,
         IconFieldModule,
-        InputIconModule
+        InputIconModule,
+        MenuModule
     ],
     providers: [MessageService, ConfirmationService],
     template: `
@@ -94,6 +97,13 @@ interface Zone {
                     </div>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Project"
                         icon="pi pi-plus"
@@ -387,6 +397,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     filteredProjects: Project[] = [];
     zones: Zone[] = [];
     project: Partial<Project> = {};
+    exportMenuItems: MenuItem[] = [];
 
     projectDialog = false;
     editMode = false;
@@ -401,17 +412,69 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     // Image upload properties
     imageFile: File | null = null;
     imagePreview: string | null = null;
+    imageRemoved: boolean = false;
 
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
         private confirmationService: ConfirmationService,
-        private cdr: ChangeDetectorRef
+        private cdr: ChangeDetectorRef,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.setupSearch();
         this.loadProjects();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.filteredProjects.map(p => ({
+            ID: p.id,
+            Name: p.name,
+            Zone: p.zone_name || '',
+            Description: p.description || '',
+            Status: p.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `projects-export-${timestamp}`, 'Projects');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.filteredProjects.map(p => ({
+            ID: p.id,
+            Name: p.name,
+            Zone: p.zone_name || '',
+            Description: p.description || '',
+            Status: p.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `projects-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     ngOnDestroy(): void {
@@ -492,6 +555,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         };
         this.imageFile = null;
         this.imagePreview = null;
+        this.imageRemoved = false;
         this.editMode = false;
         this.submitted = false;
         this.projectDialog = true;
@@ -501,6 +565,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         this.project = { ...project };
         this.imageFile = null;
         this.imagePreview = project.image || null;
+        this.imageRemoved = false;
         this.editMode = true;
         this.submitted = false;
         this.projectDialog = true;
@@ -511,6 +576,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         this.submitted = false;
         this.imageFile = null;
         this.imagePreview = null;
+        this.imageRemoved = false;
     }
 
     onImageSelect(event: any): void {
@@ -531,6 +597,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         if (this.project) {
             this.project.image = undefined;
         }
+        this.imageRemoved = true;
     }
 
     saveProject(): void {
@@ -546,7 +613,18 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         }
 
         if (this.editMode && this.project.id) {
-            this.productionService.updateProject(this.project.id, this.project as any).subscribe({
+            // Only send writable fields to avoid 400 error from read-only fields
+            const updatePayload: any = {
+                name: this.project.name,
+                description: this.project.description,
+                zone: this.project.zone,
+                is_active: this.project.is_active
+            };
+            // If image was explicitly removed and no new image uploaded, send null to delete
+            if (this.imageRemoved && !this.imageFile) {
+                updatePayload.image = null;
+            }
+            this.productionService.updateProject(this.project.id, updatePayload).subscribe({
                 next: (updatedProject) => {
                     if (this.imageFile) {
                         this.uploadProjectImage(updatedProject.id!);

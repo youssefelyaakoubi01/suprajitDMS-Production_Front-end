@@ -16,8 +16,10 @@ import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { DividerModule } from 'primeng/divider';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
 import { ProductionService } from '../../../core/services/production.service';
+import { ExportService } from '../../../core/services/export.service';
 import { forkJoin } from 'rxjs';
 
 interface MHConfiguration {
@@ -65,6 +67,11 @@ interface Part {
     efficiency?: number;
     mh_per_part?: number;
     time_per_shift?: number;
+    bottleneck_cycle_time?: number;
+    // Real target values (editable, bottleneck-based)
+    real_hourly_target?: number;
+    real_shift_target?: number;
+    real_target_per_head?: number;
     description?: string;
     material_status?: string;
     is_active: boolean;
@@ -115,9 +122,9 @@ interface ProductionLine {
         CardModule,
         ToolbarModule,
         TooltipModule,
-        DividerModule
+        DividerModule,
+        MenuModule
     ],
-    providers: [MessageService, ConfirmationService],
     template: `
         <p-toast></p-toast>
         <p-confirmDialog></p-confirmDialog>
@@ -166,6 +173,13 @@ interface ProductionLine {
                     </div>
                 </ng-template>
                 <ng-template pTemplate="right">
+                    <p-menu #exportMenu [model]="exportMenuItems" [popup]="true"></p-menu>
+                    <p-button
+                        icon="pi pi-download"
+                        label="Export"
+                        styleClass="p-button-outlined mr-2"
+                        (onClick)="exportMenu.toggle($event)">
+                    </p-button>
                     <p-button
                         label="New Part"
                         icon="pi pi-plus"
@@ -202,6 +216,8 @@ interface ProductionLine {
                         <th>Process/Line</th>
                         <th style="width: 120px">Hourly Target</th>
                         <th style="width: 120px">Headcount Target</th>
+                        <th style="width: 100px">MH per Part</th>
+                        <th style="width: 140px">Bottleneck (min)</th>
                         <th style="width: 100px">Status</th>
                         <th style="width: 150px">Actions</th>
                     </tr>
@@ -232,6 +248,8 @@ interface ProductionLine {
                         </td>
                         <td class="text-center font-bold">{{ part.shift_target }}</td>
                         <td class="text-center font-bold">{{ part.headcount_target || 0 }}</td>
+                        <td class="text-center">{{ part.mh_per_part || '-' }}</td>
+                        <td class="text-center">{{ part.bottleneck_cycle_time || '-' }}</td>
                         <td>
                             <p-tag
                                 [value]="part.is_active ? 'Active' : 'Inactive'"
@@ -257,7 +275,7 @@ interface ProductionLine {
 
                 <ng-template pTemplate="emptymessage">
                     <tr>
-                        <td colspan="10" class="text-center p-4">
+                        <td colspan="12" class="text-center p-4">
                             <i class="pi pi-inbox text-4xl text-gray-400 mb-3 block"></i>
                             <span class="text-gray-500">No parts found.</span>
                         </td>
@@ -416,7 +434,7 @@ interface ProductionLine {
                             <p-inputNumber
                                 id="mhPerPart"
                                 [ngModel]="partMhPerPart()"
-                                (onInput)="onPartMhPerPartChange($event.value)"
+                                (ngModelChange)="onPartMhPerPartChange($event)"
                                 [min]="0"
                                 [step]="0.01"
                                 [minFractionDigits]="2"
@@ -431,7 +449,7 @@ interface ProductionLine {
                             <p-inputNumber
                                 id="timePerShiftHours"
                                 [ngModel]="partTimePerShiftHours()"
-                                (onInput)="onPartTimePerShiftHoursChange($event.value)"
+                                (ngModelChange)="onPartTimePerShiftHoursChange($event)"
                                 [min]="0.1"
                                 [step]="0.05"
                                 [minFractionDigits]="2"
@@ -446,7 +464,7 @@ interface ProductionLine {
                             <p-inputNumber
                                 id="headcountTarget"
                                 [ngModel]="partHeadcountTarget()"
-                                (onInput)="onPartHeadcountTargetChange($event.value)"
+                                (ngModelChange)="onPartHeadcountTargetChange($event)"
                                 [min]="0"
                                 [showButtons]="true"
                                 placeholder="e.g., 2">
@@ -454,78 +472,122 @@ interface ProductionLine {
                             <small class="help-text">Number of operators</small>
                         </div>
 
+                        <div class="form-field">
+                            <label for="bottleneckCycleTime">Bottleneck Cycle Time (min)</label>
+                            <p-inputNumber
+                                id="bottleneckCycleTime"
+                                [ngModel]="partBottleneckCycleTime()"
+                                (ngModelChange)="onPartBottleneckCycleTimeChange($event)"
+                                [min]="0"
+                                [step]="0.01"
+                                [minFractionDigits]="2"
+                                [maxFractionDigits]="2"
+                                placeholder="e.g., 0.27">
+                            </p-inputNumber>
+                            <small class="help-text">Bottleneck station cycle time in minutes</small>
+                        </div>
+
                     </div>
                 </div>
 
-                <!-- Calculated Targets Section -->
-                <div class="calculated-section mt-4">
+                <!-- Calculated Targets (100% Efficiency) - Read-Only Display -->
+                <div class="calculated-section mt-4" *ngIf="partHeadcountTarget() > 0 && partMhPerPart() > 0">
                     <h4 class="section-header">
-                        <i class="pi pi-chart-bar mr-2"></i>Calculated Targets (Auto)
+                        <i class="pi pi-calculator mr-2"></i>Calculated Targets (100% Efficiency)
+                        <span class="text-sm font-normal text-gray-500 ml-2">(Read-only)</span>
                     </h4>
-
-                    <!-- Calculated Values Display (like MH Config dialog) -->
-                    <div class="calculated-grid mb-3">
+                    <div class="calculated-grid">
                         <div class="calculated-item">
                             <span class="calculated-label">Target/Head/Shift</span>
                             <span class="calculated-value">{{ partTargetPerHeadShift() | number:'1.0-0' }}</span>
-                            <span class="calculated-formula">= {{ partTimePerShift() }} / {{ partMhPerPart() }}</span>
+                            <span class="calculated-formula">= {{ partTimePerShift() }} ÷ {{ partMhPerPart() }}</span>
                         </div>
                         <div class="calculated-item">
                             <span class="calculated-label">Shift Target</span>
                             <span class="calculated-value">{{ partShiftTarget() | number:'1.0-0' }}</span>
-                            <span class="calculated-formula">= {{ partTargetPerHeadShift() | number:'1.0-0' }} × {{ partHeadcountTarget() }}</span>
+                            <span class="calculated-formula">= Target/Head × {{ partHeadcountTarget() }}</span>
                         </div>
                         <div class="calculated-item">
                             <span class="calculated-label">Hourly Target</span>
-                            <span class="calculated-value font-bold text-primary">{{ partHourlyTarget() | number:'1.0-0' }}</span>
-                            <span class="calculated-formula">= {{ partShiftTarget() }} / {{ partTimePerShiftHours() | number:'1.2-2' }}h</span>
+                            <span class="calculated-value">{{ partHourlyTarget() | number:'1.0-0' }}</span>
+                            <span class="calculated-formula">= Shift ÷ {{ partTimePerShiftHours() | number:'1.2-2' }}h</span>
                         </div>
                         <div class="calculated-item">
                             <span class="calculated-label">Efficiency</span>
-                            <span class="calculated-value">{{ partEfficiency() | number:'1.0-0' }}%</span>
-                            <span class="calculated-formula">= (ST × MH) / (HC × T)</span>
+                            <span class="calculated-value text-green-500">100%</span>
+                            <span class="calculated-formula">Theoretical max</span>
                         </div>
                     </div>
+                </div>
 
-                    <div class="form-grid">
+                <!-- Target With Real% Efficiency Section -->
+                <div class="calculated-section mt-4" *ngIf="partBottleneckCycleTime() > 0">
+                    <h4 class="section-header">
+                        <i class="pi pi-percentage mr-2"></i>Target With Real% Efficiency (Bottleneck-Based)
+                        <p-button
+                            icon="pi pi-refresh"
+                            [text]="true"
+                            severity="secondary"
+                            pTooltip="Recalculer depuis Bottleneck"
+                            tooltipPosition="top"
+                            (onClick)="recalculateRealTargetsFromBottleneck()"
+                            styleClass="ml-2">
+                        </p-button>
+                    </h4>
+
+                    <div class="form-grid mb-3">
+                        <!-- Hourly Target (Real) - EDITABLE -->
                         <div class="form-field">
-                            <label for="shiftTarget">Hourly Target <span class="required">*</span></label>
+                            <label for="realHourlyTarget">Hourly Target (Real)</label>
                             <p-inputNumber
-                                id="shiftTarget"
-                                [ngModel]="partHourlyTarget()"
+                                id="realHourlyTarget"
+                                [ngModel]="partRealHourlyTargetValue()"
+                                (ngModelChange)="onPartRealHourlyTargetChange($event)"
                                 [min]="0"
-                                placeholder="Target per hour"
-                                [disabled]="true"
-                                [ngClass]="{'ng-invalid ng-dirty': submitted && partHourlyTarget() === 0}">
+                                [showButtons]="true">
                             </p-inputNumber>
-                            <small class="error-message" *ngIf="submitted && partHourlyTarget() === 0">Hourly target is required.</small>
+                            <small class="help-text">Formule: 60 / {{ partBottleneckCycleTime() | number:'1.2-2' }} min</small>
                         </div>
 
+                        <!-- Shift Target (Real) - EDITABLE -->
                         <div class="form-field">
-                            <label for="efficiency">Efficiency Target (%)</label>
+                            <label for="realShiftTarget">Shift Target (Real)</label>
                             <p-inputNumber
-                                id="efficiency"
-                                [ngModel]="partEfficiency()"
+                                id="realShiftTarget"
+                                [ngModel]="partRealShiftTargetValue()"
+                                (ngModelChange)="onPartRealShiftTargetChange($event)"
                                 [min]="0"
-                                [max]="150"
-                                suffix="%"
-                                [minFractionDigits]="0"
-                                [maxFractionDigits]="0"
-                                placeholder="Target efficiency"
-                                [disabled]="true">
+                                [showButtons]="true">
                             </p-inputNumber>
+                            <small class="help-text">Formule: Hourly × {{ partTimePerShiftHours() | number:'1.2-2' }}h</small>
                         </div>
 
+                        <!-- Target/Head/Shift (Real) - EDITABLE -->
                         <div class="form-field">
-                            <label for="scrapTarget">Scrap Target (%)</label>
+                            <label for="realTargetPerHead">Target/Head/Shift (Real)</label>
                             <p-inputNumber
-                                id="scrapTarget"
-                                [(ngModel)]="part.scrap_target"
+                                id="realTargetPerHead"
+                                [ngModel]="partRealTargetPerHeadShiftValue()"
+                                (ngModelChange)="onPartRealTargetPerHeadChange($event)"
                                 [min]="0"
-                                [max]="100"
-                                suffix="%"
-                                placeholder="Max scrap percentage">
+                                [showButtons]="true">
                             </p-inputNumber>
+                            <small class="help-text">Formule: Shift Target / {{ partHeadcountTarget() }}</small>
+                        </div>
+
+                        <!-- Total Real Efficiency - Calculated (read-only display) -->
+                        <div class="form-field">
+                            <label>Total Real Efficiency</label>
+                            <div class="calculated-item" style="height: 42px; display: flex; align-items: center; justify-content: center;">
+                                <span class="calculated-value" [ngClass]="{
+                                    'text-green-500': partRealEfficiency() >= 85,
+                                    'text-orange-500': partRealEfficiency() >= 70 && partRealEfficiency() < 85,
+                                    'text-red-500': partRealEfficiency() < 70
+                                }">
+                                    {{ partRealEfficiency() | number:'1.0-0' }}%
+                                </span>
+                            </div>
+                            <small class="help-text">= (ST × MH) / (HC × T)</small>
                         </div>
                     </div>
                 </div>
@@ -867,6 +929,7 @@ export class PartsComponent implements OnInit {
     parts: Part[] = [];
     filteredParts: Part[] = [];
     projects: Project[] = [];
+    exportMenuItems: MenuItem[] = [];
     private projectsMap = new Map<number, string>();
     zones: Zone[] = [];
     processes: Process[] = [];
@@ -914,8 +977,7 @@ export class PartsComponent implements OnInit {
     partTimePerShiftHours = signal<number>(7.75);  // Affichage en heures pour l'utilisateur
     partHeadcountTarget = signal<number>(0);
 
-    // Computed: Target per Head per Shift = time_per_shift / mh_per_part
-    // Example: 465 / 0.55 = 845.45
+    // Computed signals for 100% Efficiency (read-only display, not saved)
     partTargetPerHeadShift = computed(() => {
         const mhPerPart = this.partMhPerPart();
         const timePerShift = this.partTimePerShift();
@@ -925,16 +987,12 @@ export class PartsComponent implements OnInit {
         return 0;
     });
 
-    // Computed: Shift Target = targetPerHeadShift × headcount
-    // Example: 845.45 × 2 = 1690.9 → 1691
     partShiftTarget = computed(() => {
         const targetPerHeadShift = this.partTargetPerHeadShift();
         const headcount = this.partHeadcountTarget();
         return Math.round(targetPerHeadShift * headcount);
     });
 
-    // Computed: Hourly Target (target_60min) = shift_target / (time_per_shift / 60)
-    // Example: 1691 / 7.75 = 218.2 → 218
     partHourlyTarget = computed(() => {
         const shiftTarget = this.partShiftTarget();
         const timePerShift = this.partTimePerShift();
@@ -945,13 +1003,21 @@ export class PartsComponent implements OnInit {
         return 0;
     });
 
-    // Computed: Efficiency = (shift_target × mh_per_part) / (headcount × time_per_shift) × 100
-    // Note: Cette formule retourne toujours 100% (efficacité théorique)
-    partEfficiency = computed(() => {
-        const shiftTarget = this.partShiftTarget();
+    // Signal for Bottleneck Cycle Time (in minutes)
+    partBottleneckCycleTime = signal<number>(0);
+
+    // Editable signals for Real targets (instead of computed)
+    partRealHourlyTargetValue = signal<number>(0);
+    partRealShiftTargetValue = signal<number>(0);
+    partRealTargetPerHeadShiftValue = signal<number>(0);
+
+    // Computed: Total Real Efficiency = (Shift Target × MH per part) / (HeadCount × Time per Shift) × 100
+    // This remains computed as it should always reflect the current values
+    partRealEfficiency = computed(() => {
+        const shiftTarget = this.partRealShiftTargetValue();
         const mhPerPart = this.partMhPerPart();
         const headcount = this.partHeadcountTarget();
-        const timePerShift = this.partTimePerShift();
+        const timePerShift = this.partTimePerShift(); // in minutes
 
         if (shiftTarget > 0 && headcount > 0 && timePerShift > 0) {
             const efficiency = ((shiftTarget * mhPerPart) / (headcount * timePerShift)) * 100;
@@ -959,6 +1025,69 @@ export class PartsComponent implements OnInit {
         }
         return 0;
     });
+
+    /**
+     * Recalculate Real targets from Bottleneck Cycle Time
+     * Called when user clicks the refresh button or when bottleneck changes
+     */
+    recalculateRealTargetsFromBottleneck(): void {
+        const bottleneck = this.partBottleneckCycleTime();
+        if (bottleneck > 0) {
+            // Hourly = 60 / Bottleneck
+            const hourly = Math.round(60 / bottleneck);
+            this.partRealHourlyTargetValue.set(hourly);
+
+            // Shift = Hourly × TimePerShiftHours
+            const shift = Math.round(hourly * this.partTimePerShiftHours());
+            this.partRealShiftTargetValue.set(shift);
+
+            // Target/Head = Shift / Headcount
+            const headcount = this.partHeadcountTarget();
+            if (headcount > 0) {
+                this.partRealTargetPerHeadShiftValue.set(Math.round(shift / headcount));
+            } else {
+                this.partRealTargetPerHeadShiftValue.set(0);
+            }
+        }
+    }
+
+    /**
+     * Handler for manual change of Real Hourly Target
+     * Auto-recalculates Shift Target and Target/Head
+     */
+    onPartRealHourlyTargetChange(value: number | null): void {
+        const hourly = value ?? 0;
+        this.partRealHourlyTargetValue.set(hourly);
+        // Auto-recalcul du Shift Target
+        const shift = Math.round(hourly * this.partTimePerShiftHours());
+        this.partRealShiftTargetValue.set(shift);
+        // Auto-recalcul du Target/Head
+        const headcount = this.partHeadcountTarget();
+        if (headcount > 0) {
+            this.partRealTargetPerHeadShiftValue.set(Math.round(shift / headcount));
+        }
+    }
+
+    /**
+     * Handler for manual change of Real Shift Target
+     * Auto-recalculates Target/Head
+     */
+    onPartRealShiftTargetChange(value: number | null): void {
+        const shift = value ?? 0;
+        this.partRealShiftTargetValue.set(shift);
+        // Auto-recalcul du Target/Head
+        const headcount = this.partHeadcountTarget();
+        if (headcount > 0) {
+            this.partRealTargetPerHeadShiftValue.set(Math.round(shift / headcount));
+        }
+    }
+
+    /**
+     * Handler for manual change of Real Target per Head
+     */
+    onPartRealTargetPerHeadChange(value: number | null): void {
+        this.partRealTargetPerHeadShiftValue.set(value ?? 0);
+    }
 
     // Handler methods for signal updates (fix for PrimeNG InputNumber binding)
     onPartMhPerPartChange(value: number | null): void {
@@ -974,20 +1103,91 @@ export class PartsComponent implements OnInit {
         const hours = value ?? 7.75;
         this.partTimePerShiftHours.set(hours);
         this.partTimePerShift.set(Math.round(hours * 60)); // Conversion en minutes pour le backend
+        this.recalculateRealTargetsFromBottleneck();
     }
 
     onPartHeadcountTargetChange(value: number | null): void {
         this.partHeadcountTarget.set(value ?? 0);
+        this.recalculateRealTargetsFromBottleneck();
+    }
+
+    onPartBottleneckCycleTimeChange(value: number | null): void {
+        this.partBottleneckCycleTime.set(value ?? 0);
+        // Auto-recalculate Real targets when bottleneck changes
+        this.recalculateRealTargetsFromBottleneck();
     }
 
     constructor(
         private productionService: ProductionService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private exportService: ExportService
     ) {}
 
     ngOnInit(): void {
         this.loadData();
+        this.initExportMenu();
+    }
+
+    private initExportMenu(): void {
+        this.exportMenuItems = [
+            {
+                label: 'Export Excel',
+                icon: 'pi pi-file-excel',
+                command: () => this.exportToExcel()
+            },
+            {
+                label: 'Export CSV',
+                icon: 'pi pi-file',
+                command: () => this.exportToCsv()
+            }
+        ];
+    }
+
+    exportToExcel(): void {
+        const data = this.filteredParts.map(p => ({
+            ID: p.id,
+            'Part Number': p.part_number,
+            Type: p.product_type_display || this.getProductTypeLabel(p.product_type),
+            Project: p.project_name || this.getProjectName(p.project),
+            Zone: p.zone_name || '',
+            'Process/Line': p.process_name || p.production_line_name || '',
+            'Hourly Target': p.shift_target,
+            Headcount: p.headcount_target || 0,
+            'MH/Part': p.mh_per_part || '',
+            'Bottleneck Cycle Time (min)': p.bottleneck_cycle_time || '',
+            Status: p.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToExcel(data, `parts-export-${timestamp}`, 'Parts');
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
+    }
+
+    exportToCsv(): void {
+        const data = this.filteredParts.map(p => ({
+            ID: p.id,
+            'Part Number': p.part_number,
+            Type: p.product_type_display || this.getProductTypeLabel(p.product_type),
+            Project: p.project_name || this.getProjectName(p.project),
+            Zone: p.zone_name || '',
+            'Process/Line': p.process_name || p.production_line_name || '',
+            'Hourly Target': p.shift_target,
+            Headcount: p.headcount_target || 0,
+            'MH/Part': p.mh_per_part || '',
+            'Bottleneck Cycle Time (min)': p.bottleneck_cycle_time || '',
+            Status: p.is_active ? 'Active' : 'Inactive'
+        }));
+        const timestamp = new Date().toISOString().split('T')[0];
+        this.exportService.exportToCsv(data, `parts-export-${timestamp}`);
+        this.messageService.add({
+            severity: 'success',
+            summary: 'Export',
+            detail: `${data.length} enregistrements exportés`
+        });
     }
 
     loadData(): void {
@@ -1117,6 +1317,12 @@ export class PartsComponent implements OnInit {
         this.partTimePerShift.set(465);
         this.partTimePerShiftHours.set(7.75);  // 465 min = 7.75h
         this.partHeadcountTarget.set(0);
+        this.partBottleneckCycleTime.set(0);
+
+        // Initialize Real target signals with 0 (no bottleneck yet)
+        this.partRealHourlyTargetValue.set(0);
+        this.partRealShiftTargetValue.set(0);
+        this.partRealTargetPerHeadShiftValue.set(0);
 
         this.filteredZones = [...this.zones];
         this.filteredProcesses = [...this.processes];
@@ -1142,6 +1348,25 @@ export class PartsComponent implements OnInit {
         this.partTimePerShiftHours.set(parseFloat((minutes / 60).toFixed(2)));
         this.partHeadcountTarget.set(isNaN(headcountValue) ? 0 : headcountValue);
 
+        // Initialize bottleneck cycle time from part data
+        const bottleneckValue = parseFloat(String(part.bottleneck_cycle_time || 0));
+        this.partBottleneckCycleTime.set(isNaN(bottleneckValue) ? 0 : bottleneckValue);
+
+        // Initialize Real target values from saved data or recalculate from bottleneck
+        const realHourly = parseFloat(String(part.real_hourly_target || 0));
+        const realShift = parseFloat(String(part.real_shift_target || 0));
+        const realTargetPerHead = parseFloat(String(part.real_target_per_head || 0));
+
+        if (realHourly > 0 || realShift > 0 || realTargetPerHead > 0) {
+            // Use saved values if they exist
+            this.partRealHourlyTargetValue.set(isNaN(realHourly) ? 0 : realHourly);
+            this.partRealShiftTargetValue.set(isNaN(realShift) ? 0 : realShift);
+            this.partRealTargetPerHeadShiftValue.set(isNaN(realTargetPerHead) ? 0 : realTargetPerHead);
+        } else {
+            // Recalculate from bottleneck if no saved values
+            this.recalculateRealTargetsFromBottleneck();
+        }
+
         this.updateFilteredOptions();
         this.editMode = true;
         this.submitted = false;
@@ -1166,9 +1391,9 @@ export class PartsComponent implements OnInit {
     savePart(): void {
         this.submitted = true;
 
-        // Get values from signals
-        const hourlyTarget = this.partHourlyTarget();
-        const efficiency = this.partEfficiency();
+        // Get values from Real signals (not 100% efficiency values)
+        const hourlyTarget = this.partRealHourlyTargetValue();
+        const efficiency = this.partRealEfficiency();
 
         // Basic validation
         if (!this.part.part_number || !this.part.project || hourlyTarget === 0) {
@@ -1205,7 +1430,12 @@ export class PartsComponent implements OnInit {
             time_per_shift: this.partTimePerShift(),
             headcount_target: this.partHeadcountTarget(),
             shift_target: hourlyTarget,
-            efficiency: efficiency
+            efficiency: efficiency,
+            bottleneck_cycle_time: this.partBottleneckCycleTime() || null,
+            // Real target values (editable by user)
+            real_hourly_target: this.partRealHourlyTargetValue() || null,
+            real_shift_target: this.partRealShiftTargetValue() || null,
+            real_target_per_head: this.partRealTargetPerHeadShiftValue() || null
         };
 
         // Clear unused fields before sending

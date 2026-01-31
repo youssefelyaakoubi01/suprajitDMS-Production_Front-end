@@ -16,7 +16,6 @@ import { PopoverModule } from 'primeng/popover';
 import { AppConfigurator } from './app.configurator';
 import { LayoutService } from '../service/layout.service';
 import { AuthService } from '../../core/services/auth.service';
-import { RecyclageAlertBadgeComponent } from './recyclage-alert-badge.component';
 import { User } from '../../core/models/auth.model';
 import { Subscription, filter } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -44,8 +43,7 @@ interface DmsModuleInfo {
         DividerModule,
         TagModule,
         PopoverModule,
-        AppConfigurator,
-        RecyclageAlertBadgeComponent
+        AppConfigurator
     ],
     providers: [ConfirmationService],
     template: `
@@ -89,18 +87,6 @@ interface DmsModuleInfo {
                     <app-configurator />
                 </div>
             </div>
-
-            <!-- Separator -->
-            <div class="topbar-separator desktop-only"></div>
-
-            <!-- Recyclage Alerts Badge -->
-            <app-recyclage-alert-badge class="desktop-only"></app-recyclage-alert-badge>
-
-            <!-- Notifications - Always visible on desktop -->
-            <button type="button" class="layout-topbar-action desktop-only" pTooltip="Notifications" tooltipPosition="bottom">
-                <i class="pi pi-bell"></i>
-                <span class="notification-badge" *ngIf="notificationCount > 0">{{ notificationCount }}</span>
-            </button>
 
             <!-- Home - Always visible on desktop -->
             <button type="button" class="layout-topbar-action desktop-only" routerLink="/dms-home" pTooltip="DMS Home" tooltipPosition="bottom">
@@ -261,10 +247,6 @@ interface DmsModuleInfo {
                         </div>
                     </div>
 
-                    <button type="button" class="layout-topbar-action" pTooltip="Notifications">
-                        <i class="pi pi-bell"></i>
-                        <span>Notifications</span>
-                    </button>
                     <button type="button" class="layout-topbar-action" routerLink="/dms-home">
                         <i class="pi pi-home"></i>
                         <span>DMS Home</span>
@@ -583,24 +565,6 @@ interface DmsModuleInfo {
             flex-shrink: 0;
         }
 
-        /* Notification Badge */
-        .notification-badge {
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            min-width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--red-500);
-            color: white;
-            font-size: 0.625rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 4px;
-        }
-
         /* Login Button */
         .login-btn {
             gap: 0.5rem;
@@ -683,7 +647,6 @@ export class AppTopbar implements OnInit, OnDestroy {
     private authSubscription!: Subscription;
 
     currentUser: User | null = null;
-    notificationCount = 0;
     showLogoutDialog = false;
 
     currentModule: DmsModuleInfo = {

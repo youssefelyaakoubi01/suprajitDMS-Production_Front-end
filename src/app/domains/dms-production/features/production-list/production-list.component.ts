@@ -42,6 +42,7 @@ interface ProductionListItem extends HourlyProduction {
     orderNo?: string;
     productType?: string;
     productTypeDisplay?: string;
+    processName?: string;
 }
 
 @Component({
@@ -423,6 +424,17 @@ export class ProductionListComponent implements OnInit {
             order_no: this.editForm.orderNo
         };
 
+        // Look up product type from the part (more reliable than editingProduction.productType)
+        const part = this.allParts.find(p => p.Id_Part === this.editingProduction!.Id_Part);
+        const partProductType = part?.product_type;
+
+        // Determine if semi-finished: check part's product_type, editingProduction's productType,
+        // or fall back to detecting based on process/production_line values
+        const isSemiFinished =
+            partProductType === 'semi_finished' ||
+            this.editingProduction.productType === 'semi_finished' ||
+            (this.editingProduction.process != null && !this.editingProduction.Id_ProdLine);
+
         // Si mode avancé, inclure les champs modifiés
         if (this.isAdvancedMode) {
             if (this.editAdvanced.date) {
@@ -440,12 +452,45 @@ export class ProductionListComponent implements OnInit {
             }
         } else {
             // Mode simple - garder les valeurs originales
-            updateData.date = this.editingProduction.Date_HourlyProd;
-            updateData.shift = this.editingProduction.Shift_HourlyProd;
+            const d = new Date(this.editingProduction.Date_HourlyProd);
+            updateData.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            // Find shift by ID or name, then use numeric ID
+            const shiftValue = this.editingProduction.Shift_HourlyProd;
+            const matchedShift = this.shifts.find(s =>
+                String(s.id) === String(shiftValue) || s.name === shiftValue
+            );
+            updateData.shift = matchedShift?.id ?? (typeof shiftValue === 'number' ? shiftValue : null);
             updateData.hour = this.editingProduction.Hour_HourlyProd;
             updateData.part = this.editingProduction.Id_Part;
-            updateData.production_line = this.editingProduction.Id_ProdLine;
+
+            // For semi-finished products, send 'process' instead of 'production_line'
+            if (isSemiFinished) {
+                updateData.process = this.editingProduction.process;
+                // Explicitly set production_line to null for semi-finished
+                updateData.production_line = null;
+            } else {
+                updateData.production_line = this.editingProduction.Id_ProdLine;
+                // Explicitly set process to null for finished goods
+                updateData.process = null;
+            }
         }
+
+        // DEBUG: Log the data being sent to API
+        console.log('=== DEBUG: Saving Production ===');
+        console.log('editingProduction:', this.editingProduction);
+        console.log('Part lookup from allParts:', part);
+        console.log('partProductType:', partProductType);
+        console.log('editingProduction.productType:', this.editingProduction.productType);
+        console.log('isSemiFinished:', isSemiFinished);
+        console.log('process:', this.editingProduction.process);
+        console.log('Id_ProdLine:', this.editingProduction.Id_ProdLine);
+        console.log('shifts available:', this.shifts);
+        console.log('updateData being sent:', JSON.stringify(updateData, null, 2));
+        console.log('Shift value from editingProduction:', this.editingProduction.Shift_HourlyProd);
+        console.log('Matched shift:', this.shifts.find(s =>
+            String(s.id) === String(this.editingProduction!.Shift_HourlyProd) ||
+            s.name === this.editingProduction!.Shift_HourlyProd
+        ));
 
         this.productionService.updateHourlyProduction(
             this.editingProduction.Id_HourlyProd,
@@ -461,10 +506,17 @@ export class ProductionListComponent implements OnInit {
                 this.loadProductions();
             },
             error: (error) => {
+                // DEBUG: Log the full error response
+                console.error('=== DEBUG: API Error ===');
+                console.error('Full error object:', error);
+                console.error('Error status:', error.status);
+                console.error('Error body:', error.error);
+                console.error('Error message:', error.message);
+
                 this.messageService.add({
                     severity: 'error',
                     summary: 'Erreur',
-                    detail: error.error?.detail || 'Échec de la mise à jour'
+                    detail: error.error?.detail || JSON.stringify(error.error) || 'Échec de la mise à jour'
                 });
                 this.isSaving = false;
             }
@@ -621,13 +673,23 @@ export class ProductionListComponent implements OnInit {
         const shift = this.shifts.find(s => String(s.id) === String(production.Shift_HourlyProd));
         const shiftName = shift?.name || production.Shift_HourlyProd?.toString();
 
+        // Find part to get product_type (in case it's not already set from API)
+        const part = this.allParts.find(p => p.Id_Part === production.Id_Part);
+        const productType = part?.product_type || production.productType;
+        const productTypeDisplay = part?.product_type_display || production.productTypeDisplay;
+
         // We need to load project, line and part names from the IDs
         // For now, return the production with calculated fields
         return {
             ...production,
             efficiency,
             shiftName,
-            orderNo: (production as any).order_no || production.orderNo
+            orderNo: (production as any).order_no || production.orderNo,
+            productType,
+            productTypeDisplay,
+            // Copy process info from API response
+            process: (production as any).process,
+            processName: (production as any).process_name
         };
     }
 

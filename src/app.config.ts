@@ -4,7 +4,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { provideRouter, withEnabledBlockingInitialNavigation, withInMemoryScrolling, withPreloading, PreloadAllModules } from '@angular/router';
 import Aura from '@primeuix/themes/aura';
 import { providePrimeNG } from 'primeng/config';
-import { MessageService } from 'primeng/api';
+import { MessageService, ConfirmationService } from 'primeng/api';
 import { appRoutes } from './app.routes';
 import { authInterceptor } from './app/core/interceptors/auth.interceptor';
 import { errorInterceptor } from './app/core/interceptors/error.interceptor';
@@ -29,6 +29,7 @@ export const appConfig: ApplicationConfig = {
         provideAnimationsAsync(),
         providePrimeNG({ theme: { preset: Aura, options: { darkModeSelector: '.app-dark' } } }),
         MessageService,
+        ConfirmationService,
         {
             provide: APP_INITIALIZER,
             useFactory: initializeRecyclageAlerts,
