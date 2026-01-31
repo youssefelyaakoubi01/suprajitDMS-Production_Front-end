@@ -59,11 +59,6 @@ export class AppDmsHrMenu {
                         routerLink: ['/dms-hr/qualifications']
                     },
                     {
-                        label: 'Versatility Matrix',
-                        icon: 'pi pi-fw pi-th-large',
-                        routerLink: ['/dms-hr/versatility']
-                    },
-                    {
                         label: 'Recyclage',
                         icon: 'pi pi-fw pi-refresh',
                         routerLink: ['/dms-hr/recyclage']
@@ -74,29 +69,14 @@ export class AppDmsHrMenu {
                         routerLink: ['/dms-hr/non-qualified-assignments']
                     },
                     {
-                        label: 'Teams',
-                        icon: 'pi pi-fw pi-sitemap',
-                        routerLink: ['/dms-hr/teams']
-                    },
-                    {
-                        label: 'Licenses Manager',
-                        icon: 'pi pi-fw pi-id-card',
-                        routerLink: ['/dms-hr/licenses']
-                    },
-                    {
-                        label: 'Workstations',
-                        icon: 'pi pi-fw pi-desktop',
-                        routerLink: ['/dms-hr/workstations']
-                    },
-                    {
-                        label: 'Affectations',
-                        icon: 'pi pi-fw pi-link',
-                        routerLink: ['/dms-hr/affectations']
-                    },
-                    {
                         label: 'Présences',
                         icon: 'pi pi-fw pi-clock',
                         routerLink: ['/dms-hr/presences']
+                    },
+                    {
+                        label: 'Départements',
+                        icon: 'pi pi-fw pi-building',
+                        routerLink: ['/dms-hr/departements']
                     }
                 ]
             },

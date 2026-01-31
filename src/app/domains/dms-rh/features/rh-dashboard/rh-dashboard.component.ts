@@ -185,67 +185,7 @@ interface KpiCard {
 
             <!-- Stats Row -->
             <div class="grid mt-3" *ngIf="!loading && stats">
-                <div class="col-12 md:col-4">
-                    <div class="hr-section-card">
-                        <div class="section-header">
-                            <span class="section-title">
-                                <i class="pi pi-star"></i>
-                                Versatility Score
-                            </span>
-                        </div>
-                        <div class="section-body">
-                            <div class="versatility-display">
-                                <div class="score-ring">
-                                    <svg viewBox="0 0 120 120" class="score-svg">
-                                        <circle cx="60" cy="60" r="50" fill="none"
-                                                stroke="var(--surface-border)" stroke-width="10"/>
-                                        <circle cx="60" cy="60" r="50" fill="none"
-                                                stroke="var(--hr-primary)" stroke-width="10"
-                                                [attr.stroke-dasharray]="getVersatilityDashArray()"
-                                                stroke-linecap="round"
-                                                transform="rotate(-90 60 60)"/>
-                                    </svg>
-                                    <div class="score-center">
-                                        <span class="score-value">{{ stats.averageVersatility | number:'1.1-1' }}</span>
-                                        <span class="score-max">/ 4</span>
-                                    </div>
-                                </div>
-                                <span class="score-label">Average Versatility Level</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 md:col-4">
-                    <div class="hr-section-card">
-                        <div class="section-header">
-                            <span class="section-title">
-                                <i class="pi pi-exclamation-triangle"></i>
-                                Recyclage Alerts
-                            </span>
-                            <span class="section-badge" *ngIf="stats.employeesRequiringRecyclage > 0">
-                                {{ stats.employeesRequiringRecyclage }}
-                            </span>
-                        </div>
-                        <div class="section-body">
-                            <div class="recyclage-display">
-                                <div class="recyclage-value" [class.danger]="stats.employeesRequiringRecyclage > 5">
-                                    {{ stats.employeesRequiringRecyclage }}
-                                </div>
-                                <span class="recyclage-label">Employees requiring recyclage</span>
-                                <button pButton pRipple
-                                        label="View Details"
-                                        icon="pi pi-arrow-right"
-                                        iconPos="right"
-                                        class="p-button-text p-button-sm mt-3"
-                                        (click)="onViewRecyclage()">
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 md:col-4">
+                <div class="col-12 md:col-6">
                     <div class="hr-section-card">
                         <div class="section-header">
                             <span class="section-title">
@@ -262,49 +202,6 @@ interface KpiCard {
                                     </div>
                                 </div>
                                 <span class="completion-label">of employees fully qualified</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Non-Qualified Assignments Alert -->
-            <div class="grid mt-3" *ngIf="!loading && stats && stats.nonQualifiedAssignmentsActive > 0">
-                <div class="col-12">
-                    <div class="hr-section-card non-qualified-alert">
-                        <div class="section-header">
-                            <span class="section-title">
-                                <i class="pi pi-exclamation-triangle" style="color: #EF4444;"></i>
-                                Affectations Non Qualifiées
-                            </span>
-                            <span class="section-badge danger">
-                                {{ stats.nonQualifiedAssignmentsActive }}
-                            </span>
-                        </div>
-                        <div class="section-body">
-                            <div class="non-qualified-display">
-                                <div class="nq-stats-row">
-                                    <div class="nq-stat">
-                                        <div class="nq-value danger">{{ stats.nonQualifiedAssignmentsActive }}</div>
-                                        <span class="nq-label">Actives</span>
-                                    </div>
-                                    <div class="nq-divider"></div>
-                                    <div class="nq-stat">
-                                        <div class="nq-value muted">{{ stats.nonQualifiedAssignmentsTotal }}</div>
-                                        <span class="nq-label">Total</span>
-                                    </div>
-                                </div>
-                                <p class="nq-description">
-                                    Des opérateurs ont été affectés à des postes sans qualification valide.
-                                    Ces affectations nécessitent une action (formation ou acquittement).
-                                </p>
-                                <button pButton pRipple
-                                        label="Voir les détails"
-                                        icon="pi pi-arrow-right"
-                                        iconPos="right"
-                                        class="p-button-danger p-button-sm"
-                                        (click)="onViewNonQualifiedAssignments()">
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -344,73 +241,6 @@ interface KpiCard {
     styles: [`
         .rh-dashboard {
             padding: 1.5rem;
-        }
-
-        /* Versatility Display */
-        .versatility-display {
-            text-align: center;
-            padding: 1rem 0;
-        }
-
-        .score-ring {
-            position: relative;
-            width: 140px;
-            height: 140px;
-            margin: 0 auto 1rem;
-        }
-
-        .score-svg {
-            width: 100%;
-            height: 100%;
-        }
-
-        .score-center {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-        }
-
-        .score-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--hr-primary);
-            display: block;
-        }
-
-        .score-max {
-            font-size: 0.875rem;
-            color: var(--text-color-secondary);
-        }
-
-        .score-label {
-            font-size: 0.875rem;
-            color: var(--text-color-secondary);
-        }
-
-        /* Recyclage Display */
-        .recyclage-display {
-            text-align: center;
-            padding: 1rem 0;
-        }
-
-        .recyclage-value {
-            font-size: 3.5rem;
-            font-weight: 700;
-            color: var(--hr-warning);
-            line-height: 1;
-
-            &.danger {
-                color: var(--hr-danger);
-            }
-        }
-
-        .recyclage-label {
-            display: block;
-            font-size: 0.875rem;
-            color: var(--text-color-secondary);
-            margin-top: 0.5rem;
         }
 
         /* Completion Display */
@@ -484,80 +314,11 @@ interface KpiCard {
             }
         }
 
-        /* Non-Qualified Assignments Alert */
-        .non-qualified-alert {
-            border-left: 4px solid #EF4444;
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, var(--surface-card) 100%);
-        }
-
-        .section-badge.danger {
-            background: #EF4444;
-            color: white;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-        }
-
-        .non-qualified-display {
-            text-align: center;
-            padding: 1rem 0;
-        }
-
-        .nq-stats-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        .nq-stat {
-            text-align: center;
-        }
-
-        .nq-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            line-height: 1;
-
-            &.danger {
-                color: #EF4444;
-            }
-
-            &.muted {
-                color: var(--text-color-secondary);
-            }
-        }
-
-        .nq-label {
-            display: block;
-            font-size: 0.8125rem;
-            color: var(--text-color-secondary);
-            margin-top: 0.25rem;
-        }
-
-        .nq-divider {
-            width: 1px;
-            height: 48px;
-            background: var(--surface-border);
-        }
-
-        .nq-description {
-            font-size: 0.875rem;
-            color: var(--text-color-secondary);
-            margin: 1rem 0;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-        }
     `]
 })
 export class RhDashboardComponent implements OnInit, OnDestroy {
     @Input() stats: HRDashboardStats | null = null;
     @Output() kpiClicked = new EventEmitter<KpiCard>();
-    @Output() viewRecyclage = new EventEmitter<void>();
-    @Output() viewNonQualifiedAssignments = new EventEmitter<void>();
 
     private destroy$ = new Subject<void>();
 
@@ -675,8 +436,6 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
 
         const totalEmployees = this.stats.totalEmployees || 1;
 
-        const nonQualifiedActive = this.stats.nonQualifiedAssignmentsActive || 0;
-
         this.kpiCards = [
             {
                 label: 'Total Employees',
@@ -704,15 +463,6 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
                 trend: -2,
                 progress: ((this.stats.employeesRequiringRecyclage || 0) / totalEmployees) * 100,
                 subtitle: 'Need retraining'
-            },
-            {
-                label: 'Non Qualifiés',
-                value: nonQualifiedActive,
-                icon: 'pi pi-exclamation-triangle',
-                color: nonQualifiedActive > 0 ? 'danger' : 'success',
-                trend: nonQualifiedActive > 0 ? nonQualifiedActive : 0,
-                progress: nonQualifiedActive > 0 ? Math.min((nonQualifiedActive / 10) * 100, 100) : 0,
-                subtitle: 'Affectations sans qualification'
             }
         ];
     }
@@ -764,13 +514,6 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
         };
     }
 
-    getVersatilityDashArray(): string {
-        if (!this.stats) return '0, 314';
-        const circumference = 2 * Math.PI * 50;
-        const progress = (this.stats.averageVersatility / 4) * circumference;
-        return `${progress}, ${circumference}`;
-    }
-
     getInitials(employee: any): string {
         const first = employee?.Prenom_Emp?.charAt(0) || '';
         const last = employee?.Nom_Emp?.charAt(0) || '';
@@ -779,15 +522,5 @@ export class RhDashboardComponent implements OnInit, OnDestroy {
 
     onKpiClick(kpi: KpiCard): void {
         this.kpiClicked.emit(kpi);
-    }
-
-    onViewRecyclage(): void {
-        this.viewRecyclage.emit();
-        this.router.navigate(['/dms-rh', 'recyclage']);
-    }
-
-    onViewNonQualifiedAssignments(): void {
-        this.viewNonQualifiedAssignments.emit();
-        this.router.navigate(['/dms-rh', 'non-qualified-assignments']);
     }
 }

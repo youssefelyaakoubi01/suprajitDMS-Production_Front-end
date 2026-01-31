@@ -100,20 +100,10 @@ export class AppMenu {
                         routerLink: ['/dms-hr/qualifications']
                     },
                     {
-                        label: 'Versatility Matrix',
-                        icon: 'pi pi-fw pi-th-large',
-                        routerLink: ['/dms-hr/versatility']
-                    },
-                    {
                         label: 'Recyclage',
                         icon: 'pi pi-fw pi-refresh',
                         routerLink: ['/dms-hr/recyclage']
                     },
-                    {
-                        label: 'Teams & Trainers',
-                        icon: 'pi pi-fw pi-sitemap',
-                        routerLink: ['/dms-hr/teams']
-                    }
                 ]
             },
             { separator: true },

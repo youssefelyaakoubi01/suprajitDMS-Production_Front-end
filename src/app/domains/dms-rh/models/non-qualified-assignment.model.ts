@@ -39,6 +39,7 @@ export interface NonQualifiedAssignmentCreate {
     machine_id?: number;
     hourly_production_id?: number;
     reason?: string;
+    assigned_by?: number;
 }
 
 export interface NonQualifiedAssignmentStats {

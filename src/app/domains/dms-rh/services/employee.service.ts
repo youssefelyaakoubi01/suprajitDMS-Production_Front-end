@@ -12,7 +12,8 @@ import {
     EmployeeDetail,
     EmployeeWithAssignment,
     Department,
-    Attendance
+    Attendance,
+    Departement
 } from '../models';
 
 @Injectable({
@@ -138,9 +139,30 @@ export class DmsEmployeeService {
         return this.api.delete<void>(`${this.endpoint}/categories/${id}`);
     }
 
-    // ==================== DEPARTMENTS ====================
+    // ==================== DEPARTMENTS (Legacy) ====================
     getDepartments(): Observable<Department[]> {
         return this.api.get<Department[]>(`${this.endpoint}/departments`);
+    }
+
+    // ==================== DEPARTEMENTS (CRUD) ====================
+    getDepartements(): Observable<Departement[]> {
+        return this.api.get<Departement[]>(`${this.endpoint}/department-mgmt`);
+    }
+
+    getDepartement(id: number): Observable<Departement> {
+        return this.api.get<Departement>(`${this.endpoint}/department-mgmt/${id}`);
+    }
+
+    createDepartement(departement: Partial<Departement>): Observable<Departement> {
+        return this.api.post<Departement>(`${this.endpoint}/department-mgmt`, departement);
+    }
+
+    updateDepartement(id: number, departement: Partial<Departement>): Observable<Departement> {
+        return this.api.put<Departement>(`${this.endpoint}/department-mgmt/${id}`, departement);
+    }
+
+    deleteDepartement(id: number): Observable<void> {
+        return this.api.delete<void>(`${this.endpoint}/department-mgmt/${id}`);
     }
 
     // ==================== ATTENDANCE ====================

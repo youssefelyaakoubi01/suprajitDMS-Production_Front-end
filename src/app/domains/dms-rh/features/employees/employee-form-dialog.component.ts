@@ -117,7 +117,7 @@ import { environment } from '../../../../../environments/environment';
                         </div>
 
                         <div class="form-field">
-                            <label for="dateNaissance">Date de Naissance *</label>
+                            <label for="dateNaissance">Date de Naissance</label>
                             <p-datepicker id="dateNaissance"
                                           formControlName="DateNaissance_Emp"
                                           [showIcon]="true"
@@ -476,7 +476,7 @@ export class EmployeeFormDialogComponent implements OnInit, OnChanges {
         this.form = this.fb.group({
             Prenom_Emp: ['', [Validators.required, Validators.minLength(2)]],
             Nom_Emp: ['', [Validators.required, Validators.minLength(2)]],
-            DateNaissance_Emp: [null, Validators.required],
+            DateNaissance_Emp: [null],
             Genre_Emp: ['', Validators.required],
             BadgeNumber: [''],
             DateEmbauche_Emp: [null, Validators.required],

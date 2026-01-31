@@ -64,6 +64,7 @@ import {
 import { EmployeeWithAssignment, ProductionRole, ProductionRoleOption } from '../../../../core/models/employee.model';
 import { environment } from '../../../../../environments/environment';
 import { TeamAssignmentStateService } from '../../../../core/state/team-assignment-state.service';
+import { AuthService } from '../../../../core/services/auth.service';
 
 // Export libraries
 import jsPDF from 'jspdf';
@@ -344,7 +345,8 @@ export class ProductionComponent implements OnInit, OnDestroy {
         private employeeService: EmployeeService,
         private hrService: HRService,
         private messageService: MessageService,
-        private confirmationService: ConfirmationService
+        private confirmationService: ConfirmationService,
+        private authService: AuthService
     ) {
         // Initialize mobile detection
         this.checkMobileView();
@@ -2315,12 +2317,37 @@ export class ProductionComponent implements OnInit, OnDestroy {
      */
     private recordNonQualifiedAssignment(employee: any, workstation: Workstation): void {
         const workstationId = workstation.Id_Workstation ?? workstation.id;
+        const employeeId = employee.id ?? employee.Id_Emp;
+
+        // Validate required fields
+        if (!employeeId || !workstationId) {
+            console.error('Cannot record non-qualified assignment: missing required fields', {
+                employeeId,
+                workstationId,
+                employee,
+                workstation
+            });
+            return;
+        }
+
+        const currentUser = this.authService.getCurrentUser();
         const assignment: NonQualifiedAssignmentCreate = {
-            employee_id: employee.id,
+            employee_id: employeeId,
             workstation_id: workstationId,
-            machine_id: this.selectedMachineForExplicitAssignment?.id,
             reason: 'Affectation manuelle avec qualification expirée/manquante'
         };
+
+        // Only add machine_id if it exists
+        if (this.selectedMachineForExplicitAssignment?.id) {
+            assignment.machine_id = this.selectedMachineForExplicitAssignment.id;
+        }
+
+        // Only add assigned_by if user ID exists
+        if (currentUser?.id) {
+            assignment.assigned_by = currentUser.id;
+        }
+
+        console.log('Creating non-qualified assignment:', assignment);
 
         this.hrService.createNonQualifiedAssignment(assignment).subscribe({
             next: () => {
@@ -2328,6 +2355,7 @@ export class ProductionComponent implements OnInit, OnDestroy {
             },
             error: (error) => {
                 console.error('Failed to record non-qualified assignment:', error);
+                console.error('Request payload was:', assignment);
             }
         });
     }

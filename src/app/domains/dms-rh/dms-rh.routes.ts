@@ -50,46 +50,16 @@ export const DMS_RH_ROUTES: Routes = [
         title: 'Qualifications'
     },
     {
-        path: 'versatility',
-        loadComponent: () =>
-            import('./features/versatility/versatility-matrix.component').then(m => m.VersatilityMatrixComponent),
-        title: 'Versatility Matrix'
-    },
-    {
         path: 'recyclage',
         loadComponent: () =>
             import('./features/recyclage/recyclage-list.component').then(m => m.RecyclageListComponent),
         title: 'Recyclage'
     },
     {
-        path: 'teams',
-        loadComponent: () =>
-            import('./features/teams/teams-list.component').then(m => m.TeamsListComponent),
-        title: 'Teams & Trainers'
-    },
-    {
         path: 'users',
         loadComponent: () =>
             import('./features/users/users-list.component').then(m => m.UsersListComponent),
         title: 'Users & Access'
-    },
-    {
-        path: 'licenses',
-        loadComponent: () =>
-            import('./features/licenses/licenses-manager.component').then(m => m.LicensesManagerComponent),
-        title: 'Licenses Manager'
-    },
-    {
-        path: 'workstations',
-        loadComponent: () =>
-            import('./features/workstations/workstations-manager.component').then(m => m.WorkstationsManagerComponent),
-        title: 'Workstations'
-    },
-    {
-        path: 'affectations',
-        loadComponent: () =>
-            import('./features/affectations/affectations.component').then(m => m.AffectationsComponent),
-        title: 'Workstation Assignments'
     },
     {
         path: 'qualifications-list',
@@ -114,6 +84,12 @@ export const DMS_RH_ROUTES: Routes = [
         loadComponent: () =>
             import('./features/non-qualified-assignments/non-qualified-assignments.component').then(m => m.NonQualifiedAssignmentsComponent),
         title: 'Affectations Non Qualifiées'
+    },
+    {
+        path: 'departements',
+        loadComponent: () =>
+            import('./features/departements/departements-list.component').then(m => m.DepartementsListComponent),
+        title: 'Départements'
     }
 ];
 

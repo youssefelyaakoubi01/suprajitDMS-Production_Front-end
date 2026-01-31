@@ -20,29 +20,17 @@ export * from './formations';
 // Processes
 export * from './processes';
 
-// Versatility
-export * from './versatility';
-
 // Recyclage
 export * from './recyclage';
 
-// Teams
-export * from './teams';
-
-// Workstations
-export * from './workstations';
-
 // Users
 export * from './users';
-
-// Licenses
-export * from './licenses';
-
-// Affectations
-export * from './affectations';
 
 // Qualifications
 export * from './qualifications';
 
 // Presences (synced from Production)
 export * from './presences';
+
+// Departements
+export * from './departements';

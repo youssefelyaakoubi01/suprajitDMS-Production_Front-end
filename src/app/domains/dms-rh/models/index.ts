@@ -26,3 +26,6 @@ export * from './presence.model';
 
 // Non-Qualified Assignments (Traceability)
 export * from './non-qualified-assignment.model';
+
+// Departements
+export * from './departement.model';
