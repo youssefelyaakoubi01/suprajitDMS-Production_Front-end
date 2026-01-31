@@ -446,6 +446,7 @@ export class ProductionService {
         lineId?: number;
         partId?: number;
         projectId?: number;
+        processId?: number;
     }): Observable<HourlyProduction[]> {
         // Map front-end parameter names to Django API parameter names
         const apiParams: any = {};
@@ -455,6 +456,7 @@ export class ProductionService {
         if (params?.lineId) apiParams.production_line = params.lineId;  // Django expects 'production_line'
         if (params?.partId) apiParams.part = params.partId;  // Django expects 'part'
         if (params?.projectId) apiParams.production_line__project = params.projectId;  // Django expects 'production_line__project'
+        if (params?.processId) apiParams.process = params.processId;  // Django expects 'process'
 
         return this.coreService.getHourlyProduction(apiParams).pipe(
             map((response: any) => {

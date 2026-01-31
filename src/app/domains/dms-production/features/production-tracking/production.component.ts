@@ -184,6 +184,10 @@ export class ProductionComponent implements OnInit, OnDestroy {
         { label: 'PQC', value: 'pqc', icon: 'pi pi-shield' }
     ];
 
+    // Existing Shift Detection (for pre-filling with existing data)
+    existingShiftData: any[] | null = null;
+    isExistingShift = false;
+
     // Qualification Warning Dialog (for non-qualified employees)
     showQualificationWarningDialog = false;
     pendingEmployeeAssignment: EmployeeWithAssignment | null = null;
@@ -1497,6 +1501,37 @@ export class ProductionComponent implements OnInit, OnDestroy {
             this.processes = [];
             this.parts = [];
         });
+
+        // === DÉTECTION DE SHIFT EXISTANT ===
+        // Créer un Subject pour combiner les changements des champs clés
+        const checkShiftTrigger$ = new Subject<void>();
+
+        // Écouter les changements sur les champs clés et déclencher la vérification
+        this.shiftSetupForm.get('date')?.valueChanges.pipe(
+            takeUntil(this.destroy$)
+        ).subscribe(() => checkShiftTrigger$.next());
+
+        this.shiftSetupForm.get('shift')?.valueChanges.pipe(
+            takeUntil(this.destroy$)
+        ).subscribe(() => checkShiftTrigger$.next());
+
+        this.shiftSetupForm.get('partNumber')?.valueChanges.pipe(
+            takeUntil(this.destroy$)
+        ).subscribe(() => checkShiftTrigger$.next());
+
+        this.shiftSetupForm.get('productionLine')?.valueChanges.pipe(
+            takeUntil(this.destroy$)
+        ).subscribe(() => checkShiftTrigger$.next());
+
+        this.shiftSetupForm.get('process')?.valueChanges.pipe(
+            takeUntil(this.destroy$)
+        ).subscribe(() => checkShiftTrigger$.next());
+
+        // Debounce et exécuter la vérification
+        checkShiftTrigger$.pipe(
+            debounceTime(500),
+            takeUntil(this.destroy$)
+        ).subscribe(() => this.checkForExistingShift());
     }
 
     /**
@@ -1770,6 +1805,95 @@ export class ProductionComponent implements OnInit, OnDestroy {
         });
     }
 
+    // ==================== EXISTING SHIFT DETECTION ====================
+
+    /**
+     * Vérifie si un shift avec les mêmes paramètres existe déjà
+     * Appelée quand les champs clés (date, shift, line/process, part) changent
+     */
+    checkForExistingShift(): void {
+        const formValue = this.shiftSetupForm.value;
+
+        // Vérifier que tous les champs requis sont remplis
+        if (!formValue.date || !formValue.shift || !formValue.partNumber) {
+            this.existingShiftData = null;
+            this.isExistingShift = false;
+            return;
+        }
+
+        // Vérifier la ligne OU le process selon le type de produit
+        const isSemiFinished = formValue.productType === 'semi_finished';
+        if (isSemiFinished && !formValue.process) {
+            this.existingShiftData = null;
+            this.isExistingShift = false;
+            return;
+        }
+        if (!isSemiFinished && !formValue.productionLine) {
+            this.existingShiftData = null;
+            this.isExistingShift = false;
+            return;
+        }
+
+        // Formater la date
+        const formattedDate = this.formatLocalDate(formValue.date);
+
+        // Construire les paramètres de recherche
+        const params: any = {
+            date: formattedDate,
+            shift: formValue.shift.id,
+            partId: formValue.partNumber.Id_Part
+        };
+
+        if (isSemiFinished) {
+            params.processId = formValue.process.id;
+        } else {
+            params.lineId = formValue.productionLine.id;
+        }
+
+        // Appeler l'API pour vérifier
+        this.productionService.getHourlyProductions(params).subscribe({
+            next: (productions: any[]) => {
+                if (productions && productions.length > 0) {
+                    this.existingShiftData = productions;
+                    this.isExistingShift = true;
+                    this.showExistingShiftAlert();
+                } else {
+                    this.existingShiftData = null;
+                    this.isExistingShift = false;
+                }
+            },
+            error: (err) => {
+                console.error('Error checking for existing shift:', err);
+                this.existingShiftData = null;
+                this.isExistingShift = false;
+            }
+        });
+    }
+
+    /**
+     * Affiche une alerte informant l'utilisateur que ce shift existe déjà
+     */
+    showExistingShiftAlert(): void {
+        this.messageService.add({
+            severity: 'warn',
+            summary: 'Shift déjà saisi',
+            detail: 'Ce shift existe déjà. Les données existantes seront chargées après validation.',
+            life: 5000,
+            sticky: false
+        });
+    }
+
+    /**
+     * Format a Date object to YYYY-MM-DD string using local timezone
+     * This prevents timezone conversion issues where toISOString() would shift the date
+     */
+    private formatLocalDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     // ==================== SHIFT SETUP ====================
 
     completeShiftSetup(): void {
@@ -1796,6 +1920,11 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Generate hours for the shift
         this.session.hours = this.generateShiftHours(formValue.shift, formValue.partNumber);
 
+        // Pré-remplir avec les données existantes si un shift existant a été détecté
+        if (this.isExistingShift && this.existingShiftData && this.existingShiftData.length > 0) {
+            this.prefillWithExistingData();
+        }
+
         // Sync hours with valid shift type codes (in case shiftTypes are loaded)
         this.syncHoursWithShiftTypes();
 
@@ -1805,11 +1934,63 @@ export class ProductionComponent implements OnInit, OnDestroy {
         // Update stepper to step 2 (Team Assignment)
         this.updateCurrentStep();
 
+        const message = this.isExistingShift
+            ? `${formValue.shift.name} shift chargé avec les données existantes.`
+            : `${formValue.shift.name} shift setup completed. Now assign your team.`;
+
         this.messageService.add({
             severity: 'success',
             summary: 'Setup Complete',
-            detail: `${formValue.shift.name} shift setup completed. Now assign your team.`
+            detail: message
         });
+    }
+
+    /**
+     * Pré-remplit les heures avec les données existantes du shift
+     */
+    private prefillWithExistingData(): void {
+        if (!this.existingShiftData || this.existingShiftData.length === 0) {
+            return;
+        }
+
+        console.log('Pre-filling hours with existing data:', this.existingShiftData);
+
+        this.existingShiftData.forEach((prod: any) => {
+            const hourIndex = this.session.hours.findIndex(h => h.hour === prod.Hour_HourlyProd);
+            if (hourIndex >= 0) {
+                const hour = this.session.hours[hourIndex];
+
+                // Pré-remplir les données de production
+                hour.hourlyProductionId = prod.Id_HourlyProd;
+                hour.output = prod.Result_HourlyProdPN;
+                hour.scrap = prod.Scrap_HourlyProdPN || 0;
+                hour.status = 'completed';
+                hour.efficiency = prod.Target_HourlyProdPN > 0
+                    ? Math.round((prod.Result_HourlyProdPN / prod.Target_HourlyProdPN) * 100)
+                    : 0;
+
+                // Mapper hour_type du backend
+                const backendHourType = prod.hour_type || prod.shift_type_code;
+                if (backendHourType && this.isHourTypeInOptions(backendHourType)) {
+                    hour.hourType = backendHourType;
+                }
+
+                // Charger les downtimes pour cette heure
+                if (prod.Id_HourlyProd) {
+                    this.loadDowntimesForHour(hourIndex, prod.Id_HourlyProd);
+                }
+            }
+        });
+
+        // Charger les assignments d'équipe si disponibles
+        if (this.existingShiftData.length > 0) {
+            const firstProd = this.existingShiftData[0];
+            if (firstProd.Id_HourlyProd) {
+                this.loadTeamAssignmentsPerHour(this.existingShiftData, firstProd.HC_HourlyProdPN || 0);
+            }
+        }
+
+        console.log('Hours pre-filled:', this.session.hours);
     }
 
     generateShiftHours(shift: Shift, part: Part): HourlyProductionState[] {
@@ -2446,17 +2627,27 @@ export class ProductionComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Handle workstation change in explicit assignment dialog - filter machines
+     * Handle workstation change in explicit assignment dialog - load machines by workstation
      */
     onExplicitWorkstationChange(): void {
+        this.selectedMachineForExplicitAssignment = null;
+
         if (this.selectedWorkstationForAssignment) {
-            this.filteredMachinesForExplicitAssignment = this.machines.filter(
-                m => m.workstation === this.selectedWorkstationForAssignment!.Id_Workstation
-            );
+            const wsId = this.selectedWorkstationForAssignment.Id_Workstation;
+
+            // Charger les machines directement depuis l'API par workstation
+            this.productionService.getMachines(wsId).subscribe({
+                next: (machines) => {
+                    this.filteredMachinesForExplicitAssignment = machines;
+                },
+                error: (err) => {
+                    console.error('Error loading machines for workstation:', err);
+                    this.filteredMachinesForExplicitAssignment = [];
+                }
+            });
         } else {
             this.filteredMachinesForExplicitAssignment = [];
         }
-        this.selectedMachineForExplicitAssignment = null;
     }
 
     /**
